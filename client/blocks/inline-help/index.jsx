@@ -117,7 +117,7 @@ class InlineHelp extends Component {
 			this.props.recordTracksEvent( 'calypso_inlinehelp_contact_hide' );
 		} else {
 			this.props.recordTracksEvent( 'calypso_inlinehelp_contact_show' );
-	}
+		}
 		this.setState( { showContactForm: ! this.state.showContactForm } );
 	};
 
@@ -135,7 +135,7 @@ class InlineHelp extends Component {
 				title={ translate( 'Help' ) }
 				ref={ this.inlineHelpToggleRef }
 			>
-				<Gridicon icon="help-outline" size={ 32 } />
+				<Gridicon icon="help-outline" size={ 36 } />
 				<Popover
 					isVisible={ this.state.showInlineHelp }
 					onClose={ this.closeInlineHelp }
