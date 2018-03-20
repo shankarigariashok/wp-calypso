@@ -32,6 +32,7 @@ import { managePurchase } from 'me/purchases/paths';
 import QueryContactDetailsCache from 'components/data/query-contact-details-cache';
 import QueryStoredCards from 'components/data/query-stored-cards';
 import QueryGeo from 'components/data/query-geo';
+import TermPicker from 'components/term-picker';
 import SecurePaymentForm from './secure-payment-form';
 import SecurePaymentFormPlaceholder from './secure-payment-form-placeholder';
 import { AUTO_RENEWAL } from 'lib/url/support';
@@ -60,6 +61,7 @@ import { fetchSitesAndUser } from 'lib/signup/step-actions';
 import { loadTrackingTool } from 'state/analytics/actions';
 import { getProductsList, isProductsListFetching } from 'state/products-list/selectors';
 import QueryProducts from 'components/data/query-products-list';
+import { PLAN_PREMIUM, PLAN_BUSINESS } from '../../../lib/plans/constants';
 
 const Checkout = createReactClass( {
 	displayName: 'Checkout',
@@ -479,7 +481,9 @@ const Checkout = createReactClass( {
 				selectedSite={ selectedSite }
 				redirectTo={ this.getCheckoutCompleteRedirectPath }
 				handleCheckoutCompleteRedirect={ this.handleCheckoutCompleteRedirect }
-			/>
+			>
+				<TermPicker plans={ [ PLAN_PREMIUM, PLAN_BUSINESS ] } initialValue={ PLAN_BUSINESS } />
+			</SecurePaymentForm>
 		);
 	},
 
