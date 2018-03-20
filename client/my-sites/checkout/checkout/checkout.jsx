@@ -482,8 +482,21 @@ const Checkout = createReactClass( {
 				redirectTo={ this.getCheckoutCompleteRedirectPath }
 				handleCheckoutCompleteRedirect={ this.handleCheckoutCompleteRedirect }
 			>
-				<TermPicker plans={ [ PLAN_PREMIUM, PLAN_BUSINESS ] } initialValue={ PLAN_BUSINESS } />
+				{ this.renderTermPicker() }
 			</SecurePaymentForm>
+		);
+	},
+
+	renderTermPicker() {
+		return (
+			<React.Fragment>
+				<TermPicker
+					plans={ [ PLAN_PREMIUM, PLAN_BUSINESS ] }
+					initialValue={ PLAN_BUSINESS }
+					key="picker"
+				/>
+				<hr className="term-picker-separator" key="separator" />
+			</React.Fragment>
 		);
 	},
 
