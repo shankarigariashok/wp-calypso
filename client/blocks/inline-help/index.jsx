@@ -25,7 +25,9 @@ import InlineHelpSearchCard from './inline-help-search-card';
 import HelpContact from 'me/help/help-contact';
 import { getInlineHelpSearchResultsForQuery, getSearchQuery } from 'state/inline-help/selectors';
 import { getHelpSelectedSite } from 'state/help/selectors';
+import HappychatButton from 'components/happychat/button';
 import isHappychatOpen from 'state/happychat/selectors/is-happychat-open';
+import hasActiveHappychatSession from 'state/happychat/selectors/has-active-happychat-session';
 
 /**
  * Module variables
@@ -124,71 +126,80 @@ class InlineHelp extends Component {
 	render() {
 		const { translate } = this.props;
 		const { showContactForm, showInlineHelp } = this.state;
-		const inlineHelpButtonClasses = { 'is-active': showInlineHelp };
+		const inlineHelpButtonClasses = { 'inline-help__button': true, 'is-active': showInlineHelp };
 		const popoverClasses = { 'is-help-active': showContactForm };
 		const showContactButton = abtest( 'inlineHelpWithContactForm' ) === 'inlinecontact';
 		return (
-			<Button
-				className={ classNames( 'inline-help', inlineHelpButtonClasses ) }
-				onClick={ this.handleHelpButtonClicked }
-				borderless
-				title={ translate( 'Help' ) }
-				ref={ this.inlineHelpToggleRef }
-			>
-				<Gridicon icon="help-outline" size={ 36 } />
-				<Popover
-					isVisible={ this.state.showInlineHelp }
-					onClose={ this.closeInlineHelp }
-					position="top left"
-					context={ this.inlineHelpToggle }
-					className={ classNames( 'inline-help__popover', popoverClasses ) }
+			<div className="inline-help">
+				<Button
+					className={ classNames( inlineHelpButtonClasses ) }
+					onClick={ this.handleHelpButtonClicked }
+					borderless
+					title={ translate( 'Help' ) }
+					ref={ this.inlineHelpToggleRef }
 				>
-					<div className="inline-help__search">
-						<InlineHelpSearchCard openResult={ this.openResult } query={ this.props.searchQuery } />
-						<InlineHelpSearchResults
-							openResult={ this.openResult }
-							searchQuery={ this.props.searchQuery }
-						/>
-					</div>
+					<Gridicon icon="help-outline" size={ 36 } />
+					<Popover
+						isVisible={ this.state.showInlineHelp }
+						onClose={ this.closeInlineHelp }
+						position="top left"
+						context={ this.inlineHelpToggle }
+						className={ classNames( 'inline-help__popover', popoverClasses ) }
+					>
+						<div className="inline-help__search">
+							<InlineHelpSearchCard
+								openResult={ this.openResult }
+								query={ this.props.searchQuery }
+							/>
+							<InlineHelpSearchResults
+								openResult={ this.openResult }
+								searchQuery={ this.props.searchQuery }
+							/>
+						</div>
 
-					<div className="inline-help__contact">
-						<HelpContact compact={ true } selectedSite={ this.props.selectedSite } />
-					</div>
+						<div className="inline-help__contact">
+							<HelpContact compact={ true } selectedSite={ this.props.selectedSite } />
+						</div>
 
-					<div className="inline-help__footer">
-						<Button
-							onClick={ this.moreHelpClicked }
-							className="inline-help__more-button"
-							borderless
-							href="/help"
-						>
-							<Gridicon icon="help" className="inline-help__gridicon-left" />
-							{ translate( 'More help' ) }
-						</Button>
+						<div className="inline-help__footer">
+							<Button
+								onClick={ this.moreHelpClicked }
+								className="inline-help__more-button"
+								borderless
+								href="/help"
+							>
+								<Gridicon icon="help" className="inline-help__gridicon-left" />
+								{ translate( 'More help' ) }
+							</Button>
 
-						{ showContactButton && (
+							{ showContactButton && (
+								<Button
+									onClick={ this.toggleContactForm }
+									className="inline-help__contact-button"
+									borderless
+								>
+									<Gridicon icon="chat" className="inline-help__gridicon-left" />
+									{ translate( 'Contact us' ) }
+									<Gridicon icon="chevron-right" className="inline-help__gridicon-right" />
+								</Button>
+							) }
+
 							<Button
 								onClick={ this.toggleContactForm }
-								className="inline-help__contact-button"
+								className="inline-help__cancel-button"
 								borderless
 							>
-								<Gridicon icon="chat" className="inline-help__gridicon-left" />
-								{ translate( 'Contact us' ) }
-								<Gridicon icon="chevron-right" className="inline-help__gridicon-right" />
+								<Gridicon icon="chevron-left" className="inline-help__gridicon-left" />
+								{ translate( 'Back' ) }
 							</Button>
-						) }
-
-						<Button
-							onClick={ this.toggleContactForm }
-							className="inline-help__cancel-button"
-							borderless
-						>
-							<Gridicon icon="chevron-left" className="inline-help__gridicon-left" />
-							{ translate( 'Back' ) }
-						</Button>
-					</div>
-				</Popover>
-			</Button>
+						</div>
+					</Popover>
+				</Button>
+				{ this.props.isHappychatButtonVisible &&
+					config.isEnabled( 'happychat' ) && (
+						<HappychatButton className="inline-help__happychat-button" allowMobileRedirect />
+					) }
+			</div>
 		);
 	}
 }
@@ -197,6 +208,7 @@ const mapStateToProps = ( state, ownProps ) => ( {
 	searchQuery: getSearchQuery( state ),
 	searchResults: getInlineHelpSearchResultsForQuery( state, ownProps.searchQuery ),
 	selectedSite: getHelpSelectedSite( state ),
+	isHappychatButtonVisible: hasActiveHappychatSession( state ),
 	isHappychatOpen: isHappychatOpen( state ),
 } );
 
