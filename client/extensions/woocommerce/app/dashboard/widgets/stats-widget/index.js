@@ -9,7 +9,7 @@ import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
-import { sortBy, find } from 'lodash';
+import { find } from 'lodash';
 
 /**
  * Internal dependencies
@@ -35,6 +35,7 @@ import QueryPreferences from 'components/data/query-preferences';
 import QuerySiteStats from 'components/data/query-site-stats';
 import { savePreference } from 'state/preferences/actions';
 import SelectDropdown from 'components/select-dropdown';
+import { sortBySales } from 'woocommerce/app/store-stats/referrers/helpers';
 import Stat from './stat';
 
 class StatsWidget extends Component {
@@ -197,6 +198,9 @@ class StatsWidget extends Component {
 			<Stat
 				site={ site }
 				label={ translate( 'Conversion rate' ) }
+				labelToolTip={ translate( 'Number of orders by unique visitors', {
+					context: 'Conversion rate tooltip',
+				} ) }
 				data={ data || [] }
 				delta={ delta }
 				date={ date }
@@ -212,9 +216,8 @@ class StatsWidget extends Component {
 		const { site, translate, unit, referrerData, queries } = this.props;
 		const { referrerQuery } = queries;
 
-		const row = find( referrerData, d => d.date === referrerQuery.date );
-		const fetchedData =
-			( row && sortBy( row.data, r => -r.sales ).slice( 0, dashboardListLimit ) ) || [];
+		const selectedData = find( referrerData, d => d.date === referrerQuery.date ) || { data: [] };
+		const sortedData = sortBySales( selectedData.data, dashboardListLimit );
 
 		const values = [
 			{ key: 'referrer', title: translate( 'Referrer' ), format: 'text' },
@@ -242,7 +245,7 @@ class StatsWidget extends Component {
 				query={ referrerQuery }
 				viewText={ translate( 'View referrers' ) }
 				viewLink={ viewLink }
-				fetchedData={ fetchedData }
+				fetchedData={ sortedData }
 				emptyMessage={ emptyMessage }
 			/>
 		);
