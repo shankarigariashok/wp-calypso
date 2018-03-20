@@ -13,7 +13,7 @@ import ActivityQueryManager from 'lib/query-manager/activity';
 import { ACTIVITY_LOG_UPDATE, DESERIALIZE, SERIALIZE } from 'state/action-types';
 import { useSandbox } from 'test/helpers/use-sinon';
 
-const SITE_ID = 123456789;
+const SITE_ID = '123456789';
 const ACTIVITY_ID = 'foobarbaz';
 const ACTIVITY_ITEM = deepFreeze( {
 	activityDate: '2017-08-27T00:00:59+00:00',
