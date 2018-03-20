@@ -13,7 +13,7 @@ import { moment, translate } from 'i18n-calypso';
 import AsyncLoad from 'components/async-load';
 import StatsPagePlaceholder from 'my-sites/stats/stats-page-placeholder';
 import { setDocumentHeadTitle as setTitle } from 'state/document-head/actions';
-import { getQueryDate, getUnitPeriod } from './utils';
+import { getQueryDate, getUnitPeriod, getQueries } from './utils';
 import analytics from 'lib/analytics';
 import titlecase from 'to-title-case';
 import { recordTrack } from 'woocommerce/lib/analytics';
@@ -99,16 +99,12 @@ export default function StatsController( context, next ) {
 			);
 			break;
 		case 'referrers':
-			const referrersQuery = {
-				unit: props.unit,
-				date: getUnitPeriod( props.queryDate, props.unit ),
-				quantity: UNITS[ props.unit ].quantity,
-			};
+			const { referrerQuery } = getQueries( props.unit, props.queryDate );
 			asyncComponent = (
 				<AsyncLoad
 					placeholder={ placeholder }
 					require="extensions/woocommerce/app/store-stats/referrers"
-					query={ referrersQuery }
+					query={ referrerQuery }
 					{ ...props }
 				/>
 			);
