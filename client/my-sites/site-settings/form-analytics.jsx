@@ -24,20 +24,25 @@ import FormSettingExplanation from 'components/forms/form-setting-explanation';
 import FormTextInput from 'components/forms/form-text-input';
 import FormTextValidation from 'components/forms/form-input-validation';
 import FormAnalyticsStores from './form-analytics-stores';
+import JetpackModuleToggle from 'my-sites/site-settings/jetpack-module-toggle';
 import Notice from 'components/notice';
 import NoticeAction from 'components/notice/notice-action';
-import { isBusiness, isEnterprise, isJetpackBusiness } from 'lib/products-values';
-import { activateModule } from 'state/jetpack/modules/actions';
+import { isBusiness, isEnterprise, isJetpackBusiness, isJetpackPremium } from 'lib/products-values';
 import {
 	getSiteOption,
 	isJetpackMinimumVersion,
 	isJetpackSite,
 	siteSupportsGoogleAnalyticsIPAnonymization,
 	siteSupportsGoogleAnalyticsBasicEcommerceTracking,
+	siteSupportsGoogleAnalyticsEnhancedEcommerceTracking,
 } from 'state/sites/selectors';
 import { isJetpackModuleActive } from 'state/selectors';
 import { getSelectedSite, getSelectedSiteId, getSelectedSiteSlug } from 'state/ui/selectors';
-import { FEATURE_GOOGLE_ANALYTICS, PLAN_BUSINESS } from 'lib/plans/constants';
+import {
+	FEATURE_GOOGLE_ANALYTICS,
+	PLAN_BUSINESS,
+	PLAN_JETPACK_BUSINESS,
+} from 'lib/plans/constants';
 import QueryJetpackModules from 'components/data/query-jetpack-modules';
 
 const validateGoogleAnalyticsCode = code => ! code || code.match( /^UA-\d+-\d+$/i );
@@ -55,7 +60,7 @@ class GoogleAnalyticsForm extends Component {
 	};
 
 	handleCodeChange = event => {
-		const code = event.target.value;
+		const code = event.target.value.trim();
 
 		this.setState( {
 			isCodeValid: validateGoogleAnalyticsCode( code ),
@@ -91,7 +96,6 @@ class GoogleAnalyticsForm extends Component {
 			handleSubmitForm,
 			isRequestingSettings,
 			isSavingSettings,
-			jetpackModuleActive,
 			jetpackVersionSupportsModule,
 			showUpgradeNudge,
 			site,
@@ -100,11 +104,11 @@ class GoogleAnalyticsForm extends Component {
 			siteIsJetpack,
 			siteSlug,
 			siteSupportsBasicEcommerceTracking,
+			siteSupportsEnhancedEcommerceTracking,
 			siteSupportsIPAnonymization,
 			translate,
 			uniqueEventTracker,
 		} = this.props;
-		const activateGoogleAnalytics = () => this.props.activateModule( siteId, 'google-analytics' );
 		const placeholderText = isRequestingSettings ? translate( 'Loading' ) : '';
 		const isJetpackUnsupported = siteIsJetpack && ! jetpackVersionSupportsModule;
 		const analyticsSupportUrl = siteIsJetpack
@@ -122,13 +126,17 @@ class GoogleAnalyticsForm extends Component {
 			config.isEnabled( 'jetpack/google-analytics-anonymize-ip' ) &&
 			siteIsJetpack &&
 			siteSupportsIPAnonymization;
+		const showEnhancedAnalyticsForStores =
+			config.isEnabled( 'jetpack/google-analytics-for-stores-enhanced' ) &&
+			siteIsJetpack &&
+			siteSupportsEnhancedEcommerceTracking;
 
 		const nudgeTitle = siteIsJetpack
 			? translate( 'Enable Google Analytics by upgrading to Jetpack Professional' )
 			: translate( 'Enable Google Analytics by upgrading to the Business plan' );
 
 		return (
-			<form id="site-settings" onSubmit={ handleSubmitForm }>
+			<form id="analytics" onSubmit={ handleSubmitForm }>
 				{ siteIsJetpack && <QueryJetpackModules siteId={ siteId } /> }
 
 				{ isJetpackUnsupported &&
@@ -140,21 +148,6 @@ class GoogleAnalyticsForm extends Component {
 						>
 							<NoticeAction href={ `/plugins/jetpack/${ siteSlug }` }>
 								{ translate( 'Update Now' ) }
-							</NoticeAction>
-						</Notice>
-					) }
-
-				{ siteIsJetpack &&
-					jetpackModuleActive === false &&
-					! isJetpackUnsupported &&
-					! showUpgradeNudge && (
-						<Notice
-							status="is-warning"
-							showDismiss={ false }
-							text={ translate( 'The Google Analytics module is disabled in Jetpack.' ) }
-						>
-							<NoticeAction onClick={ activateGoogleAnalytics }>
-								{ translate( 'Enable' ) }
 							</NoticeAction>
 						</Notice>
 					) }
@@ -179,11 +172,24 @@ class GoogleAnalyticsForm extends Component {
 						) }
 						event={ 'google_analytics_settings' }
 						feature={ FEATURE_GOOGLE_ANALYTICS }
-						plan={ PLAN_BUSINESS }
+						plan={ siteIsJetpack ? PLAN_JETPACK_BUSINESS : PLAN_BUSINESS }
 						title={ nudgeTitle }
 					/>
 				) : (
 					<Card className="analytics-settings site-settings__analytics-settings">
+						{ siteIsJetpack && (
+							<fieldset>
+								<JetpackModuleToggle
+									siteId={ siteId }
+									moduleSlug="google-analytics"
+									label={ translate(
+										'Track your WordPress site statistics with Google Analytics.'
+									) }
+									disabled={ isRequestingSettings || isSavingSettings }
+								/>
+							</fieldset>
+						) }
+
 						<fieldset>
 							<FormLabel htmlFor="wgaCode">
 								{ translate( 'Google Analytics Tracking ID', { context: 'site setting' } ) }
@@ -228,6 +234,14 @@ class GoogleAnalyticsForm extends Component {
 										'Enabling this option is mandatory in certain countries due to national ' +
 											'privacy laws.'
 									) }
+									<ExternalLink
+										icon
+										href="https://support.google.com/analytics/answer/2763052"
+										target="_blank"
+										rel="noopener noreferrer"
+									>
+										{ translate( 'Learn more' ) }
+									</ExternalLink>
 								</FormSettingExplanation>
 							</fieldset>
 						) }
@@ -235,6 +249,7 @@ class GoogleAnalyticsForm extends Component {
 							<FormAnalyticsStores
 								fields={ fields }
 								handleToggleChange={ this.handleToggleChange }
+								showEnhanced={ showEnhancedAnalyticsForStores }
 							/>
 						) }
 						<p>
@@ -281,12 +296,17 @@ const mapStateToProps = state => {
 	const site = getSelectedSite( state );
 	const siteId = getSelectedSiteId( state );
 	const siteSlug = getSelectedSiteSlug( state );
-	const isGoogleAnalyticsEligible = site && site.plan && hasBusinessPlan( site.plan );
+	const isGoogleAnalyticsEligible =
+		site && site.plan && ( hasBusinessPlan( site.plan ) || isJetpackPremium( site.plan ) );
 	const jetpackManagementUrl = getSiteOption( state, siteId, 'admin_url' );
 	const jetpackModuleActive = isJetpackModuleActive( state, siteId, 'google-analytics' );
 	const jetpackVersionSupportsModule = isJetpackMinimumVersion( state, siteId, '4.6-alpha' );
 	const siteSupportsIPAnonymization = siteSupportsGoogleAnalyticsIPAnonymization( state, siteId );
 	const siteSupportsBasicEcommerceTracking = siteSupportsGoogleAnalyticsBasicEcommerceTracking(
+		state,
+		siteId
+	);
+	const siteSupportsEnhancedEcommerceTracking = siteSupportsGoogleAnalyticsEnhancedEcommerceTracking(
 		state,
 		siteId
 	);
@@ -304,22 +324,15 @@ const mapStateToProps = state => {
 		showUpgradeNudge: ! isGoogleAnalyticsEligible,
 		enableForm: isGoogleAnalyticsEligible && googleAnalyticsEnabled,
 		jetpackManagementUrl,
-		jetpackModuleActive,
 		jetpackVersionSupportsModule,
 		sitePlugins,
 		siteSupportsBasicEcommerceTracking,
+		siteSupportsEnhancedEcommerceTracking,
 		siteSupportsIPAnonymization,
 	};
 };
 
-const connectComponent = connect(
-	mapStateToProps,
-	{
-		activateModule,
-	},
-	null,
-	{ pure: false }
-);
+const connectComponent = connect( mapStateToProps, null, null, { pure: false } );
 
 const getFormSettings = partialRight( pick, [ 'wga' ] );
 

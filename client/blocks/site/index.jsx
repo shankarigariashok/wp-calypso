@@ -76,6 +76,7 @@ class Site extends React.Component {
 			return null;
 		}
 
+		// Note: Update CSS selectors in SiteSelector.scrollToHighlightedSite() if the class names change.
 		const siteClass = classnames( {
 			site: true,
 			'is-jetpack': site.jetpack,
@@ -95,25 +96,21 @@ class Site extends React.Component {
 					data-tip-target={ this.props.tipTarget }
 					target={ this.props.externalLink && '_blank' }
 					title={
-						this.props.homeLink ? (
-							translate( 'View site %(domain)s', {
-								args: { domain: site.domain },
-							} )
-						) : (
-							site.domain
-						)
+						this.props.homeLink
+							? translate( 'View site %(domain)s', {
+									args: { domain: site.domain },
+								} )
+							: site.domain
 					}
 					onClick={ this.onSelect }
 					onMouseEnter={ this.onMouseEnter }
 					onMouseLeave={ this.onMouseLeave }
 					aria-label={
-						this.props.homeLink ? (
-							translate( 'View site %(domain)s', {
-								args: { domain: site.domain },
-							} )
-						) : (
-							site.domain
-						)
+						this.props.homeLink
+							? translate( 'View site %(domain)s', {
+									args: { domain: site.domain },
+								} )
+							: site.domain
 					}
 				>
 					<SiteIcon site={ site } size={ this.props.compact ? 24 : 32 } />

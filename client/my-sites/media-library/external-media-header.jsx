@@ -31,6 +31,8 @@ class MediaLibraryExternalHeader extends React.Component {
 		selectedItems: PropTypes.array,
 		onSourceChange: PropTypes.func,
 		sticky: PropTypes.bool,
+		hasAttribution: PropTypes.bool,
+		hasRefreshButton: PropTypes.bool,
 	};
 
 	constructor( props ) {
@@ -111,16 +113,30 @@ class MediaLibraryExternalHeader extends React.Component {
 		);
 	}
 
+	renderPexelsAttribution() {
+		const { translate } = this.props;
+		const attribution = translate( 'Photos provided by {{a}}Pexels{{/a}}', {
+			components: {
+				a: <a href="https://www.pexels.com/" rel="noopener noreferrer" target="_blank" />,
+			},
+		} );
+		return <span className="media-library__pexels-attribution">{ attribution }</span>;
+	}
+
 	renderCard() {
-		const { onMediaScaleChange, translate, canCopy } = this.props;
+		const { onMediaScaleChange, translate, canCopy, hasRefreshButton, hasAttribution } = this.props;
 
 		return (
 			<Card className="media-library__header">
-				<Button compact disabled={ this.state.fetching } onClick={ this.handleClick }>
-					<Gridicon icon="refresh" size={ 24 } />
+				{ hasAttribution && this.renderPexelsAttribution() }
 
-					{ translate( 'Refresh' ) }
-				</Button>
+				{ hasRefreshButton && (
+					<Button compact disabled={ this.state.fetching } onClick={ this.handleClick }>
+						<Gridicon icon="refresh" size={ 24 } />
+
+						{ translate( 'Refresh' ) }
+					</Button>
+				) }
 
 				{ canCopy && this.renderCopyButton() }
 

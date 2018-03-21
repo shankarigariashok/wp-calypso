@@ -5,53 +5,27 @@
  */
 import { expect } from 'chai';
 import { spy } from 'sinon';
+import { noop } from 'lodash';
 
 /**
  * Internal dependencies
  */
-import { fetchProductCategories } from '../actions';
-import useNock from 'test/helpers/use-nock';
+import {
+	fetchProductCategories,
+	createProductCategory,
+	updateProductCategory,
+	deleteProductCategory,
+} from '../actions';
 import {
 	WOOCOMMERCE_PRODUCT_CATEGORIES_REQUEST,
-	WOOCOMMERCE_PRODUCT_CATEGORIES_REQUEST_SUCCESS,
-	WOOCOMMERCE_ERROR_SET,
+	WOOCOMMERCE_PRODUCT_CATEGORY_CREATE,
+	WOOCOMMERCE_PRODUCT_CATEGORY_UPDATE,
+	WOOCOMMERCE_PRODUCT_CATEGORY_DELETE,
 } from 'woocommerce/state/action-types';
 
 describe( 'actions', () => {
 	describe( '#fetchProductCategories()', () => {
 		const siteId = '123';
-		const errorSiteId = '234';
-
-		useNock( nock => {
-			nock( 'https://public-api.wordpress.com:443' )
-				.persist()
-				.get( '/rest/v1.1/jetpack-blogs/123/rest-api/' )
-				.query( { path: '/wc/v3/products/categories' } )
-				.reply( 200, {
-					data: [
-						{
-							id: 10,
-							name: 'Tops',
-							slug: 'tops',
-							description: '',
-							display: 'default',
-						},
-					],
-				} )
-				.get( '/rest/v1.1/jetpack-blogs/234/rest-api/' )
-				.query( { path: '/wc/v2/products/categories' } )
-				.reply( 200, {
-					data: [
-						{
-							id: '1',
-							name: 'Error',
-							slug: false,
-							description: '',
-							display: 'default',
-						},
-					],
-				} );
-		} );
 
 		test( 'should dispatch an action', () => {
 			const getState = () => ( {} );
@@ -60,38 +34,63 @@ describe( 'actions', () => {
 			expect( dispatch ).to.have.been.calledWith( {
 				type: WOOCOMMERCE_PRODUCT_CATEGORIES_REQUEST,
 				siteId,
+				query: {},
 			} );
 		} );
+	} );
+	describe( 'createProductCategory()', () => {
+		const siteId = 123;
+		const newCategory = {
+			id: { placeholder: 'productcat_1' },
+			name: 'Test',
+			description: 'Test',
+		};
 
-		test( 'should dispatch a success action with product category information when request completes', () => {
-			const getState = () => ( {} );
-			const dispatch = spy();
-			const response = fetchProductCategories( siteId )( dispatch, getState );
-
-			return response.then( () => {
-				expect( dispatch ).to.have.been.calledWith( {
-					type: WOOCOMMERCE_PRODUCT_CATEGORIES_REQUEST_SUCCESS,
-					siteId,
-					data: [
-						{
-							id: 10,
-							name: 'Tops',
-							slug: 'tops',
-							description: '',
-							display: 'default',
-						},
-					],
-				} );
+		test( 'should dispatch an action', () => {
+			const action = createProductCategory( siteId, newCategory, noop, noop );
+			expect( action ).to.eql( {
+				type: WOOCOMMERCE_PRODUCT_CATEGORY_CREATE,
+				siteId: 123,
+				category: newCategory,
+				successAction: noop,
+				failureAction: noop,
 			} );
 		} );
+	} );
+	describe( '#updateProductCategory()', () => {
+		const siteId = 123;
+		const updatedCategory = {
+			id: 40,
+			description: 'Updated',
+		};
 
-		test( 'should dispatch error action if the data is invalid', () => {
-			const getState = () => ( {} );
-			const dispatch = spy();
-			const response = fetchProductCategories( errorSiteId )( dispatch, getState );
+		test( 'should dispatch an action', () => {
+			const action = updateProductCategory( siteId, updatedCategory, noop, noop );
+			expect( action ).to.eql( {
+				type: WOOCOMMERCE_PRODUCT_CATEGORY_UPDATE,
+				siteId: 123,
+				category: updatedCategory,
+				successAction: noop,
+				failureAction: noop,
+			} );
+		} );
+	} );
+	describe( '#deleteProductCategory()', () => {
+		const siteId = 123;
+		const category = {
+			id: 40,
+			name: 'Test',
+			slug: 'test',
+		};
 
-			return response.then( () => {
-				expect( dispatch ).to.have.been.calledWithMatch( { type: WOOCOMMERCE_ERROR_SET } );
+		test( 'should dispatch an action', () => {
+			const action = deleteProductCategory( siteId, category, noop, noop );
+			expect( action ).to.eql( {
+				type: WOOCOMMERCE_PRODUCT_CATEGORY_DELETE,
+				siteId: 123,
+				category,
+				successAction: noop,
+				failureAction: noop,
 			} );
 		} );
 	} );

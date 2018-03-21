@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import React from 'react';
 import page from 'page';
 import i18n from 'i18n-calypso';
@@ -12,18 +10,25 @@ import { find, pick } from 'lodash';
 /**
  * Internal Dependencies
  */
-import route from 'lib/route';
+import { getSiteFragment, getStatsDefaultSitePage, sectionify } from 'lib/route';
 import analytics from 'lib/analytics';
+import { recordPlaceholdersTiming } from 'lib/perfmon';
 import titlecase from 'to-title-case';
 import { setDocumentHeadTitle as setTitle } from 'state/document-head/actions';
-import { renderWithReduxStore } from 'lib/react-helpers';
 import { savePreference } from 'state/preferences/actions';
 import { getSite, isJetpackSite, getSiteOption } from 'state/sites/selectors';
 import { getCurrentLayoutFocus } from 'state/ui/layout-focus/selectors';
 import { setNextLayoutFocus } from 'state/ui/layout-focus/actions';
 import { getSelectedSiteId } from 'state/ui/selectors';
-import AsyncLoad from 'components/async-load';
-import StatsPagePlaceholder from 'my-sites/stats/stats-page-placeholder';
+import FollowList from 'lib/follow-list';
+import StatsInsights from './stats-insights';
+import StatsOverview from './overview';
+import StatsSite from './site';
+import StatsSummary from './summary';
+import StatsPostDetail from './stats-post-detail';
+import StatsCommentFollows from './comment-follows';
+import ActivityLog from './activity-log';
+
 const analyticsPageTitle = 'Stats';
 
 function rangeOfPeriod( period, date ) {
@@ -112,42 +117,28 @@ export default {
 	},
 
 	redirectToDefaultSitePage: function( context, next ) {
-		const siteFragment = route.getSiteFragment( context.path );
+		const siteFragment = getSiteFragment( context.path );
 
 		if ( siteFragment ) {
 			// if we are redirecting we need to retain our intended layout-focus
 			const currentLayoutFocus = getCurrentLayoutFocus( context.store.getState() );
 			context.store.dispatch( setNextLayoutFocus( currentLayoutFocus ) );
-			page.redirect( route.getStatsDefaultSitePage( siteFragment ) );
+			page.redirect( getStatsDefaultSitePage( siteFragment ) );
 		} else {
 			next();
 		}
 	},
 
-	insights: function( context ) {
-		const FollowList = require( 'lib/follow-list' );
-		let siteId = context.params.site_id;
-		const basePath = route.sectionify( context.path );
-		const followList = new FollowList();
+	insights: function( context, next ) {
+		const basePath = sectionify( context.path );
 
 		// FIXME: Auto-converted from the Flux setTitle action. Please use <DocumentHead> instead.
 		context.store.dispatch( setTitle( i18n.translate( 'Stats', { textOnly: true } ) ) );
 
-		const site = getSite( context.store.getState(), siteId );
-		siteId = site ? site.ID || 0 : 0;
-
 		analytics.pageView.record( basePath, analyticsPageTitle + ' > Insights' );
 
-		const props = { followList };
-		renderWithReduxStore(
-			<AsyncLoad
-				require="my-sites/stats/stats-insights"
-				placeholder={ <StatsPagePlaceholder /> }
-				{ ...props }
-			/>,
-			document.getElementById( 'primary' ),
-			context.store
-		);
+		context.primary = <StatsInsights followList={ new FollowList() } />;
+		next();
 	},
 
 	overview: function( context, next ) {
@@ -170,7 +161,7 @@ export default {
 				{ title: i18n.translate( 'Years' ), path: '/stats/year', id: 'stats-year', period: 'year' },
 			];
 		};
-		const basePath = route.sectionify( context.path );
+		const basePath = sectionify( context.path );
 
 		window.scrollTo( 0, 0 );
 
@@ -198,15 +189,8 @@ export default {
 				period: activeFilter.period,
 				path: context.pathname,
 			};
-			renderWithReduxStore(
-				<AsyncLoad
-					placeholder={ <StatsPagePlaceholder /> }
-					require="my-sites/stats/overview"
-					{ ...props }
-				/>,
-				document.getElementById( 'primary' ),
-				context.store
-			);
+			context.primary = <StatsOverview { ...props } />;
+			next();
 		}
 	},
 
@@ -218,7 +202,7 @@ export default {
 		let chartTab;
 		let period;
 		let numPeriodAgo = 0;
-		const basePath = route.sectionify( context.path );
+		const basePath = sectionify( context.path );
 		let baseAnalyticsPath;
 
 		// FIXME: Auto-converted from the Flux setTitle action. Please use <DocumentHead> instead.
@@ -270,11 +254,12 @@ export default {
 				baseAnalyticsPath,
 				analyticsPageTitle + ' > ' + titlecase( activeFilter.period )
 			);
+			recordPlaceholdersTiming();
 
 			period = rangeOfPeriod( activeFilter.period, date );
 			chartTab = queryOptions.tab || 'views';
 
-			const siteComponentChildren = {
+			const props = {
 				path: context.pathname,
 				date,
 				chartTab,
@@ -282,21 +267,14 @@ export default {
 				period,
 			};
 
-			renderWithReduxStore(
-				<AsyncLoad
-					placeholder={ <StatsPagePlaceholder /> }
-					require="my-sites/stats/site"
-					{ ...siteComponentChildren }
-				/>,
-				document.getElementById( 'primary' ),
-				context.store
-			);
+			context.primary = <StatsSite { ...props } />;
+			next();
 		}
 	},
 
 	summary: function( context, next ) {
 		let siteId = context.params.site_id;
-		const siteFragment = route.getSiteFragment( context.path );
+		const siteFragment = getSiteFragment( context.path );
 		const queryOptions = context.query;
 		const contextModule = context.params.module;
 		const filters = [
@@ -323,9 +301,10 @@ export default {
 			'videodetails',
 			'podcastdownloads',
 			'searchterms',
+			'annualstats',
 		];
 		let momentSiteZone = i18n.moment();
-		const basePath = route.sectionify( context.path );
+		const basePath = sectionify( context.path );
 
 		const site = getSite( context.store.getState(), siteId );
 		siteId = site ? site.ID || 0 : 0;
@@ -384,19 +363,12 @@ export default {
 				period,
 				...extraProps,
 			};
-			renderWithReduxStore(
-				<AsyncLoad
-					placeholder={ <StatsPagePlaceholder /> }
-					require="my-sites/stats/summary"
-					{ ...props }
-				/>,
-				document.getElementById( 'primary' ),
-				context.store
-			);
+			context.primary = <StatsSummary { ...props } />;
+			next();
 		}
 	},
 
-	post: function( context ) {
+	post: function( context, next ) {
 		let siteId = context.params.site_id;
 		const postId = parseInt( context.params.post_id, 10 );
 		const pathParts = context.path.split( '/' );
@@ -418,30 +390,22 @@ export default {
 				postId,
 				context,
 			};
-			renderWithReduxStore(
-				<AsyncLoad
-					placeholder={ <StatsPagePlaceholder /> }
-					require="my-sites/stats/stats-post-detail"
-					{ ...props }
-				/>,
-				document.getElementById( 'primary' ),
-				context.store
-			);
+			context.primary = <StatsPostDetail { ...props } />;
 		}
+		next();
 	},
 
-	follows: function( context ) {
+	follows: function( context, next ) {
 		let siteId = context.params.site_id;
-		const FollowList = require( 'lib/follow-list' );
 		let pageNum = context.params.page_num;
 		const followList = new FollowList();
-		const basePath = route.sectionify( context.path );
+		const basePath = sectionify( context.path );
 
 		const site = getSite( context.store.getState(), siteId );
 		siteId = site ? site.ID || 0 : 0;
 
 		const siteDomain =
-			site && typeof site.slug !== 'undefined' ? site.slug : route.getSiteFragment( context.path );
+			site && typeof site.slug !== 'undefined' ? site.slug : getSiteFragment( context.path );
 
 		if ( 0 === siteId ) {
 			window.location = '/stats';
@@ -466,19 +430,12 @@ export default {
 				siteId,
 				followList,
 			};
-			renderWithReduxStore(
-				<AsyncLoad
-					placeholder={ <StatsPagePlaceholder /> }
-					require="my-sites/stats/comment-follows"
-					{ ...props }
-				/>,
-				document.getElementById( 'primary' ),
-				context.store
-			);
+			context.primary = <StatsCommentFollows { ...props } />;
 		}
+		next();
 	},
 
-	activityLog: function( context ) {
+	activityLog: function( context, next ) {
 		const state = context.store.getState();
 		const siteId = getSelectedSiteId( state );
 		const isJetpack = isJetpackSite( state, siteId );
@@ -497,15 +454,8 @@ export default {
 				context,
 				startDate,
 			};
-			renderWithReduxStore(
-				<AsyncLoad
-					placeholder={ <StatsPagePlaceholder /> }
-					require="my-sites/stats/activity-log"
-					{ ...props }
-				/>,
-				document.getElementById( 'primary' ),
-				context.store
-			);
+			context.primary = <ActivityLog { ...props } />;
 		}
+		next();
 	},
 };

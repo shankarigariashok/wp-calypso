@@ -6,12 +6,12 @@
 /**
  * External dependencies
  */
-import assert from 'assert';
+import assert from 'assert'; // eslint-disable-line import/no-nodejs-modules
 
 /**
  * Internal dependencies
  */
-import postUtils from '../utils';
+import * as postUtils from '../utils';
 
 jest.mock( 'lib/wp', () => require( './mocks/lib/wp' ) );
 

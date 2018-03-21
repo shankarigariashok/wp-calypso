@@ -7,6 +7,7 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
+import { isEmpty } from 'lodash';
 import { localize } from 'i18n-calypso';
 import { bindActionCreators } from 'redux';
 
@@ -38,7 +39,7 @@ class FormStateSelectFromApi extends Component {
 		onChange: PropTypes.func.isRequired,
 		siteId: PropTypes.number.isRequired,
 		translate: PropTypes.func.isRequired,
-		value: PropTypes.string.isRequired,
+		value: PropTypes.string,
 	};
 
 	componentWillMount() {
@@ -74,7 +75,7 @@ class FormStateSelectFromApi extends Component {
 	renderDisabled = () => {
 		const { translate } = this.props;
 		return (
-			<FormSelect disabled>
+			<FormSelect autoComplete="off" disabled>
 				<option>
 					{ translate( 'N/A', { comment: "The currently-selected country doesn't have states" } ) }
 				</option>
@@ -95,7 +96,13 @@ class FormStateSelectFromApi extends Component {
 				{ isLoaded && ! locationsList.length ? (
 					this.renderDisabled()
 				) : (
-					<FormSelect id="state" name="state" onChange={ onChange } value={ value }>
+					<FormSelect
+						autoComplete="address-level1"
+						id="state"
+						name="state"
+						onChange={ onChange }
+						value={ value }
+					>
 						<option key="default" value="" disabled>
 							{ translate( 'Select State', {
 								comment: 'Label for customer address, state/province dropdown',
@@ -113,10 +120,17 @@ export default connect(
 	( state, props ) => {
 		const address = getStoreLocation( state );
 		const areSettingsLoaded = areSettingsGeneralLoaded( state );
+
 		let { country, value } = props;
-		// If value or country are empty, use the store's address
-		country = ! country ? address.country : country;
-		value = ! value ? address.state : value;
+		// If (state) value or country are empty, use the store's address
+		// Note: We only want to use te store's state if we are using
+		// the store's country, to avoid potential country-state mismatch
+		if ( isEmpty( country ) ) {
+			country = address.country; // use the store's country
+			if ( isEmpty( value ) ) {
+				value = address.state; // use the store's state
+			}
+		}
 
 		const site = getSelectedSiteWithFallback( state );
 		const siteId = site.ID || null;
@@ -125,6 +139,7 @@ export default connect(
 
 		return {
 			areSettingsLoaded,
+			country,
 			isLoaded,
 			locationsList,
 			siteId,

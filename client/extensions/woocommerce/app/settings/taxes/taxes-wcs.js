@@ -7,7 +7,6 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { bindActionCreators } from 'redux';
-import classNames from 'classnames';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
 
@@ -18,6 +17,7 @@ import ActionHeader from 'woocommerce/components/action-header';
 import {
 	areSettingsGeneralLoaded,
 	areTaxCalculationsEnabled,
+	getShipToCountrySetting,
 } from 'woocommerce/state/sites/settings/general/selectors';
 import {
 	areTaxSettingsLoaded,
@@ -25,18 +25,18 @@ import {
 	getShippingIsTaxFree,
 } from 'woocommerce/state/sites/settings/tax/selectors';
 import ExtendedHeader from 'woocommerce/components/extended-header';
-import { updateTaxesEnabledSetting } from 'woocommerce/state/sites/settings/general/actions';
-import QuerySettingsGeneral from 'woocommerce/components/query-settings-general';
 import { fetchTaxRates } from 'woocommerce/state/sites/meta/taxrates/actions';
 import { fetchTaxSettings, updateTaxSettings } from 'woocommerce/state/sites/settings/tax/actions';
 import { getLink } from 'woocommerce/lib/nav-utils';
-import Main from 'components/main';
-import TaxSettingsSaveButton from './save-button';
+import { ProtectFormGuard } from 'lib/protect-form';
+import QuerySettingsGeneral from 'woocommerce/components/query-settings-general';
 import SettingsNavigation from '../navigation';
 import { successNotice, errorNotice } from 'state/notices/actions';
 import StoreAddress from 'woocommerce/components/store-address';
 import TaxesOptions from './taxes-options';
 import TaxesRates from './taxes-rates';
+import TaxSettingsSaveButton from './save-button';
+import { updateTaxesEnabledSetting } from 'woocommerce/state/sites/settings/general/actions';
 
 class SettingsTaxesWooCommerceServices extends Component {
 	constructor( props ) {
@@ -44,9 +44,9 @@ class SettingsTaxesWooCommerceServices extends Component {
 		this.state = {
 			isSaving: false,
 			pricesIncludeTaxes: props.pricesIncludeTaxes,
+			pristine: true,
 			shippingIsTaxable: props.shippingIsTaxable,
 			taxesEnabled: props.taxesEnabled,
-			userBeganEditing: false,
 		};
 	}
 
@@ -58,6 +58,9 @@ class SettingsTaxesWooCommerceServices extends Component {
 		siteSlug: PropTypes.string.isRequired,
 		siteId: PropTypes.number.isRequired,
 		taxesEnabled: PropTypes.bool,
+		shipToCountry: PropTypes.shape( {
+			value: PropTypes.string,
+		} ),
 	};
 
 	componentDidMount = () => {
@@ -69,34 +72,28 @@ class SettingsTaxesWooCommerceServices extends Component {
 	};
 
 	componentWillReceiveProps = newProps => {
-		if ( ! this.state.userBeganEditing ) {
-			const { siteId } = this.props;
-			const newSiteId = newProps.siteId || null;
-			const oldSiteId = siteId || null;
-			if ( oldSiteId !== newSiteId ) {
-				this.props.fetchTaxSettings( newSiteId );
-			}
-
-			this.setState( {
-				pricesIncludeTaxes: newProps.pricesIncludeTaxes,
-				shippingIsTaxable: newProps.shippingIsTaxable,
-				taxesEnabled: newProps.taxesEnabled,
-			} );
+		const { siteId } = this.props;
+		const newSiteId = newProps.siteId || null;
+		const oldSiteId = siteId || null;
+		if ( oldSiteId !== newSiteId ) {
+			this.props.fetchTaxSettings( newSiteId );
 		}
+
+		this.setState( {
+			pricesIncludeTaxes: newProps.pricesIncludeTaxes,
+			shippingIsTaxable: newProps.shippingIsTaxable,
+			taxesEnabled: newProps.taxesEnabled,
+		} );
 	};
 
 	onEnabledChange = () => {
-		this.setState( { taxesEnabled: ! this.state.taxesEnabled, userBeganEditing: true } );
+		this.setState( { taxesEnabled: ! this.state.taxesEnabled, pristine: false } );
 	};
 
 	onCheckboxChange = event => {
 		const option = event.target.name;
 		const value = event.target.checked;
-		this.setState( { [ option ]: value, userBeganEditing: true } );
-	};
-
-	pageHasChanges = () => {
-		return this.state.userBeganEditing;
+		this.setState( { [ option ]: value, pristine: false } );
 	};
 
 	onSave = ( event, onSuccessExtra ) => {
@@ -106,7 +103,7 @@ class SettingsTaxesWooCommerceServices extends Component {
 		this.setState( { isSaving: true } );
 
 		const onSuccess = () => {
-			this.setState( { isSaving: false, userBeganEditing: false } );
+			this.setState( { isSaving: false, pristine: true } );
 			if ( onSuccessExtra ) {
 				onSuccessExtra();
 			}
@@ -123,7 +120,7 @@ class SettingsTaxesWooCommerceServices extends Component {
 			);
 		};
 
-		// TODO - chain these
+		// TODO - batch these
 
 		this.props.updateTaxesEnabledSetting( siteId, this.state.taxesEnabled );
 
@@ -179,12 +176,13 @@ class SettingsTaxesWooCommerceServices extends Component {
 				onCheckboxChange={ this.onCheckboxChange }
 				pricesIncludeTaxes={ this.state.pricesIncludeTaxes }
 				shippingIsTaxable={ this.state.shippingIsTaxable }
+				shipToCountry={ this.props.shipToCountry }
 			/>
 		);
 	};
 
 	render = () => {
-		const { className, loaded, siteId, siteSlug, translate } = this.props;
+		const { loaded, siteId, siteSlug, translate } = this.props;
 
 		const breadcrumbs = [
 			<a href={ getLink( '/store/settings/:site/', { slug: siteSlug } ) }>
@@ -194,7 +192,7 @@ class SettingsTaxesWooCommerceServices extends Component {
 		];
 
 		return (
-			<Main className={ classNames( 'settings-taxes', className ) }>
+			<div>
 				<ActionHeader breadcrumbs={ breadcrumbs }>
 					<TaxSettingsSaveButton onSave={ this.onSave } />
 				</ActionHeader>
@@ -203,7 +201,8 @@ class SettingsTaxesWooCommerceServices extends Component {
 				{ loaded && this.renderAddress() }
 				{ loaded && this.renderRates() }
 				{ loaded && this.renderOptions() }
-			</Main>
+				<ProtectFormGuard isChanged={ ! this.state.pristine } />
+			</div>
 		);
 	};
 }
@@ -211,12 +210,14 @@ class SettingsTaxesWooCommerceServices extends Component {
 function mapStateToProps( state ) {
 	const loaded = areTaxSettingsLoaded( state ) && areSettingsGeneralLoaded( state );
 	const pricesIncludeTaxes = getPricesIncludeTax( state );
+	const shipToCountry = getShipToCountrySetting( state );
 	const shippingIsTaxable = ! getShippingIsTaxFree( state ); // note the inversion
 	const taxesEnabled = areTaxCalculationsEnabled( state );
 
 	return {
 		loaded,
 		pricesIncludeTaxes,
+		shipToCountry,
 		shippingIsTaxable,
 		taxesEnabled,
 	};

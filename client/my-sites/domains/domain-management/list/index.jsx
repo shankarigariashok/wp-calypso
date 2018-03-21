@@ -1,11 +1,9 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import { connect } from 'react-redux';
-import { find, findIndex, identity, noop, times } from 'lodash';
+import { find, findIndex, get, identity, noop, times } from 'lodash';
 import Gridicon from 'gridicons';
 import page from 'page';
 import React from 'react';
@@ -20,7 +18,11 @@ import DomainOnly from './domain-only';
 import ListItem from './item';
 import ListItemPlaceholder from './item-placeholder';
 import Main from 'components/main';
-import paths from 'my-sites/domains/paths';
+import {
+	domainManagementEdit,
+	domainManagementList,
+	domainManagementTransferIn,
+} from 'my-sites/domains/paths';
 import SectionHeader from 'components/section-header';
 import Button from 'components/button';
 import UpgradesNavigation from 'my-sites/domains/navigation';
@@ -37,7 +39,8 @@ import Notice from 'components/notice';
 import NoticeAction from 'components/notice/notice-action';
 import { hasDomainCredit } from 'state/sites/plans/selectors';
 import TrackComponentView from 'lib/analytics/track-component-view';
-import { isDomainOnlySite } from 'state/selectors';
+import { isDomainOnlySite, isSiteAutomatedTransfer } from 'state/selectors';
+
 import { isPlanFeaturesEnabled } from 'lib/plans';
 import DomainToPlanNudge from 'blocks/domain-to-plan-nudge';
 import { type } from 'lib/domains/constants';
@@ -252,7 +255,7 @@ export class List extends React.Component {
 	};
 
 	headerButtons() {
-		if ( this.props.selectedSite && this.props.selectedSite.jetpack ) {
+		if ( this.props.selectedSite && this.props.selectedSite.jetpack && ! this.props.isAtomicSite ) {
 			return null;
 		}
 
@@ -316,7 +319,7 @@ export class List extends React.Component {
 		return new Promise( ( resolve, reject ) => {
 			this.props.setPrimaryDomain( this.props.selectedSite.ID, domainName, ( error, data ) => {
 				if ( ! error && data && data.success ) {
-					page.redirect( paths.domainManagementList( this.props.selectedSite.slug ) );
+					page.redirect( domainManagementList( this.props.selectedSite.slug ) );
 					resolve();
 				} else {
 					reject( error );
@@ -403,9 +406,9 @@ export class List extends React.Component {
 
 	goToEditDomainRoot = domain => {
 		if ( domain.type !== type.TRANSFER ) {
-			page( paths.domainManagementEdit( this.props.selectedSite.slug, domain.name ) );
+			page( domainManagementEdit( this.props.selectedSite.slug, domain.name ) );
 		} else {
-			page( paths.domainManagementTransferIn( this.props.selectedSite.slug, domain.name ) );
+			page( domainManagementTransferIn( this.props.selectedSite.slug, domain.name ) );
 		}
 	};
 }
@@ -459,11 +462,12 @@ const undoChangePrimary = domain =>
 
 export default connect(
 	( state, ownProps ) => {
-		const siteId = ownProps.selectedSite.ID;
+		const siteId = get( ownProps, 'selectedSite.ID', null );
 
 		return {
 			hasDomainCredit: !! ownProps.selectedSite && hasDomainCredit( state, siteId ),
 			isDomainOnly: isDomainOnlySite( state, siteId ),
+			isAtomicSite: isSiteAutomatedTransfer( state, siteId ),
 		};
 	},
 	dispatch => {

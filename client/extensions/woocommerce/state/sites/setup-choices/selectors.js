@@ -4,7 +4,7 @@
  * External dependencies
  */
 
-import { get, isObject } from 'lodash';
+import { get, isEmpty, isObject } from 'lodash';
 
 /**
  * Internal dependencies
@@ -22,7 +22,8 @@ const getSetupChoices = ( state, siteId ) => {
  * @return {boolean} Whether the setup choices list has been successfully loaded from the server
  */
 export const areSetupChoicesLoaded = ( state, siteId = getSelectedSiteId( state ) ) => {
-	return isObject( getSetupChoices( state, siteId ) );
+	const setupChoices = getSetupChoices( state, siteId );
+	return isObject( setupChoices ) && ! isEmpty( setupChoices );
 };
 
 /**
@@ -167,4 +168,13 @@ export function isStoreSetupComplete( state, siteId = getSelectedSiteId( state )
 		getSetStoreAddressDuringInitialSetup( state, siteId ) &&
 		getFinishedInitialSetup( state, siteId )
 	);
+}
+
+/**
+ * @param {Object} state Global state tree
+ * @param {Number} siteId wpcom site id. If not provided, the Site ID selected in the UI will be used
+ * @return {boolean} Whether or not this site is a test site.
+ */
+export function isTestSite( state, siteId = getSelectedSiteId( state ) ) {
+	return isChoiceTrue( state, siteId, 'is_test_site' );
 }

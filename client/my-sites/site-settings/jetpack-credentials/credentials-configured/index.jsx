@@ -3,8 +3,9 @@
  * External dependencies
  */
 import React, { Component } from 'react';
+import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
-import { get } from 'lodash';
+import { find } from 'lodash';
 
 /**
  * Internal dependencies
@@ -12,54 +13,67 @@ import { get } from 'lodash';
 import Gridicon from 'gridicons';
 import FoldableCard from 'components/foldable-card';
 import CompactCard from 'components/card/compact';
-import CredentialsForm from '../credentials-form/index';
+import RewindCredentialsForm from 'components/rewind-credentials-form';
+import Button from 'components/button';
+import { deleteCredentials } from 'state/jetpack/credentials/actions';
+import { getRewindState } from 'state/selectors';
 
 class CredentialsConfigured extends Component {
-	getProtocolDescription = protocol => {
-		const { translate } = this.props;
+	componentWillMount() {
+		this.setState( { isRevoking: false } );
+	}
 
-		switch ( protocol ) {
-			case 'SSH':
-				return translate( 'Secure Shell, the most complete and secure way to access your site.' );
-			case 'SFTP':
-				return translate( 'Secure File Transfer Protocol, a secure way to access your files.' );
-			case 'FTP':
-				return translate( 'File Transfer Protocol, a way to access your files.' );
-			case 'PRESSABLE-SSH':
-				return translate( 'A special Secure Shell connection to Pressable.' );
-		}
+	handleRevoke = () => this.props.deleteCredentials( this.props.siteId, 'main' );
 
-		return '';
-	};
+	toggleRevoking = () => this.setState( { isRevoking: ! this.state.isRevoking } );
 
 	render() {
-		const {
-			isPressable,
-			credentialsUpdating,
-			mainCredentials,
-			formIsSubmitting,
-			siteId,
-			updateCredentials,
-			translate,
-		} = this.props;
+		const { canAutoconfigure, siteId, translate } = this.props;
 
-		const protocol = get( this.props.mainCredentials, 'protocol', 'SSH' ).toUpperCase();
-		const protocolDescription = this.getProtocolDescription( protocol );
+		const isRevoking = this.state.isRevoking;
 
-		if ( isPressable ) {
+		if ( isRevoking ) {
 			return (
 				<CompactCard className="credentials-configured">
+					<p>
+						{ translate(
+							"Your site's server was automatically connected to Jetpack to " +
+								'perform backups, rewinds, and security scans. You do not have to ' +
+								'configure anything further, but you may revoke the credentials if necessary.'
+						) }
+					</p>
+					<div className="credentials-configured__revoke-actions">
+						<Button
+							className="credentials-configured__revoke-button"
+							borderless={ true }
+							onClick={ this.handleRevoke }
+							scary={ true }
+						>
+							<Gridicon
+								className="credentials-configured__revoke-icon"
+								icon="link-break"
+								size={ 18 }
+							/>
+							{ translate( 'Revoke credentials' ) }
+						</Button>
+						<Button primary onClick={ this.toggleRevoking }>
+							{ translate( 'Stay connected' ) }
+						</Button>
+					</div>
+				</CompactCard>
+			);
+		}
+
+		if ( canAutoconfigure ) {
+			return (
+				<CompactCard className="credentials-configured" onClick={ this.toggleRevoking } href="#">
 					<Gridicon
 						icon="checkmark-circle"
 						size={ 48 }
 						className="credentials-configured__header-gridicon"
 					/>
 					<div className="credentials-configured__header-configured-text">
-						{ translate(
-							"You're all set! Your credentials have been " +
-								'automatically configured and your site is connected. ' +
-								'Backups and restores should work seamlessly.'
-						) }
+						{ translate( 'Backups and security scans are configured and active.' ) }
 					</div>
 				</CompactCard>
 			);
@@ -73,28 +87,24 @@ class CredentialsConfigured extends Component {
 					className="credentials-configured__header-gridicon"
 				/>
 				<div className="credentials-configured__header-text">
-					<h3 className="credentials-configured__header-protocol">{ protocol }</h3>
-					<h4 className="credentials-configured__header-description">{ protocolDescription }</h4>
+					<h3 className="credentials-configured__header-protocol">{ translate( 'Connected' ) }</h3>
+					<h4 className="credentials-configured__header-description">
+						{ translate(
+							'Your site is being backed up in real time and regularly scanned for security threats.'
+						) }
+					</h4>
 				</div>
 			</div>
 		);
 
 		return (
 			<FoldableCard header={ header } className="credentials-configured">
-				<CredentialsForm
+				<RewindCredentialsForm
 					{ ...{
-						credentialsUpdating,
-						protocol: get( mainCredentials, 'protocol', 'ssh' ),
-						host: get( mainCredentials, 'host', '' ),
-						port: get( mainCredentials, 'port', '' ),
-						user: get( mainCredentials, 'user', '' ),
-						pass: get( mainCredentials, 'pass', '' ),
-						abspath: get( mainCredentials, 'abspath', '' ),
-						kpri: get( mainCredentials, 'kpri', '' ),
-						formIsSubmitting,
+						role: 'main',
 						siteId,
-						updateCredentials,
-						showCancelButton: false,
+						allowCancel: false,
+						allowDelete: true,
 					} }
 				/>
 			</FoldableCard>
@@ -102,4 +112,15 @@ class CredentialsConfigured extends Component {
 	}
 }
 
-export default localize( CredentialsConfigured );
+const mapStateToProps = ( state, { siteId } ) => {
+	const { canAutoconfigure, credentials = [] } = getRewindState( state, siteId );
+
+	return {
+		canAutoconfigure: canAutoconfigure || credentials.some( c => c.type === 'auto' ), // eslint-disable-line wpcalypso/redux-no-bound-selectors,max-len
+		mainCredentials: find( credentials, { role: 'main' } ),
+	};
+};
+
+export default connect( mapStateToProps, { deleteCredentials } )(
+	localize( CredentialsConfigured )
+);

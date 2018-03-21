@@ -28,7 +28,7 @@ import EllipsisMenu from 'components/ellipsis-menu';
 import PopoverMenuItem from 'components/popover/menu-item';
 import { formatUrlForDisplay, getFeedTitle } from 'reader/lib/feed-display-helper';
 import { addQueryArgs } from 'lib/url';
-import { READER_SUBSCRIPTIONS } from 'reader/follow-button/follow-sources';
+import { READER_SUBSCRIPTIONS } from 'reader/follow-sources';
 
 class FollowingManageSubscriptions extends Component {
 	static propTypes = {
@@ -136,7 +136,6 @@ class FollowingManageSubscriptions extends Component {
 								followSource: READER_SUBSCRIPTIONS,
 							} }
 							width={ width }
-							passthroughProp={ sortOrder }
 							totalCount={ sortedFollows.length }
 							windowScrollerRef={ this.props.windowScrollerRef }
 							rowRenderer={ siteRowRenderer }
@@ -144,10 +143,12 @@ class FollowingManageSubscriptions extends Component {
 					) }
 					{ noSitesMatchQuery && (
 						<span>
-							{ translate( 'Sorry, no followed sites match {{italic}}%s.{{/italic}}', {
-								components: { italic: <i /> },
-								args: query,
-							} ) }
+							{ query
+								? translate( 'Sorry, no followed sites match {{italic}}%s.{{/italic}}', {
+										components: { italic: <i /> },
+										args: query,
+									} )
+								: translate( 'Sorry, no followed sites found.' ) }
 						</span>
 					) }
 				</div>

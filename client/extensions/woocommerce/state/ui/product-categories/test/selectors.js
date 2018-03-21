@@ -14,6 +14,7 @@ import {
 	getProductCategoryWithLocalEdits,
 	getProductCategoriesWithLocalEdits,
 	getCurrentlyEditingProductCategory,
+	getCurrentlyEditingId,
 } from '../selectors';
 import {
 	getProductCategory,
@@ -32,11 +33,16 @@ describe( 'selectors', () => {
 				woocommerce: {
 					sites: {
 						[ siteId ]: {
-							productCategories: [
-								{ id: 1, name: 'cat 1', slug: 'cat-1' },
-								{ id: 2, name: 'cat 2', slug: 'cat-2' },
-								{ id: 3, name: 'cat 3', slug: 'cat-3' },
-							],
+							productCategories: {
+								items: {
+									1: { id: 1, name: 'cat 1', slug: 'cat-1' },
+									2: { id: 2, name: 'cat 2', slug: 'cat-2' },
+									3: { id: 3, name: 'cat 3', slug: 'cat-3' },
+								},
+								queries: {
+									'{}': [ 1, 2, 3 ],
+								},
+							},
 						},
 					},
 					ui: {
@@ -151,6 +157,21 @@ describe( 'selectors', () => {
 			set( uiProductCategories, [ siteId, 'edits', 'currentlyEditingId' ], newCategory.id );
 
 			expect( getCurrentlyEditingProductCategory( state ) ).to.eql( newCategory );
+		} );
+	} );
+
+	describe( '#getCurrentlyEditingId', () => {
+		test( 'should return undefined if there are no edits', () => {
+			expect( getCurrentlyEditingId( state ) ).to.not.exist;
+		} );
+
+		test( 'should get the last edited category id', () => {
+			const newCategory = { id: { index: 0 }, name: 'New Category' };
+			const uiProductCategories = state.extensions.woocommerce.ui.productCategories;
+			set( uiProductCategories, [ siteId, 'edits', 'creates' ], [ newCategory ] );
+			set( uiProductCategories, [ siteId, 'edits', 'currentlyEditingId' ], newCategory.id );
+
+			expect( getCurrentlyEditingId( state ) ).to.eql( newCategory.id );
 		} );
 	} );
 } );

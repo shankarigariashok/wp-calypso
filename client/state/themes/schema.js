@@ -19,6 +19,9 @@ const themeSchema = {
 
 export const queriesSchema = {
 	type: 'object',
+	properties: {
+		_timestamp: { type: 'number' },
+	},
 	patternProperties: {
 		// Site ID
 		'^(wpcom|wporg|\\d+)$': {
@@ -109,7 +112,7 @@ export const themeFiltersSchema = {
 	type: 'object',
 	patternProperties: {
 		// Taxonomy ID
-		'^\\w+$': {
+		'^[\\w-]+$': {
 			title: 'Taxonomy',
 			type: 'object',
 			patternProperties: {

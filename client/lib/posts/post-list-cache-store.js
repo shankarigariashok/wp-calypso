@@ -10,14 +10,13 @@ import debugFactory from 'debug';
 /**
  * Internal dependencies
  */
-import sitesFactory from 'lib/sites-list';
 import Dispatcher from 'dispatcher';
 import { cacheIndex } from 'lib/wp/sync-handler/cache-index';
+import PostListStoreFactory from './post-list-store-factory';
 
 let cache = {};
 const _canonicalCache = {};
 const TTL_IN_MS = 5 * 60 * 1000; // five minutes
-const sites = sitesFactory();
 const PostsListCache = {
 	get,
 	_reset: function() {
@@ -60,8 +59,7 @@ function set( list ) {
 	}
 }
 
-function markDirty( post, oldStatus ) {
-	const site = sites.getSite( post.site_ID );
+function markDirty( site, post, oldStatus ) {
 	const affectedSites = [ site.slug, site.ID, false ];
 	const affectedStatuses = [ post.status, oldStatus ];
 	let listStatuses, key, entry, list;
@@ -117,8 +115,7 @@ function isListKeyFresh( listKey ) {
 
 PostsListCache.dispatchToken = Dispatcher.register( function( payload ) {
 	var action = payload.action,
-		PostListStore = require( './post-list-store-factory' )();
-
+		PostListStore = PostListStoreFactory();
 	Dispatcher.waitFor( [ PostListStore.dispatchToken ] );
 
 	switch ( action.type ) {
@@ -136,7 +133,7 @@ PostsListCache.dispatchToken = Dispatcher.register( function( payload ) {
 		case 'RECEIVE_UPDATED_POST':
 		case 'RECEIVE_POST_BEING_EDITED':
 			if ( action.post ) {
-				markDirty( action.post, action.original ? action.original.status : null );
+				markDirty( action.site, action.post, action.original ? action.original.status : null );
 				set( PostListStore.get() );
 			}
 			break;

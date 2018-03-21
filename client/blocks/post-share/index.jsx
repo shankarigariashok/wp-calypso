@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
@@ -24,19 +22,16 @@ import QuerySitePlans from 'components/data/query-site-plans';
 import Button from 'components/button';
 import ButtonGroup from 'components/button-group';
 import NoticeAction from 'components/notice/notice-action';
-import { getPostShareScheduledActions, getPostSharePublishedActions } from 'state/selectors';
 import {
+	getPostSharePublishedActions,
+	getPostShareScheduledActions,
+	getScheduledPublicizeShareActionTime,
 	isPublicizeEnabled,
 	isSchedulingPublicizeShareAction,
-	getScheduledPublicizeShareActionTime,
 	isSchedulingPublicizeShareActionError,
 } from 'state/selectors';
 import { getSiteSlug, getSitePlanSlug, isJetpackSite } from 'state/sites/selectors';
 import { getCurrentUserId, getCurrentUserCurrencyCode } from 'state/current-user/selectors';
-import {
-	getSiteUserConnections,
-	hasFetchedConnections as siteHasFetchedConnections,
-} from 'state/sharing/publicize/selectors';
 
 import {
 	fetchConnections as requestConnections,
@@ -45,6 +40,8 @@ import {
 } from 'state/sharing/publicize/actions';
 import { schedulePostShareAction } from 'state/sharing/publicize/publicize-actions/actions';
 import {
+	getSiteUserConnections,
+	hasFetchedConnections as siteHasFetchedConnections,
 	isRequestingSharePost,
 	sharePostFailure,
 	sharePostSuccessMessage,
@@ -65,11 +62,9 @@ import ConnectionsList, { NoConnectionsNotice } from './connections-list';
 import ActionsList from './publicize-actions-list';
 import CalendarButton from 'blocks/calendar-button';
 import EventsTooltip from 'components/date-picker/events-tooltip';
-import SectionHeader from 'components/section-header';
-import Tooltip from 'components/tooltip';
 import analytics from 'lib/analytics';
 import TrackComponentView from 'lib/analytics/track-component-view';
-import { sectionify } from 'lib/route/path';
+import { sectionify } from 'lib/route';
 
 class PostShare extends Component {
 	static propTypes = {
@@ -105,7 +100,6 @@ class PostShare extends Component {
 		message: PostMetadata.publicizeMessage( this.props.post ) || '',
 		skipped: PostMetadata.publicizeSkipped( this.props.post ) || [],
 		showSharingPreview: false,
-		showAccountTooltip: false,
 		scheduledDate: null,
 		showTooltip: false,
 		tooltipContext: null,
@@ -220,13 +214,14 @@ class PostShare extends Component {
 			? this.props.connections.filter( this.isConnectionActive )
 			: [];
 		const requireCount = includes( map( targeted, 'service' ), 'twitter' );
-		const acceptableLength = requireCount ? 140 - 23 - 23 : null;
+		const acceptableLength = requireCount ? 280 - 23 - 23 : null;
 
 		return (
 			<PublicizeMessage
 				disabled={ this.isDisabled() }
 				message={ this.state.message }
 				requireCount={ requireCount }
+				displayMessageHeading={ false }
 				onChange={ this.setMessage }
 				acceptableLength={ acceptableLength }
 			/>
@@ -393,7 +388,7 @@ class PostShare extends Component {
 			return (
 				<Notice status="is-success" onDismissClick={ this.dismiss }>
 					{ translate( "We'll share your post on %s.", {
-						args: this.props.scheduledAt.format( 'ddd, MMMM Do YYYY, h:mm:ss a' ),
+						args: this.props.scheduledAt.format( 'LLLL' ),
 					} ) }
 				</Notice>
 			);
@@ -432,10 +427,6 @@ class PostShare extends Component {
 		}
 	}
 
-	showAddTooltip = () => this.setState( { showAccountTooltip: true } );
-
-	hideAddTooltip = () => this.setState( { showAccountTooltip: false } );
-
 	renderConnectionsSection() {
 		const { hasFetchedConnections, siteId, siteSlug, translate } = this.props;
 
@@ -447,31 +438,6 @@ class PostShare extends Component {
 
 		return (
 			<div className="post-share__services">
-				<SectionHeader
-					className="post-share__services-header"
-					label={ translate( 'Connected accounts' ) }
-				>
-					<Button
-						compact
-						href={ '/sharing/' + siteId }
-						className="post-share__add-button"
-						onMouseEnter={ this.showAddTooltip }
-						onMouseLeave={ this.hideAddTooltip }
-						ref="addAccountButton"
-						aria-label={ translate( 'Add account' ) }
-					>
-						<Gridicon icon="plus-small" size={ 18 } />
-						<Gridicon icon="user" size={ 18 } />
-						<Tooltip
-							isVisible={ this.state.showAccountTooltip }
-							context={ this.refs && this.refs.addAccountButton }
-							position="bottom"
-						>
-							{ translate( 'Add account' ) }
-						</Tooltip>
-					</Button>
-				</SectionHeader>
-
 				<ConnectionsList
 					{ ...{
 						connections,
@@ -481,6 +447,14 @@ class PostShare extends Component {
 					} }
 					onToggle={ this.toggleConnection }
 				/>
+
+				<div className="post-share__manage-connections-link">
+					{ translate( '{{a}}Manage connections{{/a}}', {
+						components: {
+							a: <a href={ `/sharing/${ siteId }` } />,
+						},
+					} ) }
+				</div>
 			</div>
 		);
 	}
@@ -515,12 +489,12 @@ class PostShare extends Component {
 		return (
 			<div>
 				<div className="post-share__main">
+					{ this.renderConnectionsSection() }
+
 					<div className="post-share__form">
 						{ this.renderMessage() }
 						{ this.renderSharingButtons() }
 					</div>
-
-					{ this.renderConnectionsSection() }
 				</div>
 
 				<ActionsList { ...this.props } />
@@ -564,8 +538,17 @@ class PostShare extends Component {
 
 				<div className={ classes }>
 					<div className="post-share__head">
-						<h4 className="post-share__title">
-							<span>{ translate( 'Share this post' ) }</span>
+						<div className="post-share__title">
+							<span>
+								{ translate(
+									'Share on your connected social media accounts using ' + '{{a}}Publicize{{/a}}.',
+									{
+										components: {
+											a: <a href={ `/sharing/${ siteSlug }` } />,
+										},
+									}
+								) }
+							</span>
 							{ showClose && (
 								<Button
 									borderless
@@ -576,17 +559,6 @@ class PostShare extends Component {
 								>
 									<Gridicon icon="cross" />
 								</Button>
-							) }
-						</h4>
-						<div className="post-share__subtitle">
-							{ translate(
-								'Share your post on all of your connected social media accounts using ' +
-									'{{a}}Publicize{{/a}}.',
-								{
-									components: {
-										a: <a href={ `/sharing/${ siteSlug }` } />,
-									},
-								}
 							) }
 						</div>
 					</div>

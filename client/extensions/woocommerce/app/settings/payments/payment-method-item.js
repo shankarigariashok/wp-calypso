@@ -13,7 +13,6 @@ import { localize } from 'i18n-calypso';
 /**
  * Internal dependencies
  */
-import analytics from 'lib/analytics';
 import Button from 'components/button';
 import {
 	cancelEditingPaymentMethod,
@@ -24,16 +23,19 @@ import {
 } from 'woocommerce/state/ui/payments/methods/actions';
 import { getCurrentlyEditingPaymentMethod } from 'woocommerce/state/ui/payments/methods/selectors';
 import { getSelectedSiteWithFallback } from 'woocommerce/state/sites/selectors';
+import ExternalLink from 'components/external-link';
 import FormFieldset from 'components/forms/form-fieldset';
 import FormLabel from 'components/forms/form-label';
 import { hasStripeKeyPairForMode } from './stripe/payment-method-stripe-utils';
 import ListItem from 'woocommerce/components/list/list-item';
 import ListItemField from 'woocommerce/components/list/list-item-field';
+import PaymentMethodBACS from './payment-method-bacs';
 import PaymentMethodEditDialog from './payment-method-edit-dialog';
 import PaymentMethodEditFormToggle from './payment-method-edit-form-toggle';
 import PaymentMethodPaypal from './payment-method-paypal';
 import PaymentMethodStripe from './payment-method-stripe';
 import PaymentMethodCheque from './payment-method-cheque';
+import { recordTrack } from 'woocommerce/lib/analytics';
 
 class PaymentMethodItem extends Component {
 	static propTypes = {
@@ -50,6 +52,7 @@ class PaymentMethodItem extends Component {
 			id: PropTypes.string,
 			informationUrl: PropTypes.string,
 		} ),
+		onChange: PropTypes.func.isRequired,
 		openPaymentMethodForEdit: PropTypes.func.isRequired,
 		site: PropTypes.shape( {
 			title: PropTypes.string,
@@ -75,21 +78,24 @@ class PaymentMethodItem extends Component {
 	};
 
 	onEditField = ( field, value ) => {
+		this.props.onChange();
 		this.props.changePaymentMethodField( this.props.site.ID, field, value );
 	};
 
 	onChangeEnabled = e => {
 		const { method, site } = this.props;
 
+		this.props.onChange();
+
 		const enabled = 'yes' === e.target.value;
 		this.props.changePaymentMethodEnabled( site.ID, method.id, enabled );
 
 		if ( enabled ) {
-			analytics.tracks.recordEvent( 'calypso_woocommerce_payment_method_enabled', {
+			recordTrack( 'calypso_woocommerce_payment_method_enabled', {
 				payment_method: method.id,
 			} );
 		} else {
-			analytics.tracks.recordEvent( 'calypso_woocommerce_payment_method_disabled', {
+			recordTrack( 'calypso_woocommerce_payment_method_disabled', {
 				payment_method: method.id,
 			} );
 		}
@@ -104,8 +110,9 @@ class PaymentMethodItem extends Component {
 		const { method, site } = this.props;
 		this.props.closeEditingPaymentMethod( site.ID, method.id );
 		if ( ! method.enabled ) {
+			this.props.onChange();
 			this.props.changePaymentMethodEnabled( site.ID, method.id, true );
-			analytics.tracks.recordEvent( 'calypso_woocommerce_payment_method_enabled', {
+			recordTrack( 'calypso_woocommerce_payment_method_enabled', {
 				payment_method: method.id,
 			} );
 		}
@@ -144,6 +151,18 @@ class PaymentMethodItem extends Component {
 				/>
 			);
 		}
+
+		if ( method.id === 'bacs' ) {
+			return (
+				<PaymentMethodBACS
+					method={ currentlyEditingMethod }
+					onCancel={ this.onCancel }
+					onEditField={ this.onEditField }
+					onDone={ this.onDone }
+				/>
+			);
+		}
+
 		return (
 			<PaymentMethodEditDialog
 				method={ currentlyEditingMethod }
@@ -200,7 +219,9 @@ class PaymentMethodItem extends Component {
 					{ method.fees && <p className="payments__method-information">{ method.fees }</p> }
 					{ method.informationUrl && (
 						<p className="payments__method-information">
-							<a href={ method.informationUrl }>{ translate( 'More Information' ) }</a>
+							<ExternalLink icon href={ method.informationUrl } target="_blank">
+								{ translate( 'More Information' ) }
+							</ExternalLink>
 						</p>
 					) }
 				</ListItemField>

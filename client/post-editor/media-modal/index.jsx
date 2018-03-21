@@ -32,7 +32,7 @@ import analytics from 'lib/analytics';
 import { recordEvent, recordStat } from 'lib/posts/stats';
 import MediaModalGallery from './gallery';
 import MediaActions from 'lib/media/actions';
-import MediaUtils from 'lib/media/utils';
+import * as MediaUtils from 'lib/media/utils';
 import Dialog from 'components/dialog';
 import CloseOnEscape from 'components/close-on-escape';
 import accept from 'lib/accept';
@@ -80,6 +80,7 @@ export class EditorMediaModal extends Component {
 		setView: PropTypes.func,
 		resetView: PropTypes.func,
 		postId: PropTypes.number,
+		disableLargeImageSources: PropTypes.bool,
 	};
 
 	static defaultProps = {
@@ -94,6 +95,7 @@ export class EditorMediaModal extends Component {
 		view: ModalViews.LIST,
 		imageEditorProps: {},
 		deleteMedia: () => {},
+		disableLargeImageSources: false,
 	};
 
 	constructor( props ) {
@@ -160,9 +162,9 @@ export class EditorMediaModal extends Component {
 				search: undefined,
 			},
 			() => {
-				// Copy the selected item from the external source. Note we pass the actual media data as we need this to generate
-				// transient placeholders. This is done after the state changes so our transients and external items appear
-				// in the WordPress library that we've just switched to
+				// Reset the query so that we're adding the new media items to the correct
+				// list, with no external source.
+				MediaActions.setQuery( site.ID, {} );
 				MediaActions.addExternal( site, selectedMedia, originalSource );
 			}
 		);
@@ -170,7 +172,25 @@ export class EditorMediaModal extends Component {
 
 	copyExternal( selectedMedia, originalSource ) {
 		const { site } = this.props;
+		const hasSearch = !! this.state.search;
+		if ( hasSearch ) {
+			// For unsorted external sources based on a search, when inserting a single image, there's a visual glitch
+			// where one of the items in the list cycles through other items. This seems to happen when receiving
+			// the new image, and the media store is updating pointers. We switch back to no source and no search
+			// before we upload the new image so that the glitch is hidden. The glitch is _purely_ visual, and all
+			// images, transient or otherwise are correctly dealt with.
+			this.setState( {
+				search: '',
+			} );
+		}
 		MediaActions.addExternal( site, selectedMedia, originalSource );
+		if ( hasSearch ) {
+			// make sure that query change gets everywhere so next time the source is loaded,
+			// or the WP media library is opened, the new media is loaded
+			// This has to happen _after_ the external files are added, or else they
+			// don't show up.
+			MediaActions.setQuery( site.ID, {} );
+		}
 	}
 
 	confirmSelection = () => {
@@ -587,6 +607,7 @@ export class EditorMediaModal extends Component {
 						onViewDetails={ this.props.onViewDetails }
 						mediaLibrarySelectedItems={ this.props.mediaLibrarySelectedItems }
 						postId={ this.props.postId }
+						disableLargeImageSources={ this.props.disableLargeImageSources }
 						scrollable
 					/>
 				);

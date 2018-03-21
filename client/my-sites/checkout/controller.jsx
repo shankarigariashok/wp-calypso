@@ -1,50 +1,57 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import i18n from 'i18n-calypso';
-import ReactDom from 'react-dom';
 import React from 'react';
 import { isEmpty } from 'lodash';
-import page, { Route } from 'page';
+import { Route } from 'page';
 
 /**
  * Internal Dependencies
  */
 import analytics from 'lib/analytics';
-import route from 'lib/route';
+import { sectionifyWithRoutes } from 'lib/route';
 import { setDocumentHeadTitle as setTitle } from 'state/document-head/actions';
 import { setSection } from 'state/ui/actions';
-import productsFactory from 'lib/products-list';
-import upgradesActions from 'lib/upgrades/actions';
-import { renderWithReduxStore } from 'lib/react-helpers';
 import { getSiteBySlug } from 'state/sites/selectors';
 import { getSelectedSite } from 'state/ui/selectors';
 import GsuiteNudge from 'my-sites/checkout/gsuite-nudge';
-
-/**
- * Module variables
- */
-const productsList = productsFactory();
+import Checkout from './checkout';
+import CheckoutData from 'components/data/checkout';
+import CartData from 'components/data/cart';
+import SecondaryCart from './cart/secondary-cart';
+import CheckoutThankYouComponent from './checkout-thank-you';
 
 const checkoutRoutes = [
-	new Route( '/checkout/thank-you' ),
-	new Route( '/checkout/thank-you/:receipt' ),
-	new Route( '/checkout/:product' ),
-	new Route( '/checkout/:product/renew/:receipt' ),
+	new Route( '/checkout/features/:feature/:site/:plan' ),
+	new Route( '/checkout/features/:feature/:site' ),
+	new Route( '/checkout/:product/renew/:purchase/:site' ),
+	new Route( '/checkout/:site/:product' ),
+	new Route( '/checkout/:site' ),
+];
+
+const checkoutGSuiteNudgeRoutes = [
+	new Route( '/checkout/:site/with-gsuite/:domain/:receipt' ),
+	new Route( '/checkout/:site/with-gsuite/:domain' ),
+];
+
+const checkoutThankYouRoutes = [
+	new Route( '/checkout/thank-you/no-site/:receipt' ),
+	new Route( '/checkout/thank-you/no-site' ),
+	new Route( '/checkout/thank-you/:site/:receipt' ),
+	new Route( '/checkout/thank-you/:site' ),
+	new Route( '/checkout/thank-you/:site/:receipt/with-gsuite/:gsuiteReceipt' ),
+	new Route( '/checkout/thank-you/:site/:receipt/with-gsuite' ),
+	new Route( '/checkout/thank-you/features/:feature/:site/:receipt' ),
+	new Route( '/checkout/thank-you/features/:feature/:site' ),
 ];
 
 export default {
-	checkout: function( context ) {
-		const Checkout = require( './checkout' ),
-			CheckoutData = require( 'components/data/checkout' ),
-			CartData = require( 'components/data/cart' ),
-			SecondaryCart = require( './cart/secondary-cart' ),
-			{ routePath, routeParams } = route.sectionifyWithRoutes( context.path, checkoutRoutes ),
-			product = context.params.product,
-			selectedFeature = context.params.feature;
+	checkout: function( context, next ) {
+		const { routePath, routeParams } = sectionifyWithRoutes( context.path, checkoutRoutes );
+		const { params } = context;
+		const { feature, product } = params;
 
 		const state = context.store.getState();
 		const selectedSite = getSelectedSite( state );
@@ -58,62 +65,52 @@ export default {
 		// FIXME: Auto-converted from the Flux setTitle action. Please use <DocumentHead> instead.
 		context.store.dispatch( setTitle( i18n.translate( 'Checkout' ) ) );
 
-		renderWithReduxStore(
+		context.primary = (
 			<CheckoutData>
 				<Checkout
 					product={ product }
-					productsList={ productsList }
 					purchaseId={ context.params.purchaseId }
-					selectedFeature={ selectedFeature }
+					selectedFeature={ feature }
 					couponCode={ context.query.code }
 				/>
-			</CheckoutData>,
-			document.getElementById( 'primary' ),
-			context.store
+			</CheckoutData>
 		);
 
-		renderWithReduxStore(
+		context.secondary = (
 			<CartData>
 				<SecondaryCart selectedSite={ selectedSite } />
-			</CartData>,
-			document.getElementById( 'secondary' ),
-			context.store
+			</CartData>
 		);
+		next();
 	},
 
-	sitelessCheckout: function( context ) {
-		const Checkout = require( './checkout' ),
-			CheckoutData = require( 'components/data/checkout' ),
-			CartData = require( 'components/data/cart' ),
-			SecondaryCart = require( './cart/secondary-cart' );
-
+	sitelessCheckout: function( context, next ) {
 		analytics.pageView.record( '/checkout/no-site', 'Checkout' );
 
 		// FIXME: Auto-converted from the Flux setTitle action. Please use <DocumentHead> instead.
 		context.store.dispatch( setTitle( i18n.translate( 'Checkout' ) ) );
 
-		renderWithReduxStore(
+		context.primary = (
 			<CheckoutData>
-				<Checkout reduxStore={ context.store } productsList={ productsList } />
-			</CheckoutData>,
-			document.getElementById( 'primary' ),
-			context.store
+				<Checkout reduxStore={ context.store } />
+			</CheckoutData>
 		);
 
-		renderWithReduxStore(
+		context.secondary = (
 			<CartData>
 				<SecondaryCart />
-			</CartData>,
-			document.getElementById( 'secondary' ),
-			context.store
+			</CartData>
 		);
+		next();
 	},
 
-	checkoutThankYou: function( context ) {
-		const CheckoutThankYouComponent = require( './checkout-thank-you' ),
-			{ routePath, routeParams } = route.sectionifyWithRoutes( context.path, checkoutRoutes ),
-			receiptId = Number( context.params.receiptId ),
-			gsuiteReceiptId = Number( context.params.gsuiteReceiptId ) || 0;
+	checkoutThankYou: function( context, next ) {
+		const { routePath, routeParams } = sectionifyWithRoutes( context.path, checkoutThankYouRoutes );
+		const receiptId = Number( context.params.receiptId );
+		const gsuiteReceiptId = Number( context.params.gsuiteReceiptId ) || 0;
+
+		const state = context.store.getState();
+		const selectedSite = getSelectedSite( state );
 
 		analytics.pageView.record( routePath, 'Checkout Thank You', routeParams );
 
@@ -122,26 +119,24 @@ export default {
 		// FIXME: Auto-converted from the Flux setTitle action. Please use <DocumentHead> instead.
 		context.store.dispatch( setTitle( i18n.translate( 'Thank You' ) ) );
 
-		const state = context.store.getState();
-		const selectedSite = getSelectedSite( state );
-
-		renderWithReduxStore(
+		context.primary = (
 			<CheckoutThankYouComponent
-				productsList={ productsList }
 				receiptId={ receiptId }
 				gsuiteReceiptId={ gsuiteReceiptId }
 				domainOnlySiteFlow={ isEmpty( context.params.site ) }
 				selectedFeature={ context.params.feature }
 				selectedSite={ selectedSite }
-			/>,
-			document.getElementById( 'primary' ),
-			context.store
+			/>
 		);
 
-		ReactDom.unmountComponentAtNode( document.getElementById( 'secondary' ) );
+		next();
 	},
 
-	gsuiteNudge( context ) {
+	gsuiteNudge( context, next ) {
+		const { routePath, routeParams } = sectionifyWithRoutes(
+			context.path,
+			checkoutGSuiteNudgeRoutes
+		);
 		const { domain, site, receiptId } = context.params;
 		context.store.dispatch( setSection( { name: 'gsuite-nudge' }, { hasSidebar: false } ) );
 
@@ -153,33 +148,18 @@ export default {
 			return null;
 		}
 
-		const handleAddGoogleApps = ( googleAppsCartItem, siteSlug ) => {
-			googleAppsCartItem.extra = {
-				...googleAppsCartItem.extra,
-				receipt_for_domain: receiptId,
-			};
+		analytics.pageView.record( routePath, 'G Suite Upsell', routeParams );
 
-			upgradesActions.addItem( googleAppsCartItem );
-			page( `/checkout/${ siteSlug }` );
-		};
-
-		const handleClickSkip = siteSlug => {
-			page( `/checkout/thank-you/${ siteSlug }/${ receiptId }` );
-		};
-
-		renderWithReduxStore(
-			<GsuiteNudge
-				domain={ domain }
-				productsList={ productsList }
-				receiptId={ Number( receiptId ) }
-				selectedSiteId={ selectedSite.ID }
-				onAddGoogleApps={ handleAddGoogleApps }
-				onClickSkip={ handleClickSkip }
-			/>,
-			document.getElementById( 'primary' ),
-			context.store
+		context.primary = (
+			<CartData>
+				<GsuiteNudge
+					domain={ domain }
+					receiptId={ Number( receiptId ) }
+					selectedSiteId={ selectedSite.ID }
+				/>
+			</CartData>
 		);
 
-		ReactDom.unmountComponentAtNode( document.getElementById( 'secondary' ) );
+		next();
 	},
 };

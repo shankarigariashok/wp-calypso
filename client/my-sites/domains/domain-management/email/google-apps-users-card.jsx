@@ -8,7 +8,7 @@ import PropTypes from 'prop-types';
 import { localize } from 'i18n-calypso';
 import React from 'react';
 import createReactClass from 'create-react-class';
-import { find, groupBy } from 'lodash';
+import { find, get, groupBy } from 'lodash';
 
 /**
  * Internal dependencies
@@ -17,12 +17,12 @@ import CompactCard from 'components/card/compact';
 import Notice from 'components/notice';
 import Button from 'components/button';
 import PendingGappsTosNotice from 'my-sites/domains/components/domain-warnings/pending-gapps-tos-notice';
-import paths from 'my-sites/domains/paths';
+import { domainManagementAddGoogleApps } from 'my-sites/domains/paths';
 import analyticsMixin from 'lib/mixins/analytics';
 import SectionHeader from 'components/section-header';
 import GoogleAppsUserItem from './google-apps-user-item';
 import { getSelectedDomain, hasPendingGoogleAppsUsers } from 'lib/domains';
-import support from 'lib/url/support';
+import { CALYPSO_CONTACT } from 'lib/url/support';
 
 const GoogleAppsUsers = createReactClass( {
 	displayName: 'GoogleAppsUsers',
@@ -42,19 +42,19 @@ const GoogleAppsUsers = createReactClass( {
 			: this.props.domains.list;
 	},
 
-	canAddUsers() {
+	canAddUsers( domainName ) {
 		return this.getDomainsAsList().some(
-			domain => domain.googleAppsSubscription.ownedByUserId === this.props.user.ID
+			domain =>
+				domain.name === domainName &&
+				get( domain, 'googleAppsSubscription.ownedByUserId' ) === this.props.user.ID
 		);
 	},
 
-	isNewUser( user ) {
-		const domain = find( this.props.domains.list, { name: user.domain } );
-
+	isNewUser( user, subscribedDate ) {
 		return this.props
 			.moment()
 			.subtract( 1, 'day' )
-			.isBefore( domain.googleAppsSubscription.subscribedDate );
+			.isBefore( subscribedDate );
 	},
 
 	generateClickHandler( user ) {
@@ -71,11 +71,11 @@ const GoogleAppsUsers = createReactClass( {
 		return (
 			<div key={ `google-apps-user-${ domain }` } className="google-apps-users-card">
 				<SectionHeader label={ domain }>
-					{ this.canAddUsers() && (
+					{ this.canAddUsers( domain ) && (
 						<Button
 							primary
 							compact
-							href={ paths.domainManagementAddGoogleApps( this.props.selectedSite.slug, domain ) }
+							href={ domainManagementAddGoogleApps( this.props.selectedSite.slug, domain ) }
 							onClick={ this.goToAddGoogleApps }
 						>
 							{ this.props.translate( 'Add G Suite User' ) }
@@ -96,18 +96,22 @@ const GoogleAppsUsers = createReactClass( {
 			let status = 'is-warning',
 				text = user.error,
 				supportLink = (
-					<a href={ support.CALYPSO_CONTACT }>
+					<a href={ CALYPSO_CONTACT }>
 						<strong>{ this.props.translate( 'Please contact support' ) }</strong>
 					</a>
 				);
 
-			if ( this.isNewUser( user ) ) {
-				status = null;
-				text = this.props.translate(
-					'We are setting up %(email)s for you. It should start working immediately, but may take up to 24 hours.',
-					{ args: { email: user.email } }
-				);
-				supportLink = null;
+			const domain = find( this.props.domains.list, { name: user.domain } );
+			const subscribedDate = get( domain, 'googleAppsSubscription.subscribedDate', false );
+			if ( subscribedDate ) {
+				if ( this.isNewUser( user, subscribedDate ) ) {
+					status = null;
+					text = this.props.translate(
+						'We are setting up %(email)s for you. It should start working immediately, but may take up to 24 hours.',
+						{ args: { email: user.email } }
+					);
+					supportLink = null;
+				}
 			}
 
 			return (

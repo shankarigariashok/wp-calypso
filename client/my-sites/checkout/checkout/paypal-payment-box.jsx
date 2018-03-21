@@ -14,15 +14,13 @@ import Gridicon from 'gridicons';
  */
 import analytics from 'lib/analytics';
 import cartValues from 'lib/cart-values';
-import CountrySelect from 'my-sites/domains/components/form/country-select';
 import Input from 'my-sites/domains/components/form/input';
 import notices from 'notices';
+import PaymentCountrySelect from 'components/payment-country-select';
 import SubscriptionText from './subscription-text';
 import TermsOfService from './terms-of-service';
-import { abtest } from 'lib/abtest';
 import CartCoupon from 'my-sites/checkout/cart/cart-coupon';
 import PaymentChatButton from './payment-chat-button';
-import config from 'config';
 import { PLAN_BUSINESS } from 'lib/plans/constants';
 import CartToggle from './cart-toggle';
 import wp from 'lib/wp';
@@ -38,9 +36,12 @@ class PaypalPaymentBox extends React.Component {
 	};
 
 	handleChange = event => {
-		var data = {};
-		data[ event.target.name ] = event.target.value;
+		this.updateLocalStateWithFieldValue( event.target.name, event.target.value );
+	};
 
+	updateLocalStateWithFieldValue = ( fieldName, fieldValue ) => {
+		const data = {};
+		data[ fieldName ] = fieldValue;
 		this.setState( data );
 	};
 
@@ -140,23 +141,19 @@ class PaypalPaymentBox extends React.Component {
 		const hasBusinessPlanInCart = some( this.props.cart.products, {
 			product_slug: PLAN_BUSINESS,
 		} );
-		const showPaymentChatButton =
-				config.isEnabled( 'upgrades/presale-chat' ) &&
-				abtest( 'presaleChatButton' ) === 'showChatButton' &&
-				hasBusinessPlanInCart,
+		const showPaymentChatButton = this.props.presaleChatAvailable && hasBusinessPlanInCart,
 			paymentButtonClasses = 'payment-box__payment-buttons';
 
 		return (
 			<form onSubmit={ this.redirectToPayPal }>
 				<div className="checkout__payment-box-sections">
 					<div className="checkout__payment-box-section">
-						<CountrySelect
+						<PaymentCountrySelect
 							additionalClasses="checkout-field"
 							name="country"
 							label={ this.props.translate( 'Country', { textOnly: true } ) }
 							countriesList={ this.props.countriesList }
-							value={ this.state.country }
-							onChange={ this.handleChange }
+							onCountrySelected={ this.updateLocalStateWithFieldValue }
 							disabled={ this.state.formDisabled }
 							eventFormName="Checkout Form"
 						/>

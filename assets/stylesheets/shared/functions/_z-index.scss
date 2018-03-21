@@ -32,9 +32,7 @@
 
 $z-layers: (
 	'root': (
-		'.community-translator__translator-invitation:before': -1,
 		'.NuxWelcome:before': -1,
-		'.list-end:before': -1,
 		'.is-group-editor::before': -1,
 		'.site-icon.is-blank .gridicon': 0,
 		'.chart__bar-section.is-spacer': 0,
@@ -46,7 +44,8 @@ $z-layers: (
 		'.reader-post-card__title': 0,
 		'.reader-feed-header': 0,
 		'.reader-feed-header__back-and-follow': 0,
-		'.reader-related-card-v2.card': 0,
+		'.reader-related-card.card': 0,
+		'.reader-full-post__sidebar-comment-like': 1,
 		'.list-stream__header-follow': 0,
 		'.following__intro-close-icon-bg' : 0,
 		'.media-library .search.is-expanded-to-container': 1,
@@ -79,15 +78,17 @@ $z-layers: (
 		'.thank-you-card__header': 1,
 		'.card.comment.is-bulk-mode:hover': 1,
 		'.card.comment.accessible-focus:focus': 1,
+		'.web-preview__loading-message-wrapper': 1,
 		'.comment-detail.card.is-collapsed:hover': 1,
 		'.comment-detail.card.accessible-focus:focus': 1,
-		'.web-preview__loading-message-wrapper': 1,
 		'.web-preview__inner .spinner-line': 1,
+		'.google-my-business__close-icon': 1,
+		'.google-my-business__stats-nudge.dismissible-card__close-icon': 1,
 		'.editor-sidebar': 2,
 		'.editor-action-bar .editor-status-label': 2,
 		'.is-installing .theme': 2,
 		'.people-list-item .card__link-indicator': 2,
-		'.updated-confirmation': 2,
+		'.page__shadow-notice-cover': 2,
 		'.auth__form .form-fieldset input:focus': 2,
 		'.chart__bar-section': 2,
 		'.module-content-table tbody th:first-child': 2,
@@ -99,6 +100,8 @@ $z-layers: (
 		'.site-indicator__button': 3,
 		'ul.module-content-list-item-actions.collapsed': 3,
 		'.auth__input-wrapper .gridicon': 3,
+		'.jetpack-connect__password-form .gridicon': 3,
+		'.jetpack-connect__password-container .jetpack-connect__creds-form-spinner':3,
 		'.auth__self-hosted-instructions': 4,
 		'.auth__form .form-password-input__toggle-visibility': 4,
 		'.site-selector': 10,
@@ -125,7 +128,6 @@ $z-layers: (
 		'.editor-confirmation-sidebar__overlay': 176,
 		'.editor-confirmation-sidebar__sidebar': 177,
 		'.popover.comment__author-more-info-popover': 178,
-		'.popover.comment-detail__author-more-info': 178,
 		'.popover.editor-ground-control__post-schedule-popover': 178,
 		'.popover.editor-visibility__popover': 179,
 		'.feature-example__gradient': 179,
@@ -166,6 +168,7 @@ $z-layers: (
 		'.design-menu.is-visible': 100201,
 		'.popover.gallery__order-popover': 100300,
 		'popover.is-dialog-visible': 100300,
+		'.popover.info-tooltip__container': 100300,
 		'body .webui-popover': 100300,
 		'.fullscreen-fader': 200000,
 		'.guided-tours__overlay': 200050,
@@ -173,7 +176,6 @@ $z-layers: (
 		'.wpcom-site__global-noscript': 300000, // JS off always visible
 		'.is-section-woocommerce .global-notices': 999999, //render notices on top of dialogs
 		'.webpack-build-monitor': 99999999,
-		'#habla_window_div.habla_window_div_base': 99999999 //olark
 	),
 	'.ribbon': (
 		'.ribbon__title::before': -1,
@@ -196,7 +198,8 @@ $z-layers: (
 		'.input-chrono__container .gridicons-calendar': 0,
 		'input.input-chrono': 1,
 		'.popover .popover__arrow': 1,
-		'.post-schedule__header': 1
+		'.post-schedule__header': 1,
+		'.date-picker__nav-bar': 2
 	),
 	'.search': (
 		'.search__input': 10,
@@ -231,10 +234,15 @@ $z-layers: (
 		'.card.header-cake': 1,
 		'.reader-feed-header__follow': 1
 	),
-	'.reader-related-card-v2.card': (
-		'.reader-related-card-v2__meta': 1
+	'.reader-full-post__sidebar-comment-like': (
+		'.reader-full-post .back-button': 2,
+		'.author-compact-profile__follow .follow-button': 2,
+		'.reader-full-post__visit-site-container': 2
 	),
-	'.reader-related-card-v2__meta': (
+	'.reader-related-card.card': (
+		'.reader-related-card__meta': 1
+	),
+	'.reader-related-card__meta': (
 		'.follow-button': 1
 	),
 	'.list-stream__header-follow': (

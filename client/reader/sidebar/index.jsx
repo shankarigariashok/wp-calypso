@@ -30,10 +30,9 @@ import SidebarHeading from 'layout/sidebar/heading';
 import SidebarMenu from 'layout/sidebar/menu';
 import SidebarRegion from 'layout/sidebar/region';
 import observe from 'lib/mixins/data-observe';
-import ReaderListsStore from 'lib/reader-lists/lists';
 import userSettings from 'lib/user-settings';
 import userUtils from 'lib/user/utils';
-import viewport from 'lib/viewport';
+import { isMobile } from 'lib/viewport';
 import { isDiscoverEnabled } from 'reader/discover/helper';
 import { isAutomatticTeamMember } from 'reader/lib/teams';
 import { getTagStreamUrl } from 'reader/route';
@@ -42,7 +41,6 @@ import { getSubscribedLists } from 'state/reader/lists/selectors';
 import { getReaderTeams } from 'state/selectors';
 import { setNextLayoutFocus } from 'state/ui/layout-focus/actions';
 import { toggleReaderSidebarLists, toggleReaderSidebarTags } from 'state/ui/reader/sidebar/actions';
-import url from 'url';
 
 export const ReaderSidebar = createReactClass( {
 	displayName: 'ReaderSidebar',
@@ -62,11 +60,6 @@ export const ReaderSidebar = createReactClass( {
 			this.props.setNextLayoutFocus( 'content' );
 			window.scrollTo( 0, 0 );
 		}
-	},
-
-	highlightNewList( list ) {
-		list = ReaderListsStore.get( list.owner, list.slug );
-		window.location.href = url.resolve( 'https://wordpress.com', list.URL + '/edit' );
 	},
 
 	highlightNewTag( tagSlug ) {
@@ -317,7 +310,7 @@ export const shouldRenderAppPromo = ( options = {} ) => {
 	const haveUserSettingsLoaded = userSettings.getSetting( ' is_desktop_app_user' ) === null;
 	const {
 		isDesktopPromoDisabled = store.get( 'desktop_promo_disabled' ),
-		isViewportMobile = viewport.isMobile(),
+		isViewportMobile = isMobile(),
 		isUserLocaleEnglish = 'en' === userUtils.getLocaleSlug(),
 		isDesktopPromoConfiguredToRun = config.isEnabled( 'desktop-promo' ),
 		isUserDesktopAppUser = haveUserSettingsLoaded ||

@@ -3,10 +3,8 @@
 /**
  * External dependencies
  */
-
-import React from 'react';
 import request from 'superagent';
-import { get, omit } from 'lodash';
+import { get, defer, replace } from 'lodash';
 import { translate } from 'i18n-calypso';
 
 /**
@@ -14,6 +12,10 @@ import { translate } from 'i18n-calypso';
  */
 import config from 'config';
 import {
+	LOGIN_AUTH_ACCOUNT_TYPE_REQUEST,
+	LOGIN_AUTH_ACCOUNT_TYPE_REQUESTING,
+	LOGIN_AUTH_ACCOUNT_TYPE_REQUEST_FAILURE,
+	LOGIN_AUTH_ACCOUNT_TYPE_RESET,
 	LOGIN_FORM_UPDATE,
 	LOGIN_REQUEST,
 	LOGIN_REQUEST_FAILURE,
@@ -45,127 +47,18 @@ import {
 } from 'state/action-types';
 import { getTwoFactorAuthNonce, getTwoFactorUserId } from 'state/login/selectors';
 import { getCurrentUser } from 'state/current-user/selectors';
+import { getErrorFromHTTPError, getErrorFromWPCOMError, getSMSMessageFromResponse } from './utils';
 import wpcom from 'lib/wp';
 import { addLocaleToWpcomUrl, getLocaleSlug } from 'lib/i18n-utils';
-
-function getSMSMessageFromResponse( response ) {
-	const phoneNumber = get( response, 'body.data.phone_number' );
-	return translate( 'Message sent to phone number ending in %(phoneNumber)s', {
-		args: {
-			phoneNumber,
-		},
-	} );
-}
-
-const errorFields = {
-	empty_password: 'password',
-	empty_two_step_code: 'twoStepCode',
-	empty_username: 'usernameOrEmail',
-	incorrect_password: 'password',
-	invalid_email: 'usernameOrEmail',
-	invalid_two_step_code: 'twoStepCode',
-	invalid_username: 'usernameOrEmail',
-};
+import { recordTracksEventWithClientId as recordTracksEvent } from 'state/analytics/actions';
 
 /**
- * Retrieves the first error message from the specified HTTP error.
+ * Logs a user in.
  *
- * @param {Object} httpError HTTP error
- * @returns {{code: string?, message: string, field: string}} an error message and the id of the corresponding field, if not global
- */
-function getErrorFromHTTPError( httpError ) {
-	let field = 'global';
-
-	if ( ! httpError.status ) {
-		return {
-			code: 'network_error',
-			message: httpError.message,
-			field,
-		};
-	}
-
-	const code = get( httpError, 'response.body.data.errors[0].code' );
-
-	if ( code ) {
-		if ( code in errorFields ) {
-			field = errorFields[ code ];
-		} else if ( code === 'admin_login_attempt' ) {
-			const url = addLocaleToWpcomUrl(
-				'https://wordpress.com/wp-login.php?action=lostpassword',
-				getLocaleSlug()
-			);
-
-			return {
-				code,
-				message: (
-					<div>
-						<p>
-							{ translate(
-								'You attempted to login with the username {{em}}admin{{/em}} on WordPress.com.',
-								{ components: { em: <em /> } }
-							) }
-						</p>
-
-						<p>
-							{ translate(
-								'If you were trying to access your self hosted {{a}}WordPress.org{{/a}} site, ' +
-									'try {{strong}}yourdomain.com/wp-admin/{{/strong}} instead.',
-								{
-									components: {
-										a: <a href="http://wordpress.org" target="_blank" rel="noopener noreferrer" />,
-										strong: <strong />,
-									},
-								}
-							) }
-						</p>
-
-						<p>
-							{ translate(
-								'If you can’t remember your WordPress.com username, you can {{a}}reset your password{{/a}} ' +
-									'by providing your email address.',
-								{
-									components: {
-										a: <a href={ url } rel="external" />,
-									},
-								}
-							) }
-						</p>
-					</div>
-				),
-				field,
-			};
-		}
-	}
-
-	let message = get( httpError, 'response.body.data.errors[0].message' );
-
-	if ( ! message ) {
-		message = get( httpError, 'response.body.data', httpError.message );
-	}
-
-	return { code, message, field };
-}
-
-/**
- * Transforms WPCOM error to the error object we use for login purposes
- *
- * @param {Object} wpcomError HTTP error
- * @returns {{message: string, field: string, code: string}} an error message and the id of the corresponding field
- */
-const getErrorFromWPCOMError = wpcomError => ( {
-	message: wpcomError.message,
-	code: wpcomError.error,
-	field: 'global',
-	...omit( wpcomError, [ 'error', 'message', 'field' ] ),
-} );
-
-/**
- * Attempt to login a user.
- *
- * @param  {String}    usernameOrEmail    Username or email of the user.
- * @param  {String}    password           Password of the user.
- * @param  {String}    redirectTo         Url to redirect the user to upon successful login
- * @return {Function}                     Action thunk to trigger the login process.
+ * @param  {String}   usernameOrEmail Username or email of the user
+ * @param  {String}   password        Password of the user
+ * @param  {String}   redirectTo      Url to redirect the user to upon successful login
+ * @return {Function}                 A thunk that can be dispatched
  */
 export const loginUser = ( usernameOrEmail, password, redirectTo ) => dispatch => {
 	dispatch( {
@@ -220,11 +113,11 @@ export const loginUser = ( usernameOrEmail, password, redirectTo ) => dispatch =
 };
 
 /**
- * Attempt to login a user when a two factor verification code is sent.
+ * Logs a user in with a two factor verification code.
  *
- * @param  {String}    twoStepCode  Verification code for the user.
- * @param {String}     twoFactorAuthType Two factor authentication method
- * @return {Function}                 Action thunk to trigger the login process.
+ * @param  {String}   twoStepCode       Verification code received by the user
+ * @param  {String}   twoFactorAuthType Two factor authentication method (sms, push ...)
+ * @return {Function}                   A thunk that can be dispatched
  */
 export const loginUserWithTwoFactorVerificationCode = ( twoStepCode, twoFactorAuthType ) => (
 	dispatch,
@@ -245,7 +138,7 @@ export const loginUserWithTwoFactorVerificationCode = ( twoStepCode, twoFactorAu
 		.send( {
 			user_id: getTwoFactorUserId( getState() ),
 			auth_type: twoFactorAuthType,
-			two_step_code: twoStepCode,
+			two_step_code: replace( twoStepCode, /\s/g, '' ),
 			two_step_nonce: getTwoFactorAuthNonce( getState(), twoFactorAuthType ),
 			remember_me: true,
 			client_id: config( 'wpcom_signup_id' ),
@@ -277,14 +170,14 @@ export const loginUserWithTwoFactorVerificationCode = ( twoStepCode, twoFactorAu
 };
 
 /**
- * Attempt to login a user with an external social account.
+ * Logs a user in from a third-party social account (Google ...).
  *
- * @param  {Object}    socialInfo   Object containing { service, access_token, id_token }
- *            {String}    service      The external social service name.
- *            {String}    access_token OAuth2 access token provided by the social service.
- *            {String}    id_token     JWT ID token such as the one provided by Google OpenID Connect.
- * @param  {String}    redirectTo   Url to redirect the user to upon successful login
- * @return {Function}               Action thunk to trigger the login process.
+ * @param  {Object}   socialInfo     Object containing { service, access_token, id_token }
+ *           {String}   service      The external social service name
+ *           {String}   access_token OAuth2 access token provided by the social service
+ *           {String}   id_token     JWT ID token such as the one provided by Google OpenID Connect.
+ * @param  {String}   redirectTo     Url to redirect the user to upon successful login
+ * @return {Function}                A thunk that can be dispatched
  */
 export const loginSocialUser = ( socialInfo, redirectTo ) => dispatch => {
 	dispatch( { type: SOCIAL_LOGIN_REQUEST } );
@@ -338,14 +231,14 @@ export const loginSocialUser = ( socialInfo, redirectTo ) => dispatch => {
 };
 
 /**
- * Attempt to create an account with a social service
+ * Creates a WordPress.com account from a third-party social account (Google ...).
  *
- * @param  {Object}    socialInfo   Object containing { service, access_token, id_token }
- *            {String}    service      The external social service name.
- *            {String}    access_token OAuth2 access token provided by the social service.
- *            {String}    id_token     JWT ID token such as the one provided by Google OpenID Connect.
- * @param  {String}    flowName   the name of the signup flow
- * @return {Function}             Action thunk to trigger the login process.
+ * @param  {Object}   socialInfo     Object containing { service, access_token, id_token }
+ *           {String}   service      The external social service name
+ *           {String}   access_token OAuth2 access token provided by the social service
+ *           {String}   id_token     JWT ID token such as the one provided by Google OpenID Connect
+ * @param  {String}   flowName       The name of the current signup flow
+ * @return {Function}                A thunk that can be dispatched
  */
 export const createSocialUser = ( socialInfo, flowName ) => dispatch => {
 	dispatch( {
@@ -381,14 +274,14 @@ export const createSocialUser = ( socialInfo, flowName ) => dispatch => {
 };
 
 /**
- * Attempt to connect the current account with a social service
+ * Connects the current WordPress.com account with a third-party social account (Google ...).
  *
- * @param  {Object}    socialInfo   Object containing { service, access_token, id_token, redirectTo }
- *            {String}    service      The external social service name.
- *            {String}    access_token OAuth2 access token provided by the social service.
- *            {String}    id_token     JWT ID token such as the one provided by Google OpenID Connect.
- * @param  {String}    redirectTo   Url to redirect the user to upon successful login
- * @return {Function}               Action thunk to trigger the login process.
+ * @param  {Object}   socialInfo     Object containing { service, access_token, id_token, redirectTo }
+ *           {String}   service      The external social service name
+ *           {String}   access_token OAuth2 access token provided by the social service
+ *           {String}   id_token     JWT ID token such as the one provided by Google OpenID Connect
+ * @param  {String}   redirectTo     Url to redirect the user to upon successful login
+ * @return {Function}                A thunk that can be dispatched
  */
 export const connectSocialUser = ( socialInfo, redirectTo ) => dispatch => {
 	dispatch( {
@@ -423,10 +316,10 @@ export const connectSocialUser = ( socialInfo, redirectTo ) => dispatch => {
 };
 
 /**
- * Attempt to disconnect the current account with a social service
+ * Disconnects the current WordPress.com account from a third-party social account (Google ...).
  *
- * @param  {String}    socialService    The external social service name.
- * @return {Function}               Action thunk to trigger the login process.
+ * @param  {String}   socialService The social service name
+ * @return {Function}               A thunk that can be dispatched
  */
 export const disconnectSocialUser = socialService => dispatch => {
 	dispatch( {
@@ -466,9 +359,9 @@ export const createSocialUserFailed = ( socialInfo, error ) => ( {
 } );
 
 /**
- * Sends a two factor authentication recovery code to the 2FA user
+ * Sends a two factor authentication recovery code to a user.
  *
- * @return {Function}                Action thunk to trigger the request.
+ * @return {Function} A thunk that can be dispatched
  */
 export const sendSmsCode = () => ( dispatch, getState ) => {
 	dispatch( {
@@ -521,10 +414,10 @@ export const stopPollAppPushAuth = () => ( { type: TWO_FACTOR_AUTHENTICATION_PUS
 export const formUpdate = () => ( { type: LOGIN_FORM_UPDATE } );
 
 /**
- * Attempt to logout a user.
+ * Logs the current user out.
  *
- * @param  {String}    redirectTo         Url to redirect the user to upon successful logout
- * @return {Function}                     Action thunk to trigger the logout process.
+ * @param  {String}   redirectTo Url to redirect the user to upon successful logout
+ * @return {Function}            A thunk that can be dispatched
  */
 export const logoutUser = redirectTo => ( dispatch, getState ) => {
 	dispatch( {
@@ -572,3 +465,56 @@ export const logoutUser = redirectTo => ( dispatch, getState ) => {
 			return Promise.reject( error );
 		} );
 };
+
+/**
+ * Retrieves the type of authentication of the account (regular, passwordless ...) of the specified user.
+ *
+ * @param  {String}   usernameOrEmail Identifier of the user
+ * @return {Function}                 A thunk that can be dispatched
+ */
+export const getAuthAccountType = usernameOrEmail => dispatch => {
+	dispatch( recordTracksEvent( 'calypso_login_block_login_form_get_auth_type' ) );
+
+	dispatch( {
+		type: LOGIN_AUTH_ACCOUNT_TYPE_REQUEST,
+		usernameOrEmail,
+	} );
+
+	if ( usernameOrEmail === '' ) {
+		const error = {
+			code: 'empty_username',
+			message: translate( 'Please enter a username or email address.' ),
+			field: 'usernameOrEmail',
+		};
+
+		dispatch(
+			recordTracksEvent( 'calypso_login_block_login_form_get_auth_type_failure', {
+				error_code: error.code,
+				error_message: error.message,
+			} )
+		);
+
+		defer( () => {
+			dispatch( {
+				type: LOGIN_AUTH_ACCOUNT_TYPE_REQUEST_FAILURE,
+				error,
+			} );
+		} );
+
+		return;
+	}
+
+	dispatch( {
+		type: LOGIN_AUTH_ACCOUNT_TYPE_REQUESTING,
+		usernameOrEmail,
+	} );
+};
+
+/**
+ * Resets the type of authentication of the account of the current user.
+ *
+ * @return {Object} An action that can be dispatched
+ */
+export const resetAuthAccountType = () => ( {
+	type: LOGIN_AUTH_ACCOUNT_TYPE_RESET,
+} );

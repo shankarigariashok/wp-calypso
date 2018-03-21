@@ -15,7 +15,7 @@ import page from 'page';
 import Card from 'components/card';
 import { localize } from 'i18n-calypso';
 import { isTwoFactorAuthTypeSupported } from 'state/login/selectors';
-import { recordTracksEvent } from 'state/analytics/actions';
+import { recordTracksEventWithClientId as recordTracksEvent } from 'state/analytics/actions';
 import { sendSmsCode } from 'state/login/actions';
 import { login } from 'lib/paths';
 
@@ -64,17 +64,17 @@ class TwoFactorActions extends Component {
 
 				{ isSmsAvailable && (
 					<p>
-						<a href="#" onClick={ this.sendSmsCode }>
+						<button data-e2e-link="2fa-sms-link" onClick={ this.sendSmsCode }>
 							{ translate( 'Code via text message' ) }
-						</a>
+						</button>
 					</p>
 				) }
 
 				{ isAuthenticatorAvailable && (
 					<p>
-						<a href="#" onClick={ this.recordAuthenticatorLinkClick }>
+						<button data-e2e-link="2fa-otp-link" onClick={ this.recordAuthenticatorLinkClick }>
 							{ translate( 'Your authenticator app' ) }
-						</a>
+						</button>
 					</p>
 				) }
 			</Card>

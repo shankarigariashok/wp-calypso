@@ -9,30 +9,30 @@ import React, { Component } from 'react';
 import classnames from 'classnames';
 import { connect } from 'react-redux';
 import { isEqual, range, throttle } from 'lodash';
+import { localize } from 'i18n-calypso';
 
 /**
  * Internal dependencies
  */
+import afterLayoutFlush from 'lib/after-layout-flush';
 import QueryPosts from 'components/data/query-posts';
 import { DEFAULT_POST_QUERY } from 'lib/query-manager/post/constants';
 import { getSelectedSiteId } from 'state/ui/selectors';
 import {
-	isRequestingSitePostsForQueryIgnoringPage,
-	getSitePostsForQueryIgnoringPage,
-	getSitePostsFoundForQuery,
-	getSitePostsLastPageForQuery,
+	isRequestingPostsForQueryIgnoringPage,
+	getPostsForQueryIgnoringPage,
+	getPostsFoundForQuery,
+	getPostsLastPageForQuery,
 } from 'state/posts/selectors';
 import ListEnd from 'components/list-end';
 import PostItem from 'blocks/post-item';
 import PostTypeListEmptyContent from './empty-content';
 import PostTypeListMaxPagesNotice from './max-pages-notice';
+import UpgradeNudge from 'my-sites/upgrade-nudge';
 
 /**
  * Constants
  */
-// When this many pixels or less are below the viewport, begin loading the next
-// page of items.
-const LOAD_NEXT_PAGE_THRESHOLD_PIXELS = 400;
 // The maximum number of pages of results that can be displayed in "All My
 // Sites" (API endpoint limitation).
 const MAX_ALL_SITES_PAGES = 10;
@@ -52,20 +52,25 @@ class PostTypeList extends Component {
 		lastPageToRequest: PropTypes.number,
 	};
 
-	constructor() {
-		super( ...arguments );
+	constructor( props ) {
+		super( props );
 
 		this.renderPost = this.renderPost.bind( this );
 		this.renderPlaceholder = this.renderPlaceholder.bind( this );
 
 		this.maybeLoadNextPage = this.maybeLoadNextPage.bind( this );
-		this.scrollListener = throttle( this.maybeLoadNextPage, 100 );
-		window.addEventListener( 'scroll', this.scrollListener );
+		this.maybeLoadNextPageThrottled = throttle( this.maybeLoadNextPage, 100 );
+		this.maybeLoadNextPageAfterLayoutFlush = afterLayoutFlush( this.maybeLoadNextPage );
 
 		const maxRequestedPage = this.estimatePageCountFromPosts( this.props.posts );
 		this.state = {
 			maxRequestedPage,
 		};
+	}
+
+	componentDidMount() {
+		this.maybeLoadNextPageAfterLayoutFlush();
+		window.addEventListener( 'scroll', this.maybeLoadNextPageThrottled );
 	}
 
 	componentWillReceiveProps( nextProps ) {
@@ -85,17 +90,14 @@ class PostTypeList extends Component {
 			// We just finished loading a page.  If the bottom of the list is
 			// still visible on screen (or almost visible), then we should go
 			// ahead and load the next page.
-			this.maybeLoadNextPage();
+			this.maybeLoadNextPageAfterLayoutFlush();
 		}
 	}
 
-	componentDidMount() {
-		this.maybeLoadNextPage();
-	}
-
 	componentWillUnmount() {
-		window.removeEventListener( 'scroll', this.scrollListener );
-		this.scrollListener.cancel(); // Cancel any pending scroll events
+		window.removeEventListener( 'scroll', this.maybeLoadNextPageThrottled );
+		this.maybeLoadNextPageThrottled.cancel(); // Cancel any pending scroll events
+		this.maybeLoadNextPageAfterLayoutFlush.cancel();
 	}
 
 	estimatePageCountFromPosts( posts ) {
@@ -149,11 +151,14 @@ class PostTypeList extends Component {
 		const scrollTop = this.getScrollTop();
 		const { scrollHeight, clientHeight } = scrollContainer;
 		const pixelsBelowViewport = scrollHeight - scrollTop - clientHeight;
+		// When the currently loaded list has this many pixels or less
+		// remaining below the viewport, begin loading the next page of items.
+		const thresholdPixels = Math.max( clientHeight, 400 );
 		if (
 			typeof scrollTop !== 'number' ||
 			typeof scrollHeight !== 'number' ||
 			typeof clientHeight !== 'number' ||
-			pixelsBelowViewport > LOAD_NEXT_PAGE_THRESHOLD_PIXELS
+			pixelsBelowViewport > thresholdPixels
 		) {
 			return;
 		}
@@ -199,12 +204,19 @@ class PostTypeList extends Component {
 	}
 
 	render() {
-		const { query, siteId, posts, isRequestingPosts } = this.props;
+		const { query, siteId, isRequestingPosts, translate } = this.props;
 		const { maxRequestedPage } = this.state;
-		const isLoadedAndEmpty = query && posts && ! posts.length && ! isRequestingPosts;
+		const posts = this.props.posts || [];
+		const isLoadedAndEmpty = query && ! posts.length && ! isRequestingPosts;
 		const classes = classnames( 'post-type-list', {
 			'is-empty': isLoadedAndEmpty,
 		} );
+		const showUpgradeNudge =
+			siteId &&
+			posts.length > 10 &&
+			query &&
+			( query.type === 'post' || ! query.type ) &&
+			query.status === 'publish,private';
 
 		return (
 			<div className={ classes }>
@@ -212,7 +224,16 @@ class PostTypeList extends Component {
 					range( 1, maxRequestedPage + 1 ).map( page => (
 						<QueryPosts key={ `query-${ page }` } siteId={ siteId } query={ { ...query, page } } />
 					) ) }
-				{ posts && posts.map( this.renderPost ) }
+				{ posts.slice( 0, 10 ).map( this.renderPost ) }
+				{ showUpgradeNudge && (
+					<UpgradeNudge
+						title={ translate( 'No Ads with WordPress.com Premium' ) }
+						message={ translate( 'Prevent ads from showing on your site.' ) }
+						feature="no-adverts"
+						event="published_posts_no_ads"
+					/>
+				) }
+				{ posts.slice( 10 ).map( this.renderPost ) }
 				{ isLoadedAndEmpty && (
 					<PostTypeListEmptyContent type={ query.type } status={ query.status } />
 				) }
@@ -226,16 +247,16 @@ class PostTypeList extends Component {
 export default connect( ( state, ownProps ) => {
 	const siteId = getSelectedSiteId( state );
 
-	const totalPageCount = getSitePostsLastPageForQuery( state, siteId, ownProps.query );
+	const totalPageCount = getPostsLastPageForQuery( state, siteId, ownProps.query );
 	const lastPageToRequest =
 		siteId === null ? Math.min( MAX_ALL_SITES_PAGES, totalPageCount ) : totalPageCount;
 
 	return {
 		siteId,
-		posts: getSitePostsForQueryIgnoringPage( state, siteId, ownProps.query ),
-		isRequestingPosts: isRequestingSitePostsForQueryIgnoringPage( state, siteId, ownProps.query ),
-		totalPostCount: getSitePostsFoundForQuery( state, siteId, ownProps.query ),
+		posts: getPostsForQueryIgnoringPage( state, siteId, ownProps.query ),
+		isRequestingPosts: isRequestingPostsForQueryIgnoringPage( state, siteId, ownProps.query ),
+		totalPostCount: getPostsFoundForQuery( state, siteId, ownProps.query ),
 		totalPageCount,
 		lastPageToRequest,
 	};
-} )( PostTypeList );
+} )( localize( PostTypeList ) );

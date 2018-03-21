@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import React, { PureComponent } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
@@ -14,12 +12,12 @@ import { get } from 'lodash';
  */
 import PostSchedule from 'components/post-schedule';
 import QueryPosts from 'components/data/query-posts';
-import postUtils from 'lib/posts/utils';
-import siteUtils from 'lib/site/utils';
-import { getSitePostsForQueryIgnoringPage } from 'state/posts/selectors';
+import * as postUtils from 'lib/posts/utils';
+import { timezone } from 'lib/site/utils';
+import { getPostsForQueryIgnoringPage } from 'state/posts/selectors';
 
 const PostScheduleWithOtherPostsIndicated = connect( ( state, { site, query } ) => ( {
-	posts: getSitePostsForQueryIgnoringPage( state, get( site, 'ID' ), query ) || [],
+	posts: getPostsForQueryIgnoringPage( state, get( site, 'ID' ), query ) || [],
 } ) )( function( { onDateChange, onMonthChange, posts, selectedDay, site } ) {
 	return (
 		<PostSchedule
@@ -47,7 +45,7 @@ export default class PostScheduler extends PureComponent {
 	};
 
 	getFirstDayOfTheMonth( date ) {
-		const tz = siteUtils.timezone( this.props.site );
+		const tz = timezone( this.props.site );
 
 		return postUtils.getOffsetDate( date, tz ).set( {
 			year: date.year(),

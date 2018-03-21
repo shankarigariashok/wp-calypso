@@ -10,25 +10,36 @@ import { localize } from 'i18n-calypso';
  * Internal dependencies
  */
 import Card from 'components/card';
-import config from 'config';
 import QueryLabelSettings from 'woocommerce/woocommerce-services/components/query-label-settings';
 import { getSelectedSite } from 'state/ui/selectors';
 import { getLink } from 'woocommerce/lib/nav-utils';
 import {
 	areSettingsLoaded,
 	areLabelsEnabled,
+	getLabelSettingsFormMeta,
 	getSelectedPaymentMethodId,
 } from 'woocommerce/woocommerce-services/state/label-settings/selectors';
+import { isWcsEnabled } from 'woocommerce/state/selectors/plugins';
 
-const wcsEnabled = config.isEnabled( 'woocommerce/extension-wcservices' );
-
-const LabelsSetupNotice = ( { site, loaded, enabled, hasLabelsPaymentMethod, translate } ) => {
+const LabelsSetupNotice = ( {
+	site,
+	wcsEnabled,
+	loaded,
+	enabled,
+	hasLabelsPaymentMethod,
+	translate,
+	showNotice,
+} ) => {
 	if ( ! wcsEnabled ) {
 		return null;
 	}
 
 	if ( ! loaded ) {
 		return <QueryLabelSettings siteId={ site.ID } />;
+	}
+
+	if ( ! showNotice ) {
+		return null;
 	}
 
 	if ( enabled && ! hasLabelsPaymentMethod ) {
@@ -48,9 +59,11 @@ const LabelsSetupNotice = ( { site, loaded, enabled, hasLabelsPaymentMethod, tra
 export default connect( state => {
 	const site = getSelectedSite( state );
 	return {
+		wcsEnabled: isWcsEnabled( state, site.ID ),
 		site,
 		loaded: areSettingsLoaded( state, site.ID ),
 		enabled: areLabelsEnabled( state, site.ID ),
 		hasLabelsPaymentMethod: Boolean( getSelectedPaymentMethodId( state, site.ID ) ),
+		showNotice: ( getLabelSettingsFormMeta( state, site.ID ) || {} ).can_manage_payments,
 	};
 } )( localize( LabelsSetupNotice ) );

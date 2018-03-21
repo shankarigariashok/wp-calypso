@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import classNames from 'classnames';
 import { localize } from 'i18n-calypso';
 import PropTypes from 'prop-types';
@@ -29,7 +27,7 @@ import {
 	PLAN_JETPACK_PERSONAL_MONTHLY,
 	PLAN_PERSONAL,
 } from 'lib/plans/constants';
-import purchasesPaths from 'me/purchases/paths';
+import { managePurchase } from 'me/purchases/paths';
 
 class CurrentPlanHeader extends Component {
 	static propTypes = {
@@ -77,7 +75,7 @@ class CurrentPlanHeader extends Component {
 				<div className={ classes }>
 					<span className="current-plan__header-expires-in">
 						{ hasAutoRenew && currentPlan.autoRenewDateMoment
-							? translate( 'Set to Auto Renew on %s.', {
+							? translate( 'Set to auto-renew on %s.', {
 									args: invoke( currentPlan, 'autoRenewDateMoment.format', 'LL' ),
 								} )
 							: translate( 'Expires on %s.', {
@@ -85,10 +83,7 @@ class CurrentPlanHeader extends Component {
 								} ) }
 					</span>
 					{ currentPlan.userIsOwner && (
-						<Button
-							compact
-							href={ purchasesPaths.managePurchase( selectedSite.slug, currentPlan.id ) }
-						>
+						<Button compact href={ managePurchase( selectedSite.slug, currentPlan.id ) }>
 							{ hasAutoRenew ? translate( 'Manage Payment' ) : translate( 'Renew Now' ) }
 						</Button>
 					) }
@@ -100,10 +95,12 @@ class CurrentPlanHeader extends Component {
 	render() {
 		const {
 			currentPlanSlug,
+			includePlansLink,
 			isAutomatedTransfer,
 			isPlaceholder,
 			title,
 			tagLine,
+			translate,
 			selectedSite,
 		} = this.props;
 
@@ -132,6 +129,14 @@ class CurrentPlanHeader extends Component {
 							</h2>
 						</div>
 						{ this.renderPurchaseInfo() }
+						{ includePlansLink && (
+							<Button
+								className="current-plan__compare-plans"
+								href={ '/plans/' + selectedSite.slug }
+							>
+								{ translate( 'Compare Plans' ) }
+							</Button>
+						) }
 					</div>
 				</div>
 
@@ -139,6 +144,7 @@ class CurrentPlanHeader extends Component {
 					<div className="current-plan__header-item-content">
 						<HappinessSupport
 							isJetpack={ !! selectedSite.jetpack && ! isAutomatedTransfer }
+							isJetpackFreePlan={ currentPlanSlug === PLAN_JETPACK_FREE }
 							isPlaceholder={ isPlaceholder }
 							showLiveChatButton={ this.isEligibleForLiveChat() }
 							liveChatButtonEventName="calypso_plans_current_plan_chat_initiated"

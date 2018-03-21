@@ -20,6 +20,7 @@ import {
 	startsWith,
 } from 'lodash';
 import i18n from 'i18n-calypso';
+import moment from 'moment';
 
 /**
  * Internal dependencies
@@ -35,7 +36,7 @@ import { fromApi as seoTitleFromApi } from 'components/seo/meta-title-editor/map
 import versionCompare from 'lib/version-compare';
 import { getCustomizerFocus } from 'my-sites/customize/panels';
 import { getSiteComputedAttributes } from './utils';
-import { isSiteUpgradeable, getSiteOptions } from 'state/selectors';
+import { isSiteUpgradeable, getSiteOptions, getSitesItems } from 'state/selectors';
 
 /**
  * Returns a raw site object by its ID.
@@ -45,7 +46,7 @@ import { isSiteUpgradeable, getSiteOptions } from 'state/selectors';
  * @return {?Object}        Site object
  */
 export const getRawSite = ( state, siteId ) => {
-	return state.sites.items[ siteId ] || null;
+	return getSitesItems( state )[ siteId ] || null;
 };
 
 /**
@@ -57,13 +58,8 @@ export const getRawSite = ( state, siteId ) => {
  */
 export const getSiteBySlug = createSelector(
 	( state, siteSlug ) =>
-		find(
-			state.sites.items,
-			( item, siteId ) =>
-				// find always passes the siteId as a string. We need it as a integer
-				getSiteSlug( state, parseInt( siteId, 10 ) ) === siteSlug
-		) || null,
-	state => state.sites.items
+		find( getSitesItems( state ), site => getSiteSlug( state, site.ID ) === siteSlug ) || null,
+	getSitesItems
 );
 
 /**
@@ -128,20 +124,24 @@ export function getJetpackComputedAttributes( state, siteId ) {
  * @param  {Object}   state Global state tree
  * @return {Number[]}       WordPress.com site IDs with collisions
  */
-export const getSiteCollisions = createSelector( state => {
-	return map(
-		filter( state.sites.items, wpcomSite => {
-			const wpcomSiteUrlSansProtocol = withoutHttp( wpcomSite.URL );
-			return (
-				! wpcomSite.jetpack &&
-				some( state.sites.items, jetpackSite => {
-					return jetpackSite.jetpack && wpcomSiteUrlSansProtocol === withoutHttp( jetpackSite.URL );
-				} )
-			);
-		} ),
-		'ID'
-	);
-}, state => state.sites.items );
+export const getSiteCollisions = createSelector(
+	state =>
+		map(
+			filter( getSitesItems( state ), wpcomSite => {
+				const wpcomSiteUrlSansProtocol = withoutHttp( wpcomSite.URL );
+				return (
+					! wpcomSite.jetpack &&
+					some(
+						getSitesItems( state ),
+						jetpackSite =>
+							jetpackSite.jetpack && wpcomSiteUrlSansProtocol === withoutHttp( jetpackSite.URL )
+					)
+				);
+			} ),
+			'ID'
+		),
+	getSitesItems
+);
 
 /**
  * Returns true if a collision exists for the specified WordPress.com site ID.
@@ -233,18 +233,21 @@ export function isJetpackMinimumVersion( state, siteId, version ) {
  * @param  {Number}  siteId Site ID
  * @return {?String}        Site slug
  */
-export function getSiteSlug( state, siteId ) {
-	const site = getRawSite( state, siteId );
-	if ( ! site ) {
-		return null;
-	}
+export const getSiteSlug = createSelector(
+	( state, siteId ) => {
+		const site = getRawSite( state, siteId );
+		if ( ! site ) {
+			return null;
+		}
 
-	if ( getSiteOption( state, siteId, 'is_redirect' ) || isSiteConflicting( state, siteId ) ) {
-		return withoutHttp( getSiteOption( state, siteId, 'unmapped_url' ) );
-	}
+		if ( getSiteOption( state, siteId, 'is_redirect' ) || isSiteConflicting( state, siteId ) ) {
+			return withoutHttp( getSiteOption( state, siteId, 'unmapped_url' ) );
+		}
 
-	return urlToSlug( site.URL );
-}
+		return urlToSlug( site.URL );
+	},
+	[ getSitesItems ]
+);
 
 /**
  * Returns the domain for a site, or null if the site is unknown.
@@ -287,6 +290,27 @@ export function getSiteTitle( state, siteId ) {
 	}
 
 	return getSiteDomain( state, siteId );
+}
+
+/**
+ * Returns the URL for a site, or null if the site is unknown.
+ *
+ * @param  {Object}  state  Global state tree
+ * @param  {Number}  siteId Site ID
+ * @return {?String}        Site Url
+ */
+export function getSiteUrl( state, siteId ) {
+	if ( getSiteOption( state, siteId, 'is_redirect' ) || isSiteConflicting( state, siteId ) ) {
+		return getSiteSlug( state, siteId );
+	}
+
+	const site = getRawSite( state, siteId );
+
+	if ( ! site ) {
+		return null;
+	}
+
+	return site.URL;
 }
 
 /**
@@ -654,7 +678,7 @@ export function canJetpackSiteUpdateFiles( state, siteId ) {
 		return false;
 	}
 
-	if ( ! isJetpackSiteMainNetworkSite( state, siteId ) ) {
+	if ( isJetpackSiteSecondaryNetworkSite( state, siteId ) ) {
 		return false;
 	}
 
@@ -778,16 +802,6 @@ export function isJetpackSiteMainNetworkSite( state, siteId ) {
 		return null;
 	}
 
-	const isMultiNetwork = getSiteOption( state, siteId, 'is_multi_network' );
-
-	if ( isMultiNetwork ) {
-		return false;
-	}
-
-	if ( site.is_multisite === false ) {
-		return true;
-	}
-
 	if ( ! site.is_multisite ) {
 		return false;
 	}
@@ -818,14 +832,16 @@ export function isJetpackSiteSecondaryNetworkSite( state, siteId ) {
 		return null;
 	}
 
-	const isMultiNetwork = getSiteOption( state, siteId, 'is_multi_network' );
-
-	if ( site.is_multisite === false || isMultiNetwork === false ) {
+	if ( ! site.is_multisite ) {
 		return false;
 	}
 
 	const unmappedUrl = getSiteOption( state, siteId, 'unmapped_url' ),
 		mainNetworkSite = getSiteOption( state, siteId, 'main_network_site' );
+
+	if ( ! unmappedUrl || ! mainNetworkSite ) {
+		return false;
+	}
 
 	// Compare unmapped_url with the main_network_site to see if is not the main network site.
 	return withoutHttp( unmappedUrl ) !== withoutHttp( mainNetworkSite );
@@ -1076,3 +1092,53 @@ export const siteSupportsGoogleAnalyticsIPAnonymization = ( state, siteId ) => {
 export const siteSupportsGoogleAnalyticsBasicEcommerceTracking = ( state, siteId ) => {
 	return isJetpackMinimumVersion( state, siteId, '5.4-beta3' );
 };
+
+/**
+ * Returns true if the version of Jetpack on the site supports Google Analytics Enhanced eCommerce Tracking.
+ * False otherwise.
+ *
+ * @param {Object} state  Global state tree
+ * @param {Object} siteId Site ID
+ * @return {?Boolean}     Whether site supports the settings.
+ */
+export const siteSupportsGoogleAnalyticsEnhancedEcommerceTracking = ( state, siteId ) => {
+	return isJetpackMinimumVersion( state, siteId, '5.6-beta2' );
+};
+
+/**
+ * Returns true if the site is created less than 30 mins ago.
+ * False otherwise.
+ *
+ * @param  {Object}  state  Global state tree
+ * @param  {Number}  siteId Site ID
+ * @return {Boolean}        Whether site is newly created.
+ */
+export function isNewSite( state, siteId ) {
+	const createdAt = getSiteOption( state, siteId, 'created_at' );
+
+	if ( ! createdAt ) {
+		return false;
+	}
+
+	// less than 30 minutes
+	return moment().diff( createdAt, 'minutes' ) < 30;
+}
+
+/**
+ * Returns whether all sites have been fetched.
+ * @param {Object}    state  Global state tree
+ * @return {Boolean}        Request State
+ */
+export function hasAllSitesList( state ) {
+	return !! state.sites.hasAllSitesList;
+}
+
+/**
+ * Returns the updates object for a site
+ * @param {Object} state Global state tree
+ * @param {Number} siteId Site ID
+ * @return {Object} Available updates for the site
+ */
+export function getUpdatesBySiteId( state, siteId ) {
+	return get( getRawSite( state, siteId ), 'updates', null );
+}

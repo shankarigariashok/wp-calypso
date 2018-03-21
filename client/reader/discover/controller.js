@@ -8,7 +8,7 @@ import React from 'react';
  * Internal dependencies
  */
 import config from 'config';
-import route from 'lib/route';
+import { sectionify } from 'lib/route';
 import feedStreamFactory from 'lib/feed-stream-store';
 import { recordTrack } from 'reader/stats';
 import {
@@ -17,15 +17,14 @@ import {
 	trackUpdatesLoaded,
 	trackScrollPage,
 } from 'reader/controller-helper';
-import { renderWithReduxStore } from 'lib/react-helpers';
 import AsyncLoad from 'components/async-load';
 
 const ANALYTICS_PAGE_TITLE = 'Reader';
 
 const exported = {
-	discover( context ) {
+	discover( context, next ) {
 		const blogId = config( 'discover_blog_id' );
-		const basePath = route.sectionify( context.path );
+		const basePath = sectionify( context.path );
 		const fullAnalyticsPageTitle = ANALYTICS_PAGE_TITLE + ' > Site > ' + blogId;
 		const feedStore = feedStreamFactory( 'site:' + blogId );
 		const featuredStore = feedStreamFactory( `featured:${ blogId }` );
@@ -38,7 +37,7 @@ const exported = {
 		trackPageLoad( basePath, fullAnalyticsPageTitle, mcKey );
 		recordTrack( 'calypso_reader_discover_viewed' );
 
-		renderWithReduxStore(
+		context.primary = (
 			<AsyncLoad
 				require="reader/site-stream"
 				key={ 'site-' + blogId }
@@ -59,10 +58,9 @@ const exported = {
 				showBack={ false }
 				className="is-discover-stream is-site-stream"
 				featuredStore={ featuredStore }
-			/>,
-			document.getElementById( 'primary' ),
-			context.store
+			/>
 		);
+		next();
 	},
 };
 

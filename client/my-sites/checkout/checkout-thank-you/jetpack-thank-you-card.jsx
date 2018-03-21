@@ -6,7 +6,6 @@
 
 import React, { Component } from 'react';
 import page from 'page';
-import { bindActionCreators } from 'redux';
 import { connect } from 'react-redux';
 import { difference, filter, get, map, range, reduce, some } from 'lodash';
 import { localize } from 'i18n-calypso';
@@ -23,20 +22,19 @@ import Spinner from 'components/spinner';
 import Gridicon from 'gridicons';
 import QueryPluginKeys from 'components/data/query-plugin-keys';
 import analytics from 'lib/analytics';
-import JetpackSite from 'lib/site/jetpack';
-import support from 'lib/url/support';
-import utils from 'lib/site/utils';
+import { SETTING_UP_PREMIUM_SERVICES } from 'lib/url/support';
+import { getSiteFileModDisableReason } from 'lib/site/utils';
 import HappyChatButton from 'components/happychat/button';
 
 // Redux actions & selectors
-import { getSelectedSite, getSelectedSiteId } from 'state/ui/selectors';
+import { getSelectedSiteId } from 'state/ui/selectors';
 import {
-	getRawSite,
+	getSite,
 	getSiteAdminUrl,
-	isJetpackSite,
 	isJetpackSiteMainNetworkSite,
 	isJetpackSiteMultiSite,
 	isRequestingSites,
+	getJetpackSiteRemoteManagementUrl,
 } from 'state/sites/selectors';
 import { getPlugin } from 'state/plugins/wporg/selectors';
 import { fetchPluginData } from 'state/plugins/wporg/actions';
@@ -66,17 +64,15 @@ import {
 	FEATURE_ONE_CLICK_THREAT_RESOLUTION,
 	FEATURE_SPAM_AKISMET_PLUS,
 	FEATURES_LIST,
-	getPlanClass,
-} from 'lib/plans/constants';
-import { getPlan } from 'lib/plans';
-import {
 	PLAN_JETPACK_BUSINESS,
 	PLAN_JETPACK_BUSINESS_MONTHLY,
 	PLAN_JETPACK_PERSONAL,
 	PLAN_JETPACK_PERSONAL_MONTHLY,
 	PLAN_JETPACK_PREMIUM,
 	PLAN_JETPACK_PREMIUM_MONTHLY,
+	getPlanClass,
 } from 'lib/plans/constants';
+import { getPlan } from 'lib/plans';
 
 const vpFeatures = {
 	[ FEATURE_OFFSITE_BACKUP_VAULTPRESS_DAILY ]: true,
@@ -94,12 +90,10 @@ const akismetFeatures = {
 };
 
 class JetpackThankYouCard extends Component {
-	constructor( props ) {
-		super( props );
-		this.state = {
-			completedJetpackFeatures: {},
-		};
-	}
+	state = {
+		completedJetpackFeatures: {},
+		installInitiatedPlugins: new Set(),
+	};
 
 	trackConfigFinished( eventName, options = null ) {
 		if ( ! this.sentTracks ) {
@@ -158,7 +152,7 @@ class JetpackThankYouCard extends Component {
 		if (
 			! site ||
 			! site.jetpack ||
-			! site.canManage() ||
+			! site.canManage ||
 			! this.allPluginsHaveWporgData() ||
 			this.props.isInstalling
 		) {
@@ -198,7 +192,7 @@ class JetpackThankYouCard extends Component {
 			! site ||
 			! site.jetpack ||
 			! site.canUpdateFiles ||
-			! site.canManage() ||
+			! site.canManage ||
 			this.props.isFinished
 		) {
 			return;
@@ -210,8 +204,10 @@ class JetpackThankYouCard extends Component {
 	}
 
 	startNextPlugin( plugin ) {
+		const { slug } = plugin;
+
 		// We're already installing.
-		if ( this.props.isInstalling ) {
+		if ( this.props.isInstalling || this.state.installInitiatedPlugins.has( slug ) ) {
 			return;
 		}
 
@@ -219,10 +215,10 @@ class JetpackThankYouCard extends Component {
 		const site = this.props.selectedSite;
 
 		// Merge wporg info into the plugin object
-		plugin = Object.assign( {}, plugin, getPlugin( this.props.wporg, plugin.slug ) );
+		plugin = Object.assign( {}, plugin, getPlugin( this.props.wporg, slug ) );
 
 		const getPluginFromStore = function() {
-			const sitePlugin = PluginsStore.getSitePlugin( site, plugin.slug );
+			const sitePlugin = PluginsStore.getSitePlugin( site, slug );
 			if ( ! sitePlugin && PluginsStore.isFetchingSite( site ) ) {
 				// if the Plugins are still being fetched, we wait. We are not using flux
 				// store events because it would be more messy to handle the one-time-only
@@ -230,10 +226,18 @@ class JetpackThankYouCard extends Component {
 				return setTimeout( getPluginFromStore, 500 );
 			}
 			// Merge any site-specific info into the plugin object, setting a default plugin ID if needed
-			plugin = Object.assign( { id: plugin.slug }, plugin, sitePlugin );
+			plugin = Object.assign( { id: slug }, plugin, sitePlugin );
 			install( plugin, site );
 		};
-		getPluginFromStore();
+
+		// Redux state is not updated with installing plugins quickly enough.
+		// Track installing plugins locally to avoid redundant install requests.
+		this.setState(
+			( { installInitiatedPlugins } ) => ( {
+				installInitiatedPlugins: installInitiatedPlugins.add( slug ),
+			} ),
+			getPluginFromStore
+		);
 	}
 
 	renderFeature( feature, key = 0 ) {
@@ -303,7 +307,7 @@ class JetpackThankYouCard extends Component {
 				: this.getFeaturesWithStatus().map( this.renderFeature );
 		const features = <ul className="checkout-thank-you__jetpack-features">{ mappedFeatures }</ul>;
 
-		if ( selectedSite && ! selectedSite.canManage() ) {
+		if ( selectedSite && ! selectedSite.canManage ) {
 			return <FeatureExample>{ features }</FeatureExample>;
 		}
 
@@ -312,6 +316,10 @@ class JetpackThankYouCard extends Component {
 
 	onHappyChatButtonClick = () => {
 		analytics.tracks.recordEvent( 'calypso_plans_autoconfig_chat_initiated' );
+	};
+
+	onBackToYourSiteClick = () => {
+		analytics.tracks.recordEvent( 'calypso_plans_autoconfig_backtoyoursite' );
 	};
 
 	isEligibleForLiveChat() {
@@ -350,7 +358,7 @@ class JetpackThankYouCard extends Component {
 			return null;
 		}
 
-		const reasons = utils.getSiteFileModDisableReason( selectedSite, 'modifyFiles' );
+		const reasons = getSiteFileModDisableReason( selectedSite, 'modifyFiles' );
 		let reason;
 		if ( reasons && reasons.length > 0 ) {
 			reason = translate( "We can't modify files on your site." );
@@ -415,12 +423,13 @@ class JetpackThankYouCard extends Component {
 	}
 
 	renderManageNotice() {
-		const { translate, selectedSite } = this.props;
-		const manageUrl = selectedSite.getRemoteManagementURL() + '&section=plugins-setup';
+		const { translate, selectedSite, remoteManagementUrl } = this.props;
 
-		if ( ! selectedSite || selectedSite.canManage() ) {
+		if ( ! selectedSite || selectedSite.canManage ) {
 			return null;
 		}
+
+		const manageUrl = remoteManagementUrl + '&section=plugins-setup';
 
 		return (
 			<Notice
@@ -551,7 +560,7 @@ class JetpackThankYouCard extends Component {
 					<p>
 						{ translate( 'You will have to {{link}}set up your plan manually{{/link}}.', {
 							components: {
-								link: <a href={ support.SETTING_UP_PREMIUM_SERVICES } />,
+								link: <a href={ SETTING_UP_PREMIUM_SERVICES } />,
 							},
 						} ) }
 					</p>
@@ -567,9 +576,10 @@ class JetpackThankYouCard extends Component {
 						className={ classNames( 'button', 'thank-you-card__button', {
 							'is-placeholder': ! buttonUrl,
 						} ) }
+						onClick={ this.onBackToYourSiteClick }
 						href={ buttonUrl }
 					>
-						{ translate( 'Visit your site' ) }
+						{ translate( 'Back to your site' ) }
 					</a>
 					{ this.renderLiveChatButton() }
 				</div>
@@ -634,7 +644,6 @@ class JetpackThankYouCard extends Component {
 export default connect(
 	( state, ownProps ) => {
 		const siteId = getSelectedSiteId( state );
-		const site = getSelectedSite( state );
 		const whitelist = ownProps.whitelist || false;
 		let plan = getCurrentPlan( state, siteId );
 		let planSlug;
@@ -646,8 +655,6 @@ export default connect(
 		const planFeatures = plan && plan.getFeatures ? plan.getFeatures() : false;
 
 		// We need to pass the raw redux site to JetpackSite() in order to properly build the site.
-		const selectedSite =
-			site && isJetpackSite( state, siteId ) ? JetpackSite( getRawSite( state, siteId ) ) : site;
 		return {
 			wporg: state.plugins.wporg.items,
 			isSiteMultiSite: isJetpackSiteMultiSite( state, siteId ),
@@ -659,14 +666,19 @@ export default connect(
 			plugins: getPluginsForSite( state, siteId, whitelist ),
 			activePlugin: getActivePlugin( state, siteId, whitelist ),
 			nextPlugin: getNextPlugin( state, siteId, whitelist ),
-			selectedSite: selectedSite,
+			selectedSite: getSite( state, siteId ),
 			isRequestingSites: isRequestingSites( state ),
 			siteId,
-			jetpackAdminPageUrl: getSiteAdminUrl( state, siteId, 'admin.php?page=jetpack' ),
+			jetpackAdminPageUrl: getSiteAdminUrl( state, siteId, 'admin.php?page=jetpack#/plans' ),
+			remoteManagementUrl: getJetpackSiteRemoteManagementUrl( state, siteId ),
 			planFeatures,
 			planClass,
 			planSlug,
 		};
 	},
-	dispatch => bindActionCreators( { requestSites, fetchPluginData, installPlugin }, dispatch )
+	{
+		fetchPluginData,
+		installPlugin,
+		requestSites,
+	}
 )( localize( JetpackThankYouCard ) );

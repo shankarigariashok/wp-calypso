@@ -1,9 +1,7 @@
+/** @format **/
 /**
  *  External Dependencies
- *
- * @format
  */
-
 import { forEach, get } from 'lodash';
 
 /**
@@ -11,7 +9,7 @@ import { forEach, get } from 'lodash';
  */
 import Dispatcher from 'dispatcher';
 import { action as ActionType } from './constants';
-import FeedPostStoreActions from 'lib/feed-post-store/actions';
+import { receivePosts } from 'state/reader/posts/actions';
 import feedPostListCache from './feed-stream-cache';
 import wpcom from 'lib/wp';
 import { reduxDispatch } from 'lib/redux-bridge';
@@ -26,7 +24,7 @@ function getNextPageParams( store ) {
 		lastDate = store.getLastItemWithDate();
 
 	if ( lastDate ) {
-		params.before = lastDate;
+		params.before = lastDate instanceof Date ? lastDate.toISOString() : lastDate;
 	} else {
 		// only fetch four items for the initial page
 		// speeds up the initial fetch a fair bit
@@ -72,29 +70,13 @@ export function receivePage( id, error, data ) {
 		forEach( data.posts, function( post ) {
 			if ( post && get( post, 'meta.data.discover_original_post' ) ) {
 				// Looks like the original post for a Discover post (meta=discover_original_post)
-				FeedPostStoreActions.receivePost( null, post.meta.data.discover_original_post, {
-					blogId: post.meta.data.discover_original_post.site_ID,
-					postId: post.meta.data.discover_original_post.ID,
-				} );
+				reduxDispatch( receivePosts( [ post.meta.data.discover_original_post ] ) );
 			}
 
 			if ( post && get( post, 'meta.data.post' ) ) {
-				FeedPostStoreActions.receivePost( null, post.meta.data.post, {
-					feedId: post.feed_ID,
-					postId: post.ID,
-				} );
-			} else if ( post && post.feed_ID && post.feed_item_ID ) {
-				// 1.2 style
-				FeedPostStoreActions.receivePost( null, post, {
-					feedId: post.feed_ID,
-					postId: post.feed_item_ID,
-				} );
-			} else if ( post && post.site_ID ) {
-				// this looks like a full post object
-				FeedPostStoreActions.receivePost( null, post, {
-					blogId: post.site_ID,
-					postId: post.ID,
-				} );
+				reduxDispatch( receivePosts( [ post.meta.data.post ] ) );
+			} else if ( post ) {
+				reduxDispatch( receivePosts( [ post ] ) );
 			}
 			if ( post.comments ) {
 				// conversations!
@@ -117,20 +99,6 @@ export function receivePage( id, error, data ) {
 }
 
 export function receiveUpdates( id, error, data ) {
-	if ( ! error && data && data.posts ) {
-		forEach( data.posts, post => {
-			if ( post.comments ) {
-				// conversations!
-				reduxDispatch( {
-					type: COMMENTS_RECEIVE,
-					siteId: post.site_ID,
-					postId: post.ID,
-					comments: post.comments,
-				} );
-			}
-		} );
-	}
-
 	Dispatcher.handleServerAction( {
 		type: ActionType.RECEIVE_UPDATES,
 		id,
@@ -211,7 +179,7 @@ export function receiveGap( id, gap, error, data ) {
 
 export function dismissPost( id, post ) {
 	Dispatcher.handleViewAction( {
-		type: ActionType.DISMISS_FEED_STREAM_POST,
+		type: ActionType.DISMISS_POST,
 		postKey: {
 			blogId: post.site_ID,
 			postId: post.ID,

@@ -38,15 +38,30 @@ export const sitesSchema = {
 						product_id: { type: [ 'number', 'string' ] },
 						product_slug: { type: 'string' },
 						product_name_short: { type: [ 'string', 'null' ] },
-						free_trial: { type: 'boolean' },
 						expired: { type: 'boolean' },
 						user_is_owner: { type: 'boolean' },
 						is_free: { type: 'boolean' },
 					},
 				},
 				single_user_site: { type: 'boolean' },
+				updates: {
+					type: 'object',
+					properties: {
+						jp_version: { type: 'string' },
+						plugins: { type: 'number' },
+						themes: { type: 'number' },
+						total: { type: 'number' },
+						translations: { type: 'number' },
+						wordpress: { type: 'number' },
+						wp_version: { type: 'string' },
+					},
+				},
 			},
 		},
 	},
 	additionalProperties: false,
+};
+
+export const hasAllSitesListSchema = {
+	type: [ 'boolean', 'null' ],
 };

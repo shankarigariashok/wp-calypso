@@ -48,6 +48,13 @@ const sections = [
 		secondary: true,
 	},
 	{
+		name: 'privacy',
+		paths: [ '/me/privacy' ],
+		module: 'me/privacy',
+		group: 'me',
+		secondary: true,
+	},
+	{
 		name: 'purchases',
 		paths: [ '/me/purchases', '/purchases', '/me/billing', '/payment-methods/add-credit-card' ],
 		module: 'me/purchases',
@@ -74,6 +81,7 @@ const sections = [
 		module: 'my-sites/media',
 		group: 'sites',
 		secondary: true,
+		css: 'media',
 	},
 	{
 		name: 'people',
@@ -158,6 +166,13 @@ const sections = [
 		enableLoggedOut: true,
 	},
 	{
+		name: 'jetpack-onboarding',
+		paths: [ '/jetpack/start' ],
+		module: 'jetpack-onboarding',
+		secondary: false,
+		enableLoggedOut: true,
+	},
+	{
 		name: 'signup',
 		paths: [ '/start' ],
 		module: 'signup',
@@ -179,6 +194,13 @@ const sections = [
 		module: 'my-sites/checklist',
 		secondary: true,
 		group: 'checklist',
+	},
+	{
+		name: 'google-my-business',
+		paths: [ '/google-my-business' ],
+		module: 'my-sites/google-my-business',
+		secondary: true,
+		group: 'sites',
 	},
 	// Since we're using find() and startsWith() on paths, 'themes' needs to go before 'theme',
 	// or it'll be falsely associated with the latter section.
@@ -281,22 +303,6 @@ sections.push( {
 
 sections.push( {
 	name: 'reader',
-	paths: [ '/recommendations/posts' ],
-	module: 'reader/recommendations',
-	secondary: true,
-	group: 'reader',
-} );
-
-sections.push( {
-	name: 'reader',
-	paths: [ '/recommendations' ],
-	module: 'reader/recommendations',
-	secondary: true,
-	group: 'reader',
-} );
-
-sections.push( {
-	name: 'reader',
 	paths: [ '/discover' ],
 	module: 'reader/discover',
 	secondary: true,
@@ -329,7 +335,7 @@ sections.push( {
 
 sections.push( {
 	name: 'reader',
-	paths: [ '/read/search' ],
+	paths: [ '/read/search', '/recommendations' ],
 	module: 'reader/search',
 	secondary: true,
 	group: 'reader',
@@ -400,6 +406,7 @@ sections.push( {
 	module: 'my-sites/comments',
 	group: 'sites',
 	secondary: true,
+	css: 'comments',
 } );
 
 sections.push( {

@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import classNames from 'classnames';
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
@@ -22,6 +20,7 @@ import {
 	isRenewing,
 	purchaseType,
 	showCreditCardExpiringWarning,
+	subscribedWithinPastWeek,
 } from 'lib/purchases';
 import {
 	isDomainProduct,
@@ -33,7 +32,7 @@ import {
 import Notice from 'components/notice';
 import PlanIcon from 'components/plans/plan-icon';
 import Gridicon from 'gridicons';
-import paths from '../paths';
+import { managePurchase } from '../paths';
 import TrackComponentView from 'lib/analytics/track-component-view';
 
 const eventProperties = warning => ( { warning, position: 'purchase-list' } );
@@ -68,8 +67,9 @@ class PurchaseItem extends Component {
 
 		if ( isExpiring( purchase ) ) {
 			if ( purchase.expiryMoment < moment().add( 30, 'days' ) ) {
+				const status = subscribedWithinPastWeek( purchase ) ? 'is-info' : 'is-error';
 				return (
-					<Notice isCompact status="is-error" icon="notice">
+					<Notice isCompact status={ status } icon="notice">
 						{ translate( 'Expires %(timeUntilExpiry)s', {
 							args: {
 								timeUntilExpiry: purchase.expiryMoment.fromNow(),
@@ -111,7 +111,7 @@ class PurchaseItem extends Component {
 			return translate( 'Included with Plan' );
 		}
 
-		if ( isOneTimePurchase( purchase ) ) {
+		if ( isOneTimePurchase( purchase ) && ! isDomainTransfer( purchase ) ) {
 			return translate( 'Never Expires' );
 		}
 
@@ -202,7 +202,7 @@ class PurchaseItem extends Component {
 			};
 
 			if ( ! isDisconnectedSite ) {
-				props.href = paths.managePurchase( this.props.slug, this.props.purchase.id );
+				props.href = managePurchase( this.props.slug, this.props.purchase.id );
 			}
 		}
 

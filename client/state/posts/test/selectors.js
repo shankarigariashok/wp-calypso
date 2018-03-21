@@ -6,6 +6,7 @@
 import { expect } from 'chai';
 import deepFreeze from 'deep-freeze';
 import { values } from 'lodash';
+import moment from 'moment';
 
 /**
  * Internal dependencies
@@ -15,14 +16,14 @@ import {
 	getNormalizedPost,
 	getSitePosts,
 	getSitePost,
-	getSitePostsForQuery,
+	getPostsForQuery,
 	isPostPublished,
-	isRequestingSitePostsForQuery,
-	getSitePostsFoundForQuery,
-	getSitePostsLastPageForQuery,
-	isSitePostsLastPageForQuery,
-	getSitePostsForQueryIgnoringPage,
-	isRequestingSitePostsForQueryIgnoringPage,
+	isRequestingPostsForQuery,
+	getPostsFoundForQuery,
+	getPostsLastPageForQuery,
+	isPostsLastPageForQuery,
+	getPostsForQueryIgnoringPage,
+	isRequestingPostsForQueryIgnoringPage,
 	isEditedPostPrivate,
 	isPrivateEditedPostPasswordValid,
 	getEditedPost,
@@ -40,11 +41,11 @@ describe( 'selectors', () => {
 	beforeEach( () => {
 		getSitePosts.memoizedSelector.cache.clear();
 		getSitePost.memoizedSelector.cache.clear();
-		getSitePostsForQueryIgnoringPage.memoizedSelector.cache.clear();
-		isRequestingSitePostsForQueryIgnoringPage.memoizedSelector.cache.clear();
+		getPostsForQueryIgnoringPage.memoizedSelector.cache.clear();
+		isRequestingPostsForQueryIgnoringPage.memoizedSelector.cache.clear();
 		getNormalizedPost.memoizedSelector.cache.clear();
-		getSitePostsForQuery.memoizedSelector.cache.clear();
-		getSitePostsForQueryIgnoringPage.memoizedSelector.cache.clear();
+		getPostsForQuery.memoizedSelector.cache.clear();
+		getPostsForQueryIgnoringPage.memoizedSelector.cache.clear();
 		isPostPublished.memoizedSelector.cache.clear();
 	} );
 
@@ -252,9 +253,9 @@ describe( 'selectors', () => {
 		} );
 	} );
 
-	describe( '#getSitePostsForQuery()', () => {
+	describe( '#getPostsForQuery()', () => {
 		test( 'should return null if the site query is not tracked', () => {
-			const sitePosts = getSitePostsForQuery(
+			const sitePosts = getPostsForQuery(
 				{
 					posts: {
 						queries: {},
@@ -268,7 +269,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return null if the query is not tracked to the query manager', () => {
-			const sitePosts = getSitePostsForQuery(
+			const sitePosts = getPostsForQuery(
 				{
 					posts: {
 						queries: {
@@ -287,7 +288,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return an array of normalized known queried posts', () => {
-			const sitePosts = getSitePostsForQuery(
+			const sitePosts = getPostsForQuery(
 				{
 					posts: {
 						queries: {
@@ -324,7 +325,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( "should return null if we know the number of found items but the requested set hasn't been received", () => {
-			const sitePosts = getSitePostsForQuery(
+			const sitePosts = getPostsForQuery(
 				{
 					posts: {
 						queries: {
@@ -355,9 +356,9 @@ describe( 'selectors', () => {
 		} );
 	} );
 
-	describe( '#isRequestingSitePostsForQuery()', () => {
+	describe( '#isRequestingPostsForQuery()', () => {
 		test( 'should return false if the site has not been queried', () => {
-			const isRequesting = isRequestingSitePostsForQuery(
+			const isRequesting = isRequestingPostsForQuery(
 				{
 					posts: {
 						queryRequests: {},
@@ -371,7 +372,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return false if the site has not been queried for the specific query', () => {
-			const isRequesting = isRequestingSitePostsForQuery(
+			const isRequesting = isRequestingPostsForQuery(
 				{
 					posts: {
 						queryRequests: {
@@ -387,7 +388,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return true if the site has been queried for the specific query', () => {
-			const isRequesting = isRequestingSitePostsForQuery(
+			const isRequesting = isRequestingPostsForQuery(
 				{
 					posts: {
 						queryRequests: {
@@ -403,7 +404,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return false if the site has previously, but is not currently, querying for the specified query', () => {
-			const isRequesting = isRequestingSitePostsForQuery(
+			const isRequesting = isRequestingPostsForQuery(
 				{
 					posts: {
 						queryRequests: {
@@ -419,9 +420,9 @@ describe( 'selectors', () => {
 		} );
 	} );
 
-	describe( 'getSitePostsFoundForQuery()', () => {
+	describe( 'getPostsFoundForQuery()', () => {
 		test( 'should return null if the site query is not tracked', () => {
-			const found = getSitePostsFoundForQuery(
+			const found = getPostsFoundForQuery(
 				{
 					posts: {
 						queries: {},
@@ -435,7 +436,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return the found items for a site query', () => {
-			const found = getSitePostsFoundForQuery(
+			const found = getPostsFoundForQuery(
 				{
 					posts: {
 						queries: {
@@ -466,7 +467,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return zero if in-fact there are zero items', () => {
-			const found = getSitePostsFoundForQuery(
+			const found = getPostsFoundForQuery(
 				{
 					posts: {
 						queries: {
@@ -490,9 +491,9 @@ describe( 'selectors', () => {
 		} );
 	} );
 
-	describe( '#getSitePostsLastPageForQuery()', () => {
+	describe( '#getPostsLastPageForQuery()', () => {
 		test( 'should return null if the site query is not tracked', () => {
-			const lastPage = getSitePostsLastPageForQuery(
+			const lastPage = getPostsLastPageForQuery(
 				{
 					posts: {
 						queries: {},
@@ -506,7 +507,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return the last page value for a site query', () => {
-			const lastPage = getSitePostsLastPageForQuery(
+			const lastPage = getPostsLastPageForQuery(
 				{
 					posts: {
 						queries: {
@@ -537,7 +538,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return the last page value for a site query, even if including page param', () => {
-			const lastPage = getSitePostsLastPageForQuery(
+			const lastPage = getPostsLastPageForQuery(
 				{
 					posts: {
 						queries: {
@@ -568,7 +569,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return 1 if there are no found posts', () => {
-			const lastPage = getSitePostsLastPageForQuery(
+			const lastPage = getPostsLastPageForQuery(
 				{
 					posts: {
 						queries: {
@@ -592,9 +593,9 @@ describe( 'selectors', () => {
 		} );
 	} );
 
-	describe( '#isSitePostsLastPageForQuery()', () => {
+	describe( '#isPostsLastPageForQuery()', () => {
 		test( 'should return null if the last page is not known', () => {
-			const isLastPage = isSitePostsLastPageForQuery(
+			const isLastPage = isPostsLastPageForQuery(
 				{
 					posts: {
 						queries: {},
@@ -608,7 +609,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return false if the query explicit value is not the last page', () => {
-			const isLastPage = isSitePostsLastPageForQuery(
+			const isLastPage = isPostsLastPageForQuery(
 				{
 					posts: {
 						queries: {
@@ -639,7 +640,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return true if the query explicit value is the last page', () => {
-			const isLastPage = isSitePostsLastPageForQuery(
+			const isLastPage = isPostsLastPageForQuery(
 				{
 					posts: {
 						queries: {
@@ -670,7 +671,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return true if the query implicit value is the last page', () => {
-			const isLastPage = isSitePostsLastPageForQuery(
+			const isLastPage = isPostsLastPageForQuery(
 				{
 					posts: {
 						queries: {
@@ -701,9 +702,9 @@ describe( 'selectors', () => {
 		} );
 	} );
 
-	describe( '#getSitePostsForQueryIgnoringPage()', () => {
+	describe( '#getPostsForQueryIgnoringPage()', () => {
 		test( 'should return null if the query is not tracked', () => {
-			const sitePosts = getSitePostsForQueryIgnoringPage(
+			const sitePosts = getPostsForQueryIgnoringPage(
 				{
 					posts: {
 						items: {},
@@ -718,7 +719,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return null if the query manager has not received items for query', () => {
-			const sitePosts = getSitePostsForQueryIgnoringPage(
+			const sitePosts = getPostsForQueryIgnoringPage(
 				{
 					posts: {
 						items: {},
@@ -738,7 +739,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return a concatenated array of all site posts ignoring page', () => {
-			const sitePosts = getSitePostsForQueryIgnoringPage(
+			const sitePosts = getPostsForQueryIgnoringPage(
 				{
 					posts: {
 						items: {
@@ -801,7 +802,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( "should omit found items for which the requested result hasn't been received", () => {
-			const sitePosts = getSitePostsForQueryIgnoringPage(
+			const sitePosts = getPostsForQueryIgnoringPage(
 				{
 					posts: {
 						items: {
@@ -847,9 +848,9 @@ describe( 'selectors', () => {
 		} );
 	} );
 
-	describe( 'isRequestingSitePostsForQueryIgnoringPage()', () => {
+	describe( 'isRequestingPostsForQueryIgnoringPage()', () => {
 		test( 'should return false if not requesting for query', () => {
-			const isRequesting = isRequestingSitePostsForQueryIgnoringPage(
+			const isRequesting = isRequestingPostsForQueryIgnoringPage(
 				{
 					posts: {
 						queryRequests: {},
@@ -863,7 +864,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return true requesting for query at exact page', () => {
-			const isRequesting = isRequestingSitePostsForQueryIgnoringPage(
+			const isRequesting = isRequestingPostsForQueryIgnoringPage(
 				{
 					posts: {
 						queryRequests: {
@@ -879,7 +880,7 @@ describe( 'selectors', () => {
 		} );
 
 		test( 'should return true requesting for query without page specified', () => {
-			const isRequesting = isRequestingSitePostsForQueryIgnoringPage(
+			const isRequesting = isRequestingPostsForQueryIgnoringPage(
 				{
 					posts: {
 						queryRequests: {
@@ -895,7 +896,7 @@ describe( 'selectors', () => {
 		} );
 
 		it( 'should return true for all-sites query', () => {
-			const isRequesting = isRequestingSitePostsForQueryIgnoringPage(
+			const isRequesting = isRequestingPostsForQueryIgnoringPage(
 				{
 					posts: {
 						queryRequests: {
@@ -911,7 +912,7 @@ describe( 'selectors', () => {
 		} );
 
 		it( 'should return false for single site when requesting all sites', () => {
-			const isRequesting = isRequestingSitePostsForQueryIgnoringPage(
+			const isRequesting = isRequestingPostsForQueryIgnoringPage(
 				{
 					posts: {
 						queryRequests: {
@@ -1823,6 +1824,135 @@ describe( 'selectors', () => {
 			);
 
 			expect( isDirty ).to.be.true;
+		} );
+
+		test( 'should return true if saved post parent attr changes', () => {
+			const isDirty = isEditedPostDirty(
+				{
+					posts: {
+						queries: {
+							2916284: new PostQueryManager( {
+								items: {
+									841: {
+										ID: 841,
+										site_ID: 2916284,
+										global_ID: '3d097cb7c5473c169bba0eb8e3c6cb64',
+									},
+								},
+							} ),
+						},
+						edits: {
+							2916284: {
+								841: {
+									parent: 10,
+								},
+							},
+						},
+					},
+				},
+				2916284,
+				841
+			);
+
+			expect( isDirty ).to.be.true;
+		} );
+
+		test( "should return false if saved post parent attr doesn't change", () => {
+			const isDirty = isEditedPostDirty(
+				{
+					posts: {
+						queries: {
+							2916284: new PostQueryManager( {
+								items: {
+									841: {
+										ID: 841,
+										site_ID: 2916284,
+										global_ID: '3d097cb7c5473c169bba0eb8e3c6cb64',
+										parent: {
+											ID: 10,
+										},
+									},
+								},
+							} ),
+						},
+						edits: {
+							2916284: {
+								841: {
+									parent: 10,
+								},
+							},
+						},
+					},
+				},
+				2916284,
+				841
+			);
+
+			expect( isDirty ).to.be.false;
+		} );
+
+		test( 'should return true if saved post date changes', () => {
+			const isDirty = isEditedPostDirty(
+				{
+					posts: {
+						queries: {
+							2916284: new PostQueryManager( {
+								items: {
+									841: {
+										ID: 841,
+										site_ID: 2916284,
+										global_ID: '3d097cb7c5473c169bba0eb8e3c6cb64',
+										date: moment( '2016-09-14T15:47:33-04:00' ),
+									},
+								},
+							} ),
+						},
+						edits: {
+							2916284: {
+								841: {
+									date: moment( '2017-09-14T15:47:33-04:00' ),
+								},
+							},
+						},
+					},
+				},
+				2916284,
+				841
+			);
+
+			expect( isDirty ).to.be.true;
+		} );
+
+		test( "should return false if saved post date doesn't change", () => {
+			const isDirty = isEditedPostDirty(
+				{
+					posts: {
+						queries: {
+							2916284: new PostQueryManager( {
+								items: {
+									841: {
+										ID: 841,
+										site_ID: 2916284,
+										global_ID: '3d097cb7c5473c169bba0eb8e3c6cb64',
+										date: moment( '2016-09-14T15:47:33-04:00' ),
+									},
+								},
+							} ),
+						},
+						edits: {
+							2916284: {
+								841: {
+									date: moment( '2016-09-14T15:47:33-04:00' ),
+								},
+							},
+						},
+					},
+				},
+				2916284,
+				841
+			);
+
+			expect( isDirty ).to.be.false;
 		} );
 	} );
 

@@ -16,21 +16,23 @@ import config from 'config';
 import wpcomSupport from 'lib/wp/support';
 import { injectLocalization } from './localization';
 import { injectGuestSandboxTicketHandler } from './handlers/guest-sandbox-ticket';
+import * as oauthToken from 'lib/oauth-token';
+import wpcomXhrWrapper from 'lib/wpcom-xhr-wrapper';
+import wpcomProxyRequest from 'wpcom-proxy-request';
 
 const addSyncHandlerWrapper = config.isEnabled( 'sync-handler' );
 let wpcom;
 
 if ( config.isEnabled( 'oauth' ) ) {
-	const oauthToken = require( 'lib/oauth-token' );
 	const requestHandler = addSyncHandlerWrapper
-		? new SyncHandler( require( 'lib/wpcom-xhr-wrapper' ) )
-		: require( 'lib/wpcom-xhr-wrapper' );
+		? new SyncHandler( wpcomXhrWrapper )
+		: wpcomXhrWrapper;
 
 	wpcom = wpcomUndocumented( oauthToken.getToken(), requestHandler );
 } else {
 	const requestHandler = addSyncHandlerWrapper
-		? new SyncHandler( require( 'wpcom-proxy-request' ).default )
-		: require( 'wpcom-proxy-request' ).default;
+		? new SyncHandler( wpcomProxyRequest )
+		: wpcomProxyRequest;
 
 	wpcom = wpcomUndocumented( requestHandler );
 
@@ -56,8 +58,10 @@ if ( config.isEnabled( 'support-user' ) ) {
 	wpcom = wpcomSupport( wpcom );
 }
 
-// expose wpcom global var only in development
-if ( 'development' === config( 'env' ) ) {
+if ( 'development' === process.env.NODE_ENV ) {
+	require( './offline-library' ).makeOffline( wpcom );
+
+	// expose wpcom global var only in development
 	const wpcomPKG = require( 'wpcom/package' );
 	window.wpcom = wpcom;
 	window.wpcom.__version = wpcomPKG.version;

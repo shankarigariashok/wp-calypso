@@ -7,7 +7,7 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
-import { flow, get } from 'lodash';
+import { flow, get, overSome } from 'lodash';
 
 /**
  * Internal dependencies
@@ -22,13 +22,15 @@ import PostMetadata from 'lib/post-metadata';
 import TrackInputChanges from 'components/track-input-changes';
 import actions from 'lib/posts/actions';
 import { recordStat, recordEvent } from 'lib/posts/stats';
-import { isBusiness, isEnterprise } from 'lib/products-values';
+import { isBusiness, isEnterprise, isJetpackPremium } from 'lib/products-values';
+import QueryJetpackPlugins from 'components/data/query-jetpack-plugins';
 import QueryPostTypes from 'components/data/query-post-types';
 import QuerySiteSettings from 'components/data/query-site-settings';
 import { getSelectedSiteId } from 'state/ui/selectors';
 import { getEditorPostId } from 'state/ui/editor/selectors';
 import { getEditedPostValue } from 'state/posts/selectors';
 import { getPostType } from 'state/post-types/selectors';
+import { getPlugins, isRequesting } from 'state/plugins/installed/selectors';
 import {
 	isJetpackMinimumVersion,
 	isJetpackModuleActive,
@@ -41,10 +43,12 @@ import EditorDrawerPageOptions from './page-options';
 import EditorDrawerLabel from './label';
 import EditorMoreOptionsCopyPost from 'post-editor/editor-more-options/copy-post';
 import EditPostStatus from 'post-editor/edit-post-status';
+import { getFirstConflictingPlugin } from 'lib/seo';
 
 /**
  * Constants
  */
+const hasSupportingPlan = overSome( isBusiness, isEnterprise, isJetpackPremium );
 
 /**
  * A mapping of post type to hard-coded post types support. These values are
@@ -184,7 +188,10 @@ class EditorDrawer extends Component {
 			<AccordionSection>
 				<EditorDrawerLabel
 					labelText={ translate( 'Excerpt' ) }
-					helpText={ translate( 'Excerpts are optional hand-crafted summaries of your content.' ) }
+					helpText={ translate(
+						'An excerpt is a short summary you can add to your posts. ' +
+							"Some themes show excerpts alongside post titles on your site's homepage and archive pages."
+					) }
 				>
 					<TrackInputChanges onNewValue={ this.recordExcerptChangeStats }>
 						<FormTextarea
@@ -241,22 +248,32 @@ class EditorDrawer extends Component {
 	}
 
 	renderSeo() {
-		const { jetpackVersionSupportsSeo } = this.props;
+		const {
+			hasConflictingSeoPlugins,
+			isSeoToolsModuleActive,
+			isJetpack,
+			jetpackVersionSupportsSeo,
+			isRequestingPlugins,
+			site,
+		} = this.props;
 
-		if ( ! this.props.site ) {
+		if ( ! site ) {
 			return;
 		}
 
-		if ( this.props.isJetpack ) {
-			if ( ! this.props.isSeoToolsModuleActive || ! jetpackVersionSupportsSeo ) {
+		if ( isJetpack ) {
+			if (
+				isRequestingPlugins ||
+				! isSeoToolsModuleActive ||
+				! jetpackVersionSupportsSeo ||
+				// Hide SEO accordion if this setting is managed by another SEO plugin.
+				hasConflictingSeoPlugins
+			) {
 				return;
 			}
 		}
 
-		const { plan } = this.props.site;
-		const hasBusinessPlan = isBusiness( plan ) || isEnterprise( plan );
-
-		if ( ! hasBusinessPlan ) {
+		if ( ! hasSupportingPlan( site.plan ) ) {
 			return;
 		}
 
@@ -344,6 +361,7 @@ class EditorDrawer extends Component {
 			<div className="editor-drawer">
 				{ site && <QueryPostTypes siteId={ site.ID } /> }
 				{ site && <QuerySiteSettings siteId={ site.ID } /> }
+				{ site && <QueryJetpackPlugins siteIds={ [ site.ID ] } /> }
 				{ this.renderStatus() }
 				{ this.renderCategories() }
 				{ this.renderTaxonomies() }
@@ -362,25 +380,23 @@ EditorDrawer.displayName = 'EditorDrawer';
 
 const enhance = flow(
 	localize,
-	connect(
-		state => {
-			const siteId = getSelectedSiteId( state );
-			const type = getEditedPostValue( state, siteId, getEditorPostId( state ), 'type' );
+	connect( state => {
+		const siteId = getSelectedSiteId( state );
+		const type = getEditedPostValue( state, siteId, getEditorPostId( state ), 'type' );
+		const activePlugins = getPlugins( state, [ siteId ], 'active' );
 
-			return {
-				isPermalinkEditable: areSitePermalinksEditable( state, siteId ),
-				canJetpackUseTaxonomies: isJetpackMinimumVersion( state, siteId, '4.1' ),
-				isJetpack: isJetpackSite( state, siteId ),
-				isSeoToolsModuleActive: isJetpackModuleActive( state, siteId, 'seo-tools' ),
-				jetpackVersionSupportsSeo: isJetpackMinimumVersion( state, siteId, '4.4-beta1' ),
-				type,
-				typeObject: getPostType( state, siteId, type ),
-			};
-		},
-		null,
-		null,
-		{ pure: false }
-	)
+		return {
+			hasConflictingSeoPlugins: !! getFirstConflictingPlugin( activePlugins ),
+			isPermalinkEditable: areSitePermalinksEditable( state, siteId ),
+			canJetpackUseTaxonomies: isJetpackMinimumVersion( state, siteId, '4.1' ),
+			isJetpack: isJetpackSite( state, siteId ),
+			isSeoToolsModuleActive: isJetpackModuleActive( state, siteId, 'seo-tools' ),
+			jetpackVersionSupportsSeo: isJetpackMinimumVersion( state, siteId, '4.4-beta1' ),
+			isRequestingPlugins: isRequesting( state, siteId ),
+			type,
+			typeObject: getPostType( state, siteId, type ),
+		};
+	} )
 );
 
 export default enhance( EditorDrawer );

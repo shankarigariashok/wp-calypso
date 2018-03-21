@@ -9,7 +9,6 @@
  */
 const fs = require( 'fs' );
 const HappyPack = require( 'happypack' );
-const HardSourceWebpackPlugin = require( 'hard-source-webpack-plugin' );
 const path = require( 'path' );
 const webpack = require( 'webpack' );
 const _ = require( 'lodash' );
@@ -19,13 +18,27 @@ const _ = require( 'lodash' );
  */
 const cacheIdentifier = require( './server/bundler/babel/babel-loader-cache-identifier' );
 const config = require( 'config' );
+const bundleEnv = config( 'env' );
+
+/**
+ * Internal variables
+ */
+const commitSha = process.env.hasOwnProperty( 'COMMIT_SHA' ) ? process.env.COMMIT_SHA : '(unknown)';
+
+// disable add-module-exports. TODO: remove add-module-exports from babelrc. requires fixing jest tests
+const babelConfig = JSON.parse( fs.readFileSync( './.babelrc', { encoding: 'utf8' } ) );
+_.remove( babelConfig.plugins, elem => elem === 'add-module-exports' );
+
+// remove the babel-lodash-es plugin from env.test -- it's needed only for Jest tests.
+// The Webpack-using NODE_ENV=test build doesn't need it, as there is a special loader for that.
+_.remove( babelConfig.env.test.plugins, elem => /babel-lodash-es/.test( elem ) );
 
 /**
  * This lists modules that must use commonJS `require()`s
  * All modules listed here need to be ES5.
  *
  * @returns { object } list of externals
-*/
+ */
 function getExternals() {
 	const externals = {};
 
@@ -54,8 +67,7 @@ function getExternals() {
 	externals[ 'bundler/assets' ] = 'commonjs bundler/assets';
 	// Map React and redux to the minimized version in production
 	if ( config( 'env' ) === 'production' ) {
-		externals[ 'react-with-addons' ] = 'commonjs react/dist/react-with-addons.min';
-		externals.react = 'commonjs react/dist/react.min';
+		externals.react = 'commonjs react/umd/react.production.min.js';
 		externals.redux = 'commonjs redux/dist/redux.min';
 	}
 
@@ -65,7 +77,10 @@ function getExternals() {
 const babelLoader = {
 	loader: 'babel-loader',
 	options: {
+		...babelConfig,
+		babelrc: false,
 		plugins: [
+			...babelConfig.plugins,
 			[
 				path.join(
 					__dirname,
@@ -98,14 +113,24 @@ const webpackConfig = {
 				loader: path.join( __dirname, 'server', 'bundler', 'extensions-loader' ),
 			},
 			{
-				test: /sections.js$/,
-				exclude: path.join( __dirname, 'node_modules' ),
-				loader: path.join( __dirname, 'server', 'isomorphic-routing', 'loader' ),
+				include: path.join( __dirname, 'client/sections.js' ),
+				use: {
+					loader: path.join( __dirname, 'server', 'bundler', 'sections-loader' ),
+					options: { forceRequire: true, onlyIsomorphic: true },
+				},
 			},
 			{
 				test: /\.jsx?$/,
 				exclude: /(node_modules|devdocs[\/\\]search-index)/,
 				loader: [ 'happypack/loader' ],
+			},
+			{
+				test: /node_modules[\/\\](redux-form|react-redux)[\/\\]es/,
+				loader: 'babel-loader',
+				options: {
+					babelrc: false,
+					plugins: [ path.join( __dirname, 'server', 'bundler', 'babel', 'babel-lodash-es' ) ],
+				},
 			},
 		],
 	},
@@ -134,21 +159,13 @@ const webpackConfig = {
 		} ),
 		new webpack.DefinePlugin( {
 			PROJECT_NAME: JSON.stringify( config( 'project' ) ),
+			COMMIT_SHA: JSON.stringify( commitSha ),
+			'process.env.NODE_ENV': JSON.stringify( bundleEnv ),
 		} ),
 		new HappyPack( { loaders: [ babelLoader ] } ),
 		new webpack.NormalModuleReplacementPlugin( /^lib[\/\\]abtest$/, 'lodash/noop' ), // Depends on BOM
 		new webpack.NormalModuleReplacementPlugin( /^lib[\/\\]analytics$/, 'lodash/noop' ), // Depends on BOM
-		new webpack.NormalModuleReplacementPlugin( /^lib[\/\\]sites-list$/, 'lodash/noop' ), // Depends on BOM
-		new webpack.NormalModuleReplacementPlugin( /^lib[\/\\]olark$/, 'lodash/noop' ), // Depends on DOM
 		new webpack.NormalModuleReplacementPlugin( /^lib[\/\\]user$/, 'lodash/noop' ), // Depends on BOM
-		new webpack.NormalModuleReplacementPlugin(
-			/^lib[\/\\]post-normalizer[\/\\]rule-create-better-excerpt$/,
-			'lodash/noop'
-		), // Depends on BOM
-		new webpack.NormalModuleReplacementPlugin(
-			/^components[\/\\]seo[\/\\]reader-preview$/,
-			'components/empty-component'
-		), // Conflicts with component-closest module
 		new webpack.NormalModuleReplacementPlugin(
 			/^components[\/\\]popover$/,
 			'components/null-component'
@@ -157,14 +174,6 @@ const webpackConfig = {
 			/^my-sites[\/\\]themes[\/\\]theme-upload$/,
 			'components/empty-component'
 		), // Depends on BOM
-		new webpack.NormalModuleReplacementPlugin(
-			/^client[\/\\]layout[\/\\]guided-tours[\/\\]config$/,
-			'components/empty-component'
-		), // should never be required server side
-		new webpack.NormalModuleReplacementPlugin(
-			/^components[\/\\]site-selector$/,
-			'components/null-component'
-		), // Depends on BOM
 	] ),
 	externals: getExternals(),
 };
@@ -172,15 +181,6 @@ const webpackConfig = {
 if ( ! config.isEnabled( 'desktop' ) ) {
 	webpackConfig.plugins.push(
 		new webpack.NormalModuleReplacementPlugin( /^lib[\/\\]desktop$/, 'lodash/noop' )
-	);
-}
-
-if ( config.isEnabled( 'webpack/persistent-caching' ) ) {
-	webpackConfig.recordsPath = path.join( __dirname, '.webpack-cache', 'server-records.json' );
-	webpackConfig.plugins.unshift(
-		new HardSourceWebpackPlugin( {
-			cacheDirectory: path.join( __dirname, '.webpack-cache', 'server' ),
-		} )
 	);
 }
 

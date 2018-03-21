@@ -7,30 +7,29 @@
 import page from 'page';
 import React from 'react';
 
+import { get } from 'lodash';
+
 /**
  * Internal Dependencies
  */
-import { renderWithReduxStore } from 'lib/react-helpers';
-import { get } from 'lodash';
 import { isValidFeatureKey } from 'lib/plans';
+import Plans from 'my-sites/plans/main';
+import CheckoutData from 'components/data/checkout';
 
 export default {
-	plans( context ) {
-		const Plans = require( 'my-sites/plans/main' ),
-			CheckoutData = require( 'components/data/checkout' );
-
-		renderWithReduxStore(
+	plans( context, next ) {
+		context.primary = (
 			<CheckoutData>
 				<Plans
 					context={ context }
 					intervalType={ context.params.intervalType }
 					destinationType={ context.params.destinationType }
 					selectedFeature={ context.query.feature }
+					selectedPlan={ context.query.plan }
 				/>
-			</CheckoutData>,
-			document.getElementById( 'primary' ),
-			context.store
+			</CheckoutData>
 		);
+		next();
 	},
 
 	features( context ) {

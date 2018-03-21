@@ -21,13 +21,13 @@
 	margin: -24px -24px 0;
 	padding: 0 24px;
 	background-color: #fbfcfd;
-	height: 116px;
-	box-shadow: 0 1px 0 0 lighten( $gray, 20% ),
+	height: 80px;
+	box-shadow: 0 1px 0 0 $gray-lighten-20,
 		0 1px 0 lighten( $gray, 40% );
+}
 
-	p {
-		margin: 0;
-	}
+.dialog__content .privacy-policy-banner__dialog-header-text h1 {
+	margin: 0;
 }
 
 .privacy-policy-banner__dialog-header-image {
@@ -42,6 +42,11 @@
 .privacy-policy-banner__dialog-body {
 	overflow-y: auto;
 	height: 320px;
-	padding-top: 10px;
-	padding-bottom: 10px;
+	padding-top: 24px;
+}
+
+.privacy-policy-banner__dialog-body h3,
+.privacy-policy-banner__dialog-body h4 {
+	font-weight: bold;
+	margin: 1.5em 0;
 }

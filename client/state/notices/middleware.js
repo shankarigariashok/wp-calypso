@@ -1,11 +1,9 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import { translate } from 'i18n-calypso';
-import { truncate, includes } from 'lodash';
+import { get, truncate, includes } from 'lodash';
 
 /**
  * Internal dependencies
@@ -13,6 +11,7 @@ import { truncate, includes } from 'lodash';
 import { successNotice, errorNotice } from 'state/notices/actions';
 import { getSitePost } from 'state/posts/selectors';
 import { getSiteDomain } from 'state/sites/selectors';
+import { getInviteForSite } from 'state/invites/selectors';
 import {
 	ACCOUNT_RECOVERY_SETTINGS_FETCH_FAILED,
 	ACCOUNT_RECOVERY_SETTINGS_UPDATE_SUCCESS,
@@ -29,6 +28,9 @@ import {
 	GRAVATAR_UPLOAD_REQUEST_FAILURE,
 	GRAVATAR_UPLOAD_REQUEST_SUCCESS,
 	GUIDED_TRANSFER_HOST_DETAILS_SAVE_SUCCESS,
+	INVITE_RESEND_REQUEST_FAILURE,
+	INVITES_DELETE_REQUEST_SUCCESS,
+	INVITES_DELETE_REQUEST_FAILURE,
 	JETPACK_MODULE_ACTIVATE_SUCCESS,
 	JETPACK_MODULE_DEACTIVATE_SUCCESS,
 	JETPACK_MODULE_ACTIVATE_FAILURE,
@@ -55,7 +57,7 @@ import {
 	THEME_DELETE_SUCCESS,
 	THEME_ACTIVATE_FAILURE,
 } from 'state/action-types';
-import purchasesPaths from 'me/purchases/paths';
+import { purchasesRoot } from 'me/purchases/paths';
 import { dispatchSuccess, dispatchError } from './utils';
 
 import {
@@ -74,6 +76,27 @@ import { onJetpackModuleActivationActionMessage } from './jetpack-modules';
 /**
  * Handlers
  */
+
+export const onDeleteInvitesFailure = ( dispatch, action, getState ) => {
+	action.inviteIds.map( inviteId => {
+		const invite = getInviteForSite( getState(), action.siteId, inviteId );
+		dispatch(
+			errorNotice(
+				translate( 'An error occurred while deleting the invite for %s.', {
+					args: truncate( invite.user.email, { length: 20 } ),
+				} )
+			)
+		);
+	} );
+};
+
+export const onDeleteInvitesSuccess = ( dispatch, { inviteIds } ) =>
+	dispatch(
+		successNotice(
+			translate( 'Invite deleted.', 'Invites deleted.', { count: inviteIds.length } ),
+			{ displayOnNextPage: true }
+		)
+	);
 
 export function onPostDeleteFailure( dispatch, action, getState ) {
 	const post = getSitePost( getState(), action.siteId, action.postId );
@@ -258,7 +281,7 @@ const onSiteDeleteFailure = ( dispatch, { error } ) => {
 					id: 'site-delete',
 					showDismiss: false,
 					button: translate( 'Manage Purchases' ),
-					href: purchasesPaths.purchasesRoot(),
+					href: purchasesRoot,
 				}
 			)
 		);
@@ -297,6 +320,9 @@ export const handlers = {
 	[ GRAVATAR_UPLOAD_REQUEST_SUCCESS ]: dispatchSuccess(
 		translate( 'You successfully uploaded a new Gravatar — looking sharp!' )
 	),
+	[ INVITES_DELETE_REQUEST_SUCCESS ]: onDeleteInvitesSuccess,
+	[ INVITES_DELETE_REQUEST_FAILURE ]: onDeleteInvitesFailure,
+	[ INVITE_RESEND_REQUEST_FAILURE ]: dispatchError( translate( 'Invitation failed to resend.' ) ),
 	[ JETPACK_MODULE_ACTIVATE_SUCCESS ]: onJetpackModuleActivationActionMessage,
 	[ JETPACK_MODULE_DEACTIVATE_SUCCESS ]: onJetpackModuleActivationActionMessage,
 	[ JETPACK_MODULE_ACTIVATE_FAILURE ]: onJetpackModuleActivationActionMessage,
@@ -332,7 +358,7 @@ export const handlers = {
  */
 
 export default ( { dispatch, getState } ) => next => action => {
-	if ( handlers.hasOwnProperty( action.type ) ) {
+	if ( ! get( action, 'meta.notices.skip' ) && handlers.hasOwnProperty( action.type ) ) {
 		handlers[ action.type ]( dispatch, action, getState );
 	}
 

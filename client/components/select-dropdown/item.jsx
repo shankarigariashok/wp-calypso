@@ -13,10 +13,12 @@ import Gridicon from 'gridicons';
  * Internal dependencies
  */
 import Count from 'components/count';
+import TranslatableString from 'components/translatable/proptype';
 
 class SelectDropdownItem extends Component {
 	static propTypes = {
-		children: PropTypes.string.isRequired,
+		children: TranslatableString.isRequired,
+		compactCount: PropTypes.bool,
 		path: PropTypes.string,
 		isDropdownOpen: PropTypes.bool,
 		selected: PropTypes.bool,
@@ -50,6 +52,7 @@ class SelectDropdownItem extends Component {
 					role="menuitem"
 					tabIndex={ this.props.isDropdownOpen ? 0 : '' }
 					aria-selected={ this.props.selected }
+					data-e2e-title={ this.props.e2eTitle }
 				>
 					<span className="select-dropdown__item-text">
 						{ this.props.icon && this.props.icon.type === Gridicon ? this.props.icon : null }
@@ -57,7 +60,7 @@ class SelectDropdownItem extends Component {
 					</span>
 					{ 'number' === typeof this.props.count && (
 						<span data-text={ this.props.count } className="select-dropdown__item-count">
-							<Count count={ this.props.count } />
+							<Count count={ this.props.count } compact={ this.props.compactCount } />
 						</span>
 					) }
 				</a>

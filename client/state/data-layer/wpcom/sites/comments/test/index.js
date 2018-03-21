@@ -14,12 +14,12 @@ import {
 	announceEditFailure,
 	editComment,
 	fetchCommentsList,
+	handleChangeCommentStatusSuccess,
 	requestComment,
 	receiveCommentError,
 	receiveCommentSuccess,
-	removeCommentStatusErrorNotice,
 } from '../';
-import { COMMENTS_EDIT } from 'state/action-types';
+import { COMMENTS_EDIT, NOTICE_REMOVE } from 'state/action-types';
 import {
 	requestComment as requestCommentAction,
 	editComment as editCommentAction,
@@ -29,6 +29,7 @@ import {
 import { bypassDataLayer } from 'state/data-layer/utils';
 import { http } from 'state/data-layer/wpcom-http/actions';
 import { errorNotice, removeNotice } from 'state/notices/actions';
+import { noRetry } from 'state/data-layer/wpcom-http/pipeline/retry-on-failure/policies';
 
 const query = {
 	siteId: 1337,
@@ -44,7 +45,7 @@ describe( '#addComments', () => {
 	test( 'should dispatch a tree initialization action for no comments', () => {
 		addComments( { dispatch }, { query }, { comments: [] } );
 
-		expect( dispatch ).to.have.been.calledOnce;
+		expect( dispatch ).to.have.been.calledTwice;
 		expect( dispatch.lastCall ).to.have.been.calledWith( {
 			type: 'COMMENTS_TREE_SITE_ADD',
 			siteId: query.siteId,
@@ -58,7 +59,7 @@ describe( '#addComments', () => {
 
 		addComments( { dispatch }, { query }, { comments } );
 
-		expect( dispatch ).to.have.been.calledOnce;
+		expect( dispatch ).to.have.been.calledTwice;
 		expect( dispatch.lastCall ).to.have.been.calledWith(
 			receiveCommentsAction( {
 				siteId: query.siteId,
@@ -77,7 +78,7 @@ describe( '#addComments', () => {
 
 		addComments( { dispatch }, { query }, { comments } );
 
-		expect( dispatch ).to.have.been.calledTwice;
+		expect( dispatch ).to.have.been.calledThrice;
 
 		expect( dispatch ).to.have.been.calledWithMatch( {
 			postId: 1,
@@ -147,6 +148,25 @@ describe( '#requestComment', () => {
 			)
 		);
 	} );
+
+	test( 'when we see an attempt to use the wpcom endpoint over a jetpack remote, we do not attempt to retry using that query', () => {
+		const siteId = '124';
+		const commentId = '579';
+		const action = requestCommentAction( { siteId, commentId, query: { force: 'wpcom' } } );
+
+		expect( requestComment( action ) ).eql(
+			http(
+				{
+					method: 'GET',
+					path: `/sites/${ siteId }/comments/${ commentId }`,
+					apiVersion: '1.1',
+					query: { force: 'wpcom' },
+					retryPolicy: noRetry(),
+				},
+				action
+			)
+		);
+	} );
 } );
 
 describe( '#receiveCommentSuccess', () => {
@@ -177,6 +197,20 @@ describe( '#receiveCommentError', () => {
 
 		expect( receiveCommentError( action, response ) ).eql(
 			receiveCommentsErrorAction( {
+				siteId,
+				commentId,
+			} )
+		);
+	} );
+
+	test( 'when we see a failed shadow comment get, we should dispatch retry to the remote', () => {
+		const siteId = '124';
+		const commentId = '579';
+		const response = { post: { ID: 1 } };
+		const action = requestCommentAction( { siteId, commentId, query: { force: 'wpcom' } } );
+
+		expect( receiveCommentError( action, response ) ).eql(
+			requestCommentAction( {
 				siteId,
 				commentId,
 			} )
@@ -220,18 +254,6 @@ describe( '#editComment', () => {
 	} );
 } );
 
-describe( '#removeCommentStatusErrorNotice', () => {
-	let dispatch;
-
-	beforeEach( () => ( dispatch = spy() ) );
-
-	test( 'should dispatch a remove notice action', () => {
-		removeCommentStatusErrorNotice( { dispatch }, { commentId: 123 } );
-
-		expect( dispatch ).to.have.been.calledWith( removeNotice( 'comment-notice-error-123' ) );
-	} );
-} );
-
 describe( '#announceEditFailure', () => {
 	let dispatch;
 	const originalComment = { ID: 123, text: 'lorem ipsum' };
@@ -268,5 +290,47 @@ describe( '#announceEditFailure', () => {
 				id: `comment-notice-error-${ action.commentId }`,
 			} )
 		);
+	} );
+} );
+
+describe( '#handleChangeCommentStatusSuccess', () => {
+	test( 'should remove the error notice', () => {
+		const dispatch = spy();
+		handleChangeCommentStatusSuccess( { dispatch }, { commentId: 1234 } );
+		expect( dispatch ).to.have.been.calledOnce;
+		expect( dispatch ).to.have.been.calledWithMatch( {
+			type: NOTICE_REMOVE,
+			noticeId: 'comment-notice-error-1234',
+		} );
+	} );
+
+	test( 'should request a fresh copy of a comments page when the query object is filled', () => {
+		const dispatch = spy();
+		handleChangeCommentStatusSuccess(
+			{ dispatch },
+			{
+				commentId: 1234,
+				refreshCommentListQuery: {
+					listType: 'site',
+					number: 20,
+					page: 1,
+					siteId: 12345678,
+					status: 'all',
+					type: 'any',
+				},
+			}
+		);
+		expect( dispatch ).to.have.been.calledTwice;
+		expect( dispatch.lastCall ).to.have.been.calledWithExactly( {
+			type: 'COMMENTS_LIST_REQUEST',
+			query: {
+				listType: 'site',
+				number: 20,
+				page: 1,
+				siteId: 12345678,
+				status: 'all',
+				type: 'any',
+			},
+		} );
 	} );
 } );

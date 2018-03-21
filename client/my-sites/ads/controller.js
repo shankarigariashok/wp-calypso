@@ -11,19 +11,16 @@ import page from 'page';
 /**
  * Internal Dependencies
  */
-import route from 'lib/route';
+import { sectionify } from 'lib/route';
 import analytics from 'lib/analytics';
 import titlecase from 'to-title-case';
-import { canAccessWordads } from 'lib/ads/utils';
 import { setDocumentHeadTitle as setTitle } from 'state/document-head/actions';
-import { userCan } from 'lib/site/utils';
-import { renderWithReduxStore } from 'lib/react-helpers';
-import { getSelectedSite, getSelectedSiteId } from 'state/ui/selectors';
+import { getSelectedSiteId } from 'state/ui/selectors';
 import { isJetpackSite } from 'state/sites/selectors';
 import Ads from 'my-sites/ads/main';
 
 function _recordPageView( context, analyticsPageTitle ) {
-	var basePath = route.sectionify( context.path );
+	const basePath = sectionify( context.path );
 	if ( 'undefined' !== typeof context.params.section ) {
 		analyticsPageTitle += ' > ' + titlecase( context.params.section );
 	}
@@ -49,22 +46,10 @@ export default {
 		return;
 	},
 
-	layout: function( context ) {
-		const site = getSelectedSite( context.store.getState() );
-		const pathSuffix = site ? '/' + site.slug : '';
+	layout: function( context, next ) {
 		const layoutTitle = _getLayoutTitle( context );
 
 		context.store.dispatch( setTitle( layoutTitle ) ); // FIXME: Auto-converted from the Flux setTitle action. Please use <DocumentHead> instead.
-
-		if ( ! userCan( 'manage_options', site ) ) {
-			page.redirect( '/stats' + pathSuffix );
-			return;
-		}
-
-		if ( ! canAccessWordads( site ) ) {
-			page.redirect( '/stats' + pathSuffix );
-			return;
-		}
 
 		_recordPageView( context, layoutTitle );
 
@@ -73,13 +58,10 @@ export default {
 			window.scrollTo( 0, 0 );
 		}
 
-		renderWithReduxStore(
-			React.createElement( Ads, {
-				section: context.params.section,
-				path: context.path,
-			} ),
-			document.getElementById( 'primary' ),
-			context.store
-		);
+		context.primary = React.createElement( Ads, {
+			section: context.params.section,
+			path: context.path,
+		} );
+		next();
 	},
 };

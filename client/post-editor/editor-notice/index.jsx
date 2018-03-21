@@ -9,6 +9,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
 import classNames from 'classnames';
+import { get } from 'lodash';
 
 /**
  * Internal dependencies
@@ -26,6 +27,7 @@ import { recordTracksEvent } from 'state/analytics/actions';
 export class EditorNotice extends Component {
 	static propTypes = {
 		translate: PropTypes.func,
+		moment: PropTypes.func,
 		siteId: PropTypes.number,
 		site: PropTypes.object,
 		type: PropTypes.string,
@@ -34,14 +36,16 @@ export class EditorNotice extends Component {
 		status: PropTypes.string,
 		onDismissClick: PropTypes.func,
 		error: PropTypes.object,
+		postUrl: PropTypes.string,
+		postDate: PropTypes.string,
 	};
 
-	handlePillExternalClick = () => {
-		this.props.recordTracksEvent( 'calypso_editor_pill_site_external_click' );
+	handleViewPostClick = () => {
+		this.props.recordTracksEvent( 'calypso_editor_notice_view_post_click' );
 	};
 
-	handlePillAddPagePromptClick = () => {
-		this.props.recordTracksEvent( 'calypso_editor_pill_add_page_prompt_click' );
+	handleAddPagePromptClick = () => {
+		this.props.recordTracksEvent( 'calypso_editor_notice_add_page_prompt_click' );
 	};
 
 	componentWillReceiveProps( nextProps ) {
@@ -68,8 +72,9 @@ export class EditorNotice extends Component {
 
 	getText( key ) {
 		/* eslint-disable max-len */
-		const { translate, type, typeObject, site } = this.props;
-		const typeLabel = typeObject && typeObject.labels.singular_name;
+		const { translate, type, typeObject, site, postUrl, postDate, moment } = this.props;
+		const formattedPostDate = moment( postDate ).format( 'lll' );
+		const typeLabel = get( typeObject, 'labels.singular_name', type );
 
 		switch ( key ) {
 			case 'warnPublishDateChange':
@@ -80,170 +85,55 @@ export class EditorNotice extends Component {
 				);
 
 			case 'publishFailure':
-				if ( 'page' === type ) {
-					return translate( 'Publishing of page failed.' );
-				}
-
-				if ( 'post' !== type && typeLabel ) {
-					return translate( 'Publishing of %(typeLabel)s failed.', { args: { typeLabel } } );
-				}
-
-				return translate( 'Publishing of post failed.' );
+				return translate( 'Publishing of %(typeLabel)s failed.', {
+					args: { typeLabel: typeLabel.toLowerCase() },
+				} );
 
 			case 'saveFailure':
 				return translate( 'Saving of draft failed.' );
 
 			case 'trashFailure':
-				if ( 'page' === type ) {
-					return translate( 'Trashing of page failed.' );
-				}
-
-				if ( 'post' !== type && typeLabel ) {
-					return translate( 'Trashing of %(typeLabel)s failed.', { args: { typeLabel } } );
-				}
-
-				return translate( 'Trashing of post failed.' );
+				return translate( 'Trashing of %(typeLabel)s failed.', {
+					args: { typeLabel: typeLabel.toLowerCase() },
+				} );
 
 			case 'published':
 				if ( ! site ) {
-					if ( 'page' === type ) {
-						return translate( 'Page published!' );
-					}
-
-					if ( 'post' !== type && typeLabel ) {
-						return translate( '%(typeLabel)s published!', { args: { typeLabel } } );
-					}
-
-					return translate( 'Post published!' );
+					return translate( '%(typeLabel)s published!', { args: { typeLabel: typeLabel } } );
 				}
 
 				if ( 'page' === type ) {
-					return translate( 'Page published on {{siteLink/}}! {{a}}Add another page{{/a}}', {
+					return translate( 'Page published on {{pageLink/}}! {{a}}Add another page{{/a}}', {
 						components: {
-							siteLink: (
-								<a
-									href={ site.URL }
-									target="_blank"
-									rel="noopener noreferrer"
-									onClick={ this.handlePillExternalClick }
-								>
+							pageLink: (
+								<a href={ postUrl } onClick={ this.handleViewPostClick }>
 									{ site.title }
 								</a>
 							),
-							a: (
-								<a href={ `/page/${ site.slug }` } onClick={ this.handlePillAddPagePromptClick } />
-							),
+							a: <a href={ `/page/${ site.slug }` } onClick={ this.handleAddPagePromptClick } />,
 						},
-						comment:
-							'Editor: Message displayed when a page is published, with a link to the site it was published on.',
+						comment: 'Editor: Message displayed when a page is published, with a link to the page.',
 					} );
 				}
 
-				if ( 'post' !== type && typeLabel ) {
-					return translate( '%(typeLabel)s published on {{siteLink/}}!', {
-						args: { typeLabel },
-						components: {
-							siteLink: (
-								<a
-									href={ site.URL }
-									target="_blank"
-									rel="noopener noreferrer"
-									onClick={ this.handlePillExternalClick }
-								>
-									{ site.title }
-								</a>
-							),
-						},
-						comment:
-							'Editor: Message displayed when a post of a custom type is published, with a link to the site it was published on.',
-					} );
-				}
-
-				return translate( 'Post published on {{siteLink/}}!', {
+				return translate( '%(typeLabel)s published on {{postLink/}}!', {
+					args: { typeLabel: typeLabel },
 					components: {
-						siteLink: (
-							<a
-								href={ site.URL }
-								target="_blank"
-								rel="noopener noreferrer"
-								onClick={ this.handlePillExternalClick }
-							>
+						postLink: (
+							<a href={ postUrl } onClick={ this.handleViewPostClick }>
 								{ site.title }
 							</a>
 						),
 					},
 					comment:
-						'Editor: Message displayed when a post is published, with a link to the site it was published on.',
+						'Editor: Message displayed when a post or post of a custom type is published, with a link to the post.',
 				} );
 
 			case 'scheduled':
-				if ( ! site ) {
-					if ( 'page' === type ) {
-						return translate( 'Page scheduled!' );
-					}
-
-					if ( 'post' !== type && typeLabel ) {
-						return translate( '%(typeLabel)s scheduled!', { args: { typeLabel } } );
-					}
-
-					return translate( 'Post scheduled!' );
-				}
-
-				if ( 'page' === type ) {
-					return translate( 'Page scheduled on {{siteLink/}}! {{a}}Add another page{{/a}}', {
-						components: {
-							siteLink: (
-								<a
-									href={ site.URL }
-									target="_blank"
-									rel="noopener noreferrer"
-									onClick={ this.handlePillExternalClick }
-								>
-									{ site.title }
-								</a>
-							),
-							a: <a href={ `/page/${ site.slug }` } />,
-						},
-						comment:
-							'Editor: Message displayed when a page is scheduled, with a link to the site it was scheduled on.',
-					} );
-				}
-
-				if ( 'post' !== type && typeLabel ) {
-					return translate( '%(typeLabel)s scheduled on {{siteLink/}}!', {
-						args: { typeLabel },
-						components: {
-							siteLink: (
-								<a
-									href={ site.URL }
-									target="_blank"
-									rel="noopener noreferrer"
-									onClick={ this.handlePillExternalClick }
-								>
-									{ site.title }
-								</a>
-							),
-						},
-						comment:
-							'Editor: Message displayed when a post of a custom type is scheduled, with a link to the site it was scheduled on.',
-					} );
-				}
-
-				return translate( 'Post scheduled on {{siteLink/}}!', {
-					components: {
-						siteLink: (
-							<a
-								href={ site.URL }
-								target="_blank"
-								rel="noopener noreferrer"
-								onClick={ this.handlePillExternalClick }
-							>
-								{ site.title }
-							</a>
-						),
-					},
+				return translate( '%(typeLabel)s scheduled for %(formattedPostDate)s!', {
+					args: { typeLabel, formattedPostDate },
 					comment:
-						'Editor: Message displayed when a post is scheduled, with a link to the site it was scheduled on.',
+						'Editor: Message displayed when a post, page, or post of a custom type is scheduled, with the scheduled date and time.',
 				} );
 
 			case 'publishedPrivately':
@@ -258,87 +148,19 @@ export class EditorNotice extends Component {
 				);
 
 			case 'view':
-				if ( 'page' === type ) {
-					return translate( 'View Page' );
-				}
-
-				if ( 'post' !== type && typeObject ) {
-					return typeObject.labels.view_item;
-				}
-
-				return translate( 'View Post' );
+				return typeObject.labels.view_item;
 
 			case 'preview':
 				return translate( 'View Preview' );
 
 			case 'updated':
-				if ( ! site ) {
-					if ( 'page' === type ) {
-						return translate( 'Page updated!' );
-					}
-
-					if ( 'post' !== type && typeLabel ) {
-						return translate( '%(typeLabel)s updated!', { args: { typeLabel } } );
-					}
-
-					return translate( 'Post updated!' );
-				}
-
-				if ( 'page' === type ) {
-					return translate( 'Page updated on {{siteLink/}}! {{a}}Add another page{{/a}}', {
-						components: {
-							siteLink: (
-								<a
-									href={ site.URL }
-									target="_blank"
-									rel="noopener noreferrer"
-									onClick={ this.handlePillExternalClick }
-								>
-									{ site.title }
-								</a>
-							),
-							a: <a href={ `/page/${ site.slug }` } />,
-						},
-						comment:
-							'Editor: Message displayed when a page is updated, with a link to the site it was updated on.',
-					} );
-				}
-
-				if ( 'post' !== type && typeLabel ) {
-					return translate( '%(typeLabel)s updated on {{siteLink/}}!', {
-						args: { typeLabel },
-						components: {
-							siteLink: (
-								<a
-									href={ site.URL }
-									target="_blank"
-									rel="noopener noreferrer"
-									onClick={ this.handlePillExternalClick }
-								>
-									{ site.title }
-								</a>
-							),
-						},
-						comment:
-							'Editor: Message displayed when a post of a custom type is updated, with a link to the site it was updated on.',
-					} );
-				}
-
-				return translate( 'Post updated on {{siteLink/}}!', {
+				return translate( '%(typeLabel)s updated! {{postLink}}Visit %(typeLabel)s{{/postLink}}.', {
+					args: { typeLabel },
 					components: {
-						siteLink: (
-							<a
-								href={ site.URL }
-								target="_blank"
-								rel="noopener noreferrer"
-								onClick={ this.handlePillExternalClick }
-							>
-								{ site.title }
-							</a>
-						),
+						postLink: <a href={ postUrl } onClick={ this.handleViewPostClick } />,
 					},
 					comment:
-						'Editor: Message displayed when a post is updated, with a link to the site it was updated on.',
+						'Editor: Message displayed when a page, post, or post of a custom type is updated, with a link to the updated post.',
 				} );
 		}
 		/* eslint-enable max-len */
@@ -370,6 +192,8 @@ export default connect(
 			site: getSelectedSite( state ),
 			type: post.type,
 			typeObject: getPostType( state, siteId, post.type ),
+			postUrl: post.URL || null,
+			postDate: post.date || null,
 		};
 	},
 	{

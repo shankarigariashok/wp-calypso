@@ -4,8 +4,12 @@
  * Internal dependencies
  */
 import { combineReducers } from 'state/utils';
-import shifts from './shifts/reducer';
+import appointmentDetails from './appointment-details/reducer';
+import availableTimes from './available-times/reducer';
+import signupForm from './signup-form/reducer';
 
 export default combineReducers( {
-	shifts,
+	appointmentDetails,
+	availableTimes,
+	signupForm,
 } );

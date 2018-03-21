@@ -3,9 +3,8 @@
 /**
  * Internal dependencies
  */
-
 import { getSelectedSiteId } from 'state/ui/selectors';
-import request from '../request';
+import request from 'woocommerce/state/sites/request';
 import { setError } from '../status/wc-api/actions';
 import {
 	WOOCOMMERCE_SETTINGS_BATCH_REQUEST,
@@ -28,6 +27,7 @@ export const doInitialSetup = (
 	stateOrProvince,
 	postcode,
 	country,
+	settings,
 	successAction,
 	failureAction
 ) => ( dispatch, getState ) => {
@@ -45,10 +45,8 @@ export const doInitialSetup = (
 	// If a state is given (e.g. CT), combine it with the country (e.g. US)
 	// to create the appropriate value for woocommerce_default_country (e.g. US:CT)
 	const countryState = stateOrProvince ? country + ':' + stateOrProvince : country;
-	const currency = 'CA' === country ? 'CAD' : 'USD';
 
-	// TODO Support other currency positions, post-v1 etc. See https://github.com/Automattic/wp-calypso/issues/15498
-	const update = [
+	let update = [
 		{
 			group_id: 'general',
 			id: 'woocommerce_store_address',
@@ -74,47 +72,74 @@ export const doInitialSetup = (
 			id: 'woocommerce_store_postcode',
 			value: postcode,
 		},
-		{
-			group_id: 'general',
-			id: 'woocommerce_currency',
-			value: currency,
-		},
-		{
-			group_id: 'general',
-			id: 'woocommerce_currency_pos',
-			value: 'left',
-		},
-		{
-			group_id: 'general',
-			id: 'woocommerce_price_decimal_sep',
-			value: '.',
-		},
-		{
-			group_id: 'general',
-			id: 'woocommerce_price_num_decimals',
-			value: '2',
-		},
-		{
-			group_id: 'general',
-			id: 'woocommerce_price_thousand_sep',
-			value: ',',
-		},
-		{
-			group_id: 'products',
-			id: 'woocommerce_dimension_unit',
-			value: 'in',
-		},
-		{
-			group_id: 'products',
-			id: 'woocommerce_weight_unit',
-			value: 'lbs',
-		},
+	];
+
+	// TODO Only enable taxes when applicable
+	update = update.concat( [
 		{
 			group_id: 'general',
 			id: 'woocommerce_calc_taxes',
 			value: 'yes',
 		},
-	];
+	] );
+
+	if ( settings.currency_code ) {
+		update.push( {
+			group_id: 'general',
+			id: 'woocommerce_currency',
+			value: settings.currency_code,
+		} );
+	}
+
+	if ( settings.currency_pos ) {
+		update.push( {
+			group_id: 'general',
+			id: 'woocommerce_currency_pos',
+			value: settings.currency_pos,
+		} );
+	}
+
+	if ( settings.decimal_sep ) {
+		update.push( {
+			group_id: 'general',
+			id: 'woocommerce_price_decimal_sep',
+			value: settings.decimal_sep,
+		} );
+	}
+
+	if ( settings.num_decimals ) {
+		update.push( {
+			group_id: 'general',
+			id: 'woocommerce_price_num_decimals',
+			value: settings.num_decimals,
+		} );
+	}
+
+	if ( settings.thousand_sep ) {
+		update.push( {
+			group_id: 'general',
+			id: 'woocommerce_price_thousand_sep',
+			value: settings.thousand_sep,
+		} );
+	}
+
+	if ( settings.dimension_unit ) {
+		update.push( {
+			group_id: 'products',
+			id: 'woocommerce_dimension_unit',
+			value: settings.dimension_unit,
+		} );
+	}
+
+	if ( settings.weight_unit ) {
+		update = update.concat( [
+			{
+				group_id: 'products',
+				id: 'woocommerce_weight_unit',
+				value: settings.weight_unit,
+			},
+		] );
+	}
 
 	return request( siteId )
 		.post( 'settings/batch', { update } )

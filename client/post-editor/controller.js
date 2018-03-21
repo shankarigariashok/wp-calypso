@@ -4,13 +4,11 @@
  * External dependencies
  */
 
-import ReactDom from 'react-dom';
 import ReactDomServer from 'react-dom/server';
 import React from 'react';
 import i18n from 'i18n-calypso';
 import page from 'page';
-import { Provider as ReduxProvider } from 'react-redux';
-import qs from 'querystring';
+import { stringify } from 'qs';
 import { isWebUri as isValidUrl } from 'valid-url';
 import { map, pick, reduce, startsWith } from 'lodash';
 
@@ -18,14 +16,14 @@ import { map, pick, reduce, startsWith } from 'lodash';
  * Internal dependencies
  */
 import actions from 'lib/posts/actions';
-import route from 'lib/route';
+import { addSiteFragment } from 'lib/route';
 import User from 'lib/user';
-import userUtils from 'lib/user/utils';
 import analytics from 'lib/analytics';
 import { decodeEntities } from 'lib/formatting';
 import PostEditor from './post-editor';
 import { startEditingPost, stopEditingPost } from 'state/ui/editor/actions';
 import { getSelectedSiteId } from 'state/ui/selectors';
+import { getSite } from 'state/sites/selectors';
 import { getEditorPostId, getEditorPath } from 'state/ui/editor/selectors';
 import { editPost } from 'state/posts/actions';
 import wpcom from 'lib/wp';
@@ -56,18 +54,7 @@ function determinePostType( context ) {
 }
 
 function renderEditor( context ) {
-	ReactDom.unmountComponentAtNode( document.getElementById( 'secondary' ) );
-	ReactDom.render(
-		React.createElement(
-			ReduxProvider,
-			{ store: context.store },
-			React.createElement( PostEditor, {
-				user: user,
-				userUtils: userUtils,
-			} )
-		),
-		document.getElementById( 'primary' )
-	);
+	context.primary = React.createElement( PostEditor );
 }
 
 function maybeRedirect( context ) {
@@ -129,9 +116,9 @@ function getPressThisContent( query ) {
 // - (Flux) startEditingNew: to set the editor content;
 // - (Redux) editPost: to set every other attribute (in particular, to update the Category Selector, terms can only be set via Redux);
 // - (Flux) edit: to reliably show the updated post attributes before (auto)saving.
-function startEditingPostCopy( siteId, postToCopyId, context ) {
+function startEditingPostCopy( site, postToCopyId, context ) {
 	wpcom
-		.site( siteId )
+		.site( site.ID )
 		.post( postToCopyId )
 		.get( { context: 'edit' } )
 		.then( postToCopy => {
@@ -152,35 +139,35 @@ function startEditingPostCopy( siteId, postToCopyId, context ) {
 			postAttributes.featured_image = getFeaturedImageId( postToCopy );
 
 			/**
-		 * A post attributes whitelist for Redux's `editPost()` action.
-		 *
-		 * This is needed because blindly passing all post attributes to `editPost()`
-		 * caused some of them (notably the featured image) to revert to their original value
-		 * when modified right after the copy.
-		 *
-		 * @see https://github.com/Automattic/wp-calypso/pull/13933
-		 */
+			 * A post attributes whitelist for Redux's `editPost()` action.
+			 *
+			 * This is needed because blindly passing all post attributes to `editPost()`
+			 * caused some of them (notably the featured image) to revert to their original value
+			 * when modified right after the copy.
+			 *
+			 * @see https://github.com/Automattic/wp-calypso/pull/13933
+			 */
 			const reduxPostAttributes = {
 				terms: postAttributes.terms,
 				title: postAttributes.title,
 			};
 
-			actions.startEditingNew( siteId, {
+			actions.startEditingNew( site, {
 				content: postToCopy.content,
 				title: postToCopy.title,
 				type: postToCopy.type,
 			} );
-			context.store.dispatch( editPost( siteId, null, reduxPostAttributes ) );
+			context.store.dispatch( editPost( site.ID, null, reduxPostAttributes ) );
 			actions.edit( postAttributes );
 
 			/**
-		 * A post metadata whitelist for Flux's `updateMetadata()` action.
-		 *
-		 * This is needed because blindly passing all post metadata to `updateMetadata()`
-		 * causes unforeseeable issues, such as Publicize not triggering on the copied post.
-		 *
-		 * @see https://github.com/Automattic/wp-calypso/issues/14840
-		 */
+			 * A post metadata whitelist for Flux's `updateMetadata()` action.
+			 *
+			 * This is needed because blindly passing all post metadata to `updateMetadata()`
+			 * causes unforeseeable issues, such as Publicize not triggering on the copied post.
+			 *
+			 * @see https://github.com/Automattic/wp-calypso/issues/14840
+			 */
 			const metadataWhitelist = [ 'geo_latitude', 'geo_longitude' ];
 
 			// Convert the metadata array into a metadata object, needed because `updateMetadata()` expects an object.
@@ -204,12 +191,13 @@ function startEditingPostCopy( siteId, postToCopyId, context ) {
 }
 
 export default {
-	post: function( context ) {
+	post: function( context, next ) {
 		const postType = determinePostType( context );
 		const postID = getPostID( context );
 		const postToCopyId = context.query.copy;
 
 		function startEditing( siteId ) {
+			const site = getSite( context.store.getState(), siteId );
 			const isCopy = context.query.copy ? true : false;
 			context.store.dispatch( startEditingPost( siteId, isCopy ? null : postID, postType ) );
 
@@ -233,11 +221,11 @@ export default {
 			// so kick it off here to minimize time spent waiting for it to load
 			// in the view components
 			if ( postToCopyId ) {
-				startEditingPostCopy( siteId, postToCopyId, context );
+				startEditingPostCopy( site, postToCopyId, context );
 				analytics.pageView.record( '/' + postType, gaTitle + ' > New' );
 			} else if ( postID ) {
 				// TODO: REDUX - remove flux actions when whole post-editor is reduxified
-				actions.startEditingExisting( siteId, postID );
+				actions.startEditingExisting( site, postID );
 				analytics.pageView.record( '/' + postType + '/:blogid/:postid', gaTitle + ' > Edit' );
 			} else {
 				const postOptions = { type: postType };
@@ -253,7 +241,7 @@ export default {
 				}
 
 				// TODO: REDUX - remove flux actions when whole post-editor is reduxified
-				actions.startEditingNew( siteId, postOptions );
+				actions.startEditingNew( site, postOptions );
 				analytics.pageView.record( '/' + postType, gaTitle + ' > New' );
 			}
 		}
@@ -287,6 +275,8 @@ export default {
 		}
 
 		renderEditor( context );
+
+		next();
 	},
 
 	exitPost: function( context, next ) {
@@ -314,8 +304,8 @@ export default {
 			return next();
 		}
 
-		const redirectPath = route.addSiteFragment( context.pathname, currentUser.primarySiteSlug );
-		const queryString = qs.stringify( context.query );
+		const redirectPath = addSiteFragment( context.pathname, currentUser.primarySiteSlug );
+		const queryString = stringify( context.query );
 		const redirectWithParams = [ redirectPath, queryString ].join( '?' );
 
 		page.redirect( redirectWithParams );

@@ -144,7 +144,7 @@ const wrapSettingsForm = getFormSettings => SettingsForm => {
 		submitForm = () => {
 			const {
 				fields,
-				jetpackSiteRequiresLegacySettingsAPI,
+				jetpackSiteSettingsAPIVersion,
 				settingsFields,
 				siteId,
 				siteIsJetpack,
@@ -154,10 +154,13 @@ const wrapSettingsForm = getFormSettings => SettingsForm => {
 
 			// Support site settings for older Jetpacks as needed
 			const siteFields = pick( fields, settingsFields.site );
-			const apiVersion = siteIsJetpack && jetpackSiteRequiresLegacySettingsAPI ? '1.1' : '1.3';
+			const apiVersion = siteIsJetpack ? jetpackSiteSettingsAPIVersion : '1.4';
 			this.props.saveSiteSettings( siteId, { ...siteFields, apiVersion } );
 			if ( jetpackSettingsUISupported ) {
-				this.props.updateSettings( siteId, pick( fields, settingsFields.jetpack ) );
+				const fieldsToUpdate = /^error_/.test( fields.lang_id )
+					? omit( fields, 'lang_id' )
+					: fields;
+				this.props.updateSettings( siteId, pick( fieldsToUpdate, settingsFields.jetpack ) );
 			}
 		};
 
@@ -270,8 +273,15 @@ const wrapSettingsForm = getFormSettings => SettingsForm => {
 			const isJetpack = isJetpackSite( state, siteId );
 			const jetpackSettingsUISupported =
 				isJetpack && siteSupportsJetpackSettingsUi( state, siteId );
-			const jetpackSiteRequiresLegacySettingsAPI =
-				isJetpack && ! isJetpackMinimumVersion( state, siteId, '5.4-beta3' );
+			let jetpackSiteSettingsAPIVersion = false;
+			if ( isJetpack ) {
+				if ( isJetpackMinimumVersion( state, siteId, '5.4-beta3' ) ) {
+					jetpackSiteSettingsAPIVersion = '1.3';
+				}
+				if ( isJetpackMinimumVersion( state, siteId, '5.6-beta2' ) ) {
+					jetpackSiteSettingsAPIVersion = '1.4';
+				}
+			}
 			if ( jetpackSettingsUISupported ) {
 				const jetpackSettings = getJetpackSettings( state, siteId );
 				isSavingSettings = isSavingSettings || isUpdatingJetpackSettings( state, siteId );
@@ -288,7 +298,7 @@ const wrapSettingsForm = getFormSettings => SettingsForm => {
 				isRequestingSettings,
 				isSavingSettings,
 				isSaveRequestSuccessful,
-				jetpackSiteRequiresLegacySettingsAPI,
+				jetpackSiteSettingsAPIVersion,
 				siteIsJetpack: isJetpack,
 				siteSettingsSaveError,
 				settings,

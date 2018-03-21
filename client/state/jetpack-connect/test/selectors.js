@@ -5,19 +5,12 @@
 import {
 	getAuthAttempts,
 	getAuthorizationData,
-	getAuthorizationRemoteQueryData,
-	getAuthorizationRemoteSite,
 	getConnectingSite,
-	getFlowType,
 	getJetpackSiteByUrl,
-	getSessions,
-	getSiteIdFromQueryObject,
 	getSSO,
 	getUserAlreadyConnected,
 	hasExpiredSecretError,
 	hasXmlrpcError,
-	isCalypsoStartedConnection,
-	isRedirectingToWpAdmin,
 	isRemoteSiteOnSitesList,
 } from '../selectors';
 
@@ -87,72 +80,35 @@ describe( 'selectors', () => {
 		} );
 	} );
 
-	describe( '#getAuthorizationRemoteQueryData()', () => {
-		test( 'should return undefined if user has not started the authorization flow', () => {
-			const state = {
-				jetpackConnect: {},
-			};
-
-			expect( getAuthorizationRemoteQueryData( state ) ).toBeUndefined();
-		} );
-
-		test( 'should return the current authorization query object if there is such', () => {
-			const queryObject = {
-				_wp_nonce: 'nonce',
-				client_id: '12345678',
-				redirect_uri: 'https://wordpress.com/',
-				scope: 'auth',
-				secret: '1234abcd',
-				state: 12345678,
-			};
-			const state = {
-				jetpackConnect: {
-					jetpackConnectAuthorize: {
-						queryObject,
-					},
-				},
-			};
-
-			expect( getAuthorizationRemoteQueryData( state ) ).toEqual( queryObject );
-		} );
-	} );
-
 	describe( '#isRemoteSiteOnSitesList()', () => {
 		test( 'should return false if user has not started the authorization flow', () => {
 			const state = {
-				jetpackConnect: {},
+				jetpackConnect: {
+					jetpackConnectAuthorize: {},
+				},
+				sites: { items: {} },
 			};
 
-			expect( isRemoteSiteOnSitesList( state ) ).toBe( false );
+			expect( isRemoteSiteOnSitesList( state, 'https://wordpress.com' ) ).toBe( false );
 		} );
 
 		test( 'should return true if the site is in the sites list', () => {
 			const state = {
+				jetpackConnect: {
+					jetpackConnectAuthorize: {},
+				},
 				sites: {
 					items: {
 						12345678: {
 							ID: 12345678,
 							jetpack: true,
-							URL: 'https://wordpress.com/',
-						},
-					},
-				},
-				jetpackConnect: {
-					jetpackConnectAuthorize: {
-						queryObject: {
-							_wp_nonce: 'nonce',
-							client_id: '12345678',
-							redirect_uri: 'https://wordpress.com/',
-							scope: 'auth',
-							secret: '1234abcd',
-							state: 12345678,
-							site: 'https://wordpress.com/',
+							URL: 'https://wordpress.com',
 						},
 					},
 				},
 			};
 
-			expect( isRemoteSiteOnSitesList( state ) ).toBe( true );
+			expect( isRemoteSiteOnSitesList( state, 'https://wordpress.com' ) ).toBe( true );
 		} );
 
 		test( 'should return false if the site is in the sites list, but is not responding', () => {
@@ -162,83 +118,18 @@ describe( 'selectors', () => {
 						12345678: {
 							ID: 12345678,
 							jetpack: true,
-							URL: 'https://wordpress.com/',
+							URL: 'https://wordpress.com',
 						},
 					},
 				},
 				jetpackConnect: {
 					jetpackConnectAuthorize: {
-						queryObject: {
-							client_id: '12345678',
-						},
 						clientNotResponding: true,
 					},
 				},
 			};
 
-			expect( isRemoteSiteOnSitesList( state ) ).toBe( false );
-		} );
-	} );
-
-	describe( '#getAuthorizationRemoteSite()', () => {
-		test( 'should return undefined if user has not started the authorization flow', () => {
-			const state = {
-				jetpackConnect: {},
-			};
-
-			expect( getAuthorizationRemoteSite( state ) ).toBeUndefined();
-		} );
-
-		test( 'should return the current authorization url if there is such', () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectAuthorize: {
-						queryObject: {
-							_wp_nonce: 'nonce',
-							client_id: '12345678',
-							redirect_uri: 'https://wordpress.com/',
-							scope: 'auth',
-							secret: '1234abcd',
-							state: 12345678,
-							site: 'https://wordpress.com/',
-						},
-					},
-				},
-			};
-
-			expect( getAuthorizationRemoteSite( state ) ).toEqual(
-				state.jetpackConnect.jetpackConnectAuthorize.queryObject.site
-			);
-		} );
-	} );
-
-	describe( '#getSessions()', () => {
-		test( 'should return undefined if user has not started any jetpack connect sessions', () => {
-			const state = {
-				jetpackConnect: {},
-			};
-
-			expect( getSessions( state ) ).toBeUndefined();
-		} );
-
-		test( "should return all of the user's single sign-on sessions", () => {
-			const jetpackConnectSessions = {
-				'wordpress.com': {
-					timestamp: 1234567890,
-					flowType: 'premium',
-				},
-				'jetpack.me': {
-					timestamp: 2345678901,
-					flowType: 'pro',
-				},
-			};
-			const state = {
-				jetpackConnect: {
-					jetpackConnectSessions,
-				},
-			};
-
-			expect( getSessions( state ) ).toEqual( jetpackConnectSessions );
+			expect( isRemoteSiteOnSitesList( state, 'https://wordpress.com' ) ).toBe( false );
 		} );
 	} );
 
@@ -289,143 +180,6 @@ describe( 'selectors', () => {
 			};
 
 			expect( getSSO( state ) ).toEqual( jetpackSSO );
-		} );
-	} );
-
-	describe( '#isCalypsoStartedConnection()', () => {
-		test( 'should return true if the user have started a session in calypso less than an hour ago', () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectSessions: {
-						sitetest: {
-							timestamp: new Date( Date.now() - 59 * 60 * 1000 ).getTime(),
-							flowType: '',
-						},
-					},
-				},
-			};
-
-			expect( isCalypsoStartedConnection( state, 'sitetest' ) ).toBe( true );
-		} );
-
-		test( 'should return true if the user has just started a session in calypso and site contains a forward slash', () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectSessions: {
-						'example.com::example123': {
-							timestamp: Date.now(),
-							flow: '',
-						},
-					},
-				},
-			};
-
-			expect( isCalypsoStartedConnection( state, 'example.com/example123' ) ).toBe( true );
-		} );
-
-		test( "should return false if the user haven't started a session in calypso  ", () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectSessions: {
-						sitetest: {},
-					},
-				},
-			};
-
-			expect( isCalypsoStartedConnection( state, 'sitetest' ) ).toBe( false );
-		} );
-
-		test( 'should return false if the user started a session in calypso more than an hour ago', () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectSessions: {
-						sitetest: {
-							timestamp: new Date( Date.now() - 60 * 60 * 1000 ).getTime(),
-							flow: '',
-						},
-					},
-				},
-			};
-
-			expect( isCalypsoStartedConnection( state, 'sitetest' ) ).toBe( false );
-		} );
-	} );
-
-	describe( '#isRedirectingToWpAdmin()', () => {
-		test( 'should return false if redirection flag is not set', () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectAuthorize: {},
-				},
-			};
-
-			expect( isRedirectingToWpAdmin( state ) ).toBe( false );
-		} );
-
-		test( 'should return false if redirection flag is set to false', () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectAuthorize: {
-						isRedirectingToWpAdmin: false,
-					},
-				},
-			};
-
-			expect( isRedirectingToWpAdmin( state ) ).toBe( false );
-		} );
-
-		test( 'should return true if redirection flag is set to true', () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectAuthorize: {
-						isRedirectingToWpAdmin: true,
-					},
-				},
-			};
-
-			expect( isRedirectingToWpAdmin( state ) ).toBe( true );
-		} );
-	} );
-
-	describe( '#getFlowType()', () => {
-		test( 'should return the flow of the session for a site', () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectSessions: {
-						sitetest: {
-							timestamp: new Date( Date.now() - 59 * 60 * 1000 ).getTime(),
-							flowType: 'pro',
-						},
-					},
-				},
-			};
-
-			expect( getFlowType( state, 'sitetest' ) ).toEqual( 'pro' );
-		} );
-
-		test( 'should return the flow of the session for a site with slash in the site slug', () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectSessions: {
-						'example.com::example123': {
-							timestamp: new Date( Date.now() - 59 * 60 * 1000 ).getTime(),
-							flowType: 'pro',
-						},
-					},
-				},
-			};
-
-			expect( getFlowType( state, 'example.com/example123' ) ).toEqual( 'pro' );
-		} );
-
-		test( "should return false if there's no session for a site", () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectSessions: {},
-				},
-			};
-
-			expect( getFlowType( state, 'sitetest' ) ).toBe( false );
 		} );
 	} );
 
@@ -656,41 +410,6 @@ describe( 'selectors', () => {
 			};
 
 			expect( getAuthAttempts( state, 'sitetest.com' ) ).toBe( 2 );
-		} );
-	} );
-
-	describe( '#getSiteIdFromQueryObject()', () => {
-		test( 'should return an integer', () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectAuthorize: {
-						queryObject: {
-							client_id: '123',
-						},
-					},
-				},
-			};
-			expect( getSiteIdFromQueryObject( state ) ).toBe( 123 );
-		} );
-
-		test( 'should return null if there is no query object', () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectAuthorize: {},
-				},
-			};
-			expect( getSiteIdFromQueryObject( state ) ).toBeNull();
-		} );
-
-		test( 'should return null if there is no client id', () => {
-			const state = {
-				jetpackConnect: {
-					jetpackConnectAuthorize: {
-						queryObject: {},
-					},
-				},
-			};
-			expect( getSiteIdFromQueryObject( state ) ).toBeNull();
 		} );
 	} );
 

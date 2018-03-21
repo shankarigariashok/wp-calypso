@@ -1,13 +1,17 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import i18n from 'i18n-calypso';
 
-module.exports = require( './utils.js' );
+export {
+	addLocaleToPath,
+	addLocaleToWpcomUrl,
+	getLanguage,
+	getLocaleFromPath,
+	isDefaultLocale,
+	isLocaleVariant,
+	removeLocaleFromPath,
+} from './utils';
 
-module.exports.getLocaleSlug = function() {
-	return i18n.getLocaleSlug();
-};
+export const getLocaleSlug = () => i18n.getLocaleSlug();

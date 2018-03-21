@@ -300,6 +300,26 @@ export function parseUnitPeriods( unit, period ) {
 	}
 }
 
+export function parseStoreStatsReferrers( payload ) {
+	if ( ! payload || ! payload.data || ! payload.fields || ! Array.isArray( payload.data ) ) {
+		return [];
+	}
+	const { fields } = payload;
+	return payload.data.map( record => {
+		return {
+			date: record.date,
+			data: record.data.map( referrer => {
+				const obj = {};
+				referrer.forEach( ( value, i ) => {
+					const key = fields[ i ];
+					obj[ key ] = value;
+				} );
+				return obj;
+			} ),
+		};
+	} );
+}
+
 export const normalizers = {
 	/**
 	 * Returns a normalized payload from `/sites/{ site }/stats`
@@ -332,6 +352,7 @@ export const normalizers = {
 			highest_day_of_week,
 			highest_hour_percent,
 			hourly_views,
+			years,
 		} = data;
 
 		// Adjust Day of Week from 0 = Monday to 0 = Sunday (for Moment)
@@ -351,6 +372,7 @@ export const normalizers = {
 				.format( 'LT' ),
 			hourPercent: Math.round( highest_hour_percent ),
 			hourlyViews: hourly_views,
+			years,
 		};
 	},
 
@@ -848,6 +870,10 @@ export const normalizers = {
 			data: parseOrdersChartData( payload ),
 			deltas: parseOrderDeltas( payload ),
 		};
+	},
+
+	statsStoreReferrers( payload ) {
+		return parseStoreStatsReferrers( payload );
 	},
 
 	statsTopSellers( payload ) {

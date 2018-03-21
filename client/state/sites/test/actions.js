@@ -13,7 +13,6 @@ import {
 	receiveDeletedSite,
 	receiveSite,
 	receiveSites,
-	receiveSiteUpdates,
 	requestSites,
 	requestSite,
 } from '../actions';
@@ -29,7 +28,6 @@ import {
 	SITES_REQUEST,
 	SITES_REQUEST_FAILURE,
 	SITES_REQUEST_SUCCESS,
-	SITES_UPDATE,
 } from 'state/action-types';
 import useNock from 'test/helpers/use-nock';
 import { useSandbox } from 'test/helpers/use-sinon';
@@ -64,19 +62,6 @@ describe( 'actions', () => {
 			const action = receiveSites( sites );
 			expect( action ).to.eql( {
 				type: SITES_RECEIVE,
-				sites,
-			} );
-		} );
-	} );
-
-	describe( 'receiveSiteUpdates()', () => {
-		test( 'should return an action object', () => {
-			const sites = [ { ID: 2916284, name: 'WordPress.com Example Blog' } ];
-
-			const action = receiveSiteUpdates( sites );
-
-			expect( action ).to.eql( {
-				type: SITES_UPDATE,
 				sites,
 			} );
 		} );
@@ -155,11 +140,17 @@ describe( 'actions', () => {
 				.reply( 200, {
 					ID: 2916284,
 					name: 'WordPress.com Example Blog',
+					capabilities: {},
 				} )
 				.get( '/rest/v1.1/sites/77203074' )
 				.reply( 403, {
 					error: 'authorization_required',
 					message: 'User cannot access this private blog.',
+				} )
+				.get( '/rest/v1.1/sites/8894098' )
+				.reply( 200, {
+					ID: 8894098,
+					name: 'Some random site I dont have access to',
 				} );
 		} );
 
@@ -177,6 +168,18 @@ describe( 'actions', () => {
 				expect( spy ).to.have.been.calledWith(
 					receiveSite( {
 						ID: 2916284,
+						name: 'WordPress.com Example Blog',
+						capabilities: {},
+					} )
+				);
+			} );
+		} );
+
+		test( "should not dispatch receive site when request completes with site we can't manage", () => {
+			return requestSite( 8894098 )( spy ).then( () => {
+				expect( spy ).to.have.not.been.calledWith(
+					receiveSite( {
+						ID: 8894098,
 						name: 'WordPress.com Example Blog',
 					} )
 				);
@@ -198,6 +201,15 @@ describe( 'actions', () => {
 					type: SITE_REQUEST_FAILURE,
 					siteId: 77203074,
 					error: match( { message: 'User cannot access this private blog.' } ),
+				} );
+			} );
+		} );
+
+		test( "should not dispatch request success action when request completes with site we can't manage", () => {
+			return requestSite( 8894098 )( spy ).then( () => {
+				expect( spy ).to.have.not.been.calledWith( {
+					type: SITE_REQUEST_SUCCESS,
+					siteId: 8894098,
 				} );
 			} );
 		} );

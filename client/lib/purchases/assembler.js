@@ -31,7 +31,6 @@ function createPurchaseObject( purchase ) {
 		includedDomain: purchase.included_domain,
 		isCancelable: Boolean( purchase.is_cancelable ),
 		isDomainRegistration: Boolean( purchase.is_domain_registration ),
-		isRedeemable: Boolean( purchase.is_redeemable ),
 		isRefundable: Boolean( purchase.is_refundable ),
 		isRenewable: Boolean( purchase.is_renewable ),
 		isRenewal: Boolean( purchase.is_renewal ),
@@ -47,6 +46,7 @@ function createPurchaseObject( purchase ) {
 		productId: Number( purchase.product_id ),
 		productName: purchase.product_name,
 		productSlug: purchase.product_slug,
+		refundAmount: Number( purchase.refund_amount ),
 		refundText: `${ purchase.refund_currency_symbol }${ purchase.refund_amount }`,
 		refundPeriodInDays: purchase.refund_period_in_days,
 		renewDate: purchase.renew_date,
@@ -66,7 +66,8 @@ function createPurchaseObject( purchase ) {
 			creditCard: {
 				id: Number( purchase.payment_card_id ),
 				type: purchase.payment_card_type,
-				number: Number( purchase.payment_details ),
+				processor: purchase.payment_card_processor,
+				number: purchase.payment_details,
 				expiryDate: purchase.payment_expiry,
 				expiryMoment: purchase.payment_expiry
 					? i18n.moment( purchase.payment_expiry, 'MM/YY' )

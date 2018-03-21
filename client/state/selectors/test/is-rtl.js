@@ -8,36 +8,36 @@ import { expect } from 'chai';
 /**
  * Internal dependencies
  */
-import { isRtl } from '../';
+import { isRtl } from 'state/selectors';
 
 describe( 'isRtl()', () => {
 	test( 'should return null if the value is not known', () => {
-		const result = isRtl( {} );
+		const result = isRtl( { ui: { language: {} } } );
 
 		expect( result ).to.be.null;
 	} );
 
-	test( 'should return true if the localeSlug is RTL language', () => {
+	test( 'should return false if the isRtl reducer is false', () => {
 		const result = isRtl( {
 			ui: {
 				language: {
-					localeSlug: 'he',
-				},
-			},
-		} );
-
-		expect( result ).to.be.true;
-	} );
-
-	test( 'should return true if the localeSlug is LTR language', () => {
-		const result = isRtl( {
-			ui: {
-				language: {
-					localeSlug: 'fr',
+					isRtl: false,
 				},
 			},
 		} );
 
 		expect( result ).to.be.false;
+	} );
+
+	test( 'should return true if the isRtl reducer is true', () => {
+		const result = isRtl( {
+			ui: {
+				language: {
+					isRtl: true,
+				},
+			},
+		} );
+
+		expect( result ).to.be.true;
 	} );
 } );

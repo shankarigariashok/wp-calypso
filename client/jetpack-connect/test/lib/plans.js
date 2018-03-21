@@ -64,14 +64,14 @@ export const SITE_PLAN_PRO = deepFreeze( {
 } );
 
 export const CONTEXT = deepFreeze( {
-	canonicalPath: `/jetpack/connect/plans/${ SITE_SLUG }`,
-	path: `/jetpack/connect/plans/${ SITE_SLUG }`,
+	canonicalPath: `${ BASE_PLANS_PATH }/${ SITE_SLUG }`,
+	path: `${ BASE_PLANS_PATH }/${ SITE_SLUG }`,
 	title: 'WordPress.com',
-	state: { path: `/jetpack/connect/plans/${ SITE_SLUG }` },
+	state: { path: `${ BASE_PLANS_PATH }/${ SITE_SLUG }` },
 	querystring: '',
-	pathname: `/jetpack/connect/plans/${ SITE_SLUG }`,
+	pathname: `${ BASE_PLANS_PATH }/${ SITE_SLUG }`,
 	params: {
-		0: `/jetpack/connect/plans/${ SITE_SLUG }`,
+		0: `${ BASE_PLANS_PATH }/${ SITE_SLUG }`,
 		site: SITE_SLUG,
 	},
 	hash: {},
@@ -84,6 +84,7 @@ export const CONTEXT = deepFreeze( {
 export const TRANSACTION = deepFreeze( {
 	errors: {},
 	newCardFormFields: {},
+	newCardRawDetails: {},
 	step: { name: 'before-submit' },
 	domainDetails: null,
 } );
@@ -243,17 +244,16 @@ export const DEFAULT_PROPS = {
 	context: CONTEXT,
 	flowType: false,
 	getPlanBySlug: noop,
-	goBackToWpAdmin: noop,
 	hasPlan: false,
 	isAutomatedTransfer: false,
 	isRequestingPlans: false,
 	isRtlLayout: false,
 	jetpackConnectAuthorize: {},
+	notJetpack: false,
 	recordTracksEvent: noop,
 	redirectingToWpAdmin: false,
 	selectedSite: SELECTED_SITE,
 	selectedSiteSlug: SITE_SLUG,
-	selectPlanInAdvance: noop,
 	siteSlug: PLANS_SLUG,
 	transaction: TRANSACTION,
 	translate: identity,

@@ -14,7 +14,12 @@ import { spy } from 'sinon';
 import { HappinessSupport } from '..';
 import HappychatButton from 'components/happychat/button';
 import HappychatConnection from 'components/happychat/connection-connected';
-import support from 'lib/url/support';
+import {
+	CALYPSO_CONTACT,
+	JETPACK_CONTACT_SUPPORT,
+	JETPACK_SUPPORT,
+	SUPPORT_ROOT,
+} from 'lib/url/support';
 
 describe( 'HappinessSupport', () => {
 	let wrapper;
@@ -27,16 +32,14 @@ describe( 'HappinessSupport', () => {
 	test( 'should render translated heading content', () => {
 		const heading = wrapper.find( 'h3' );
 		expect( heading ).to.have.length( 1 );
-		expect( heading.props().children ).to.equal(
-			'Translated: Enjoy priority support from our Happiness Engineers'
-		);
+		expect( heading.props().children ).to.equal( 'Translated: Priority support' );
 	} );
 
 	test( 'should render translated help content', () => {
 		const content = wrapper.find( 'p.happiness-support__text' );
 		expect( content ).to.have.length( 1 );
 		expect( content.props().children ).to.equal(
-			'Translated: {{strong}}Need help?{{/strong}} A Happiness Engineer can answer questions about your site, your account, or how to do just about anything.' // eslint-disable-line max-len
+			'Translated: {{strong}}Need help?{{/strong}} A Happiness Engineer can answer questions about your site and your account.' // eslint-disable-line max-len
 		);
 	} );
 
@@ -51,7 +54,7 @@ describe( 'HappinessSupport', () => {
 			<HappinessSupport translate={ translate } recordTracksEvent={ noop } isJetpack={ false } />
 		);
 		expect( wrapper.find( 'Button.happiness-support__support-button' ).props().href ).to.equal(
-			support.SUPPORT_ROOT
+			SUPPORT_ROOT
 		);
 	} );
 
@@ -64,7 +67,7 @@ describe( 'HappinessSupport', () => {
 				.find( 'Button' )
 				.last()
 				.prop( 'href' )
-		).to.equal( support.JETPACK_SUPPORT );
+		).to.equal( JETPACK_SUPPORT );
 	} );
 
 	test( 'should have is-placeholder className only if it is a placeholder', () => {
@@ -213,12 +216,12 @@ describe( 'HappinessSupport', () => {
 
 		test( 'should be rendered with link to CALYPSO_CONTACT if it is not for JetPack', () => {
 			wrapper = shallow( <HappinessSupport { ...props } /> );
-			expect( wrapper.find( selector ).prop( 'href' ) ).to.equal( support.CALYPSO_CONTACT );
+			expect( wrapper.find( selector ).prop( 'href' ) ).to.equal( CALYPSO_CONTACT );
 		} );
 
 		test( 'should be rendered with link to JETPACK_CONTACT_SUPPORT if it is for JetPack', () => {
 			wrapper = shallow( <HappinessSupport { ...props } isJetpack={ true } /> );
-			expect( wrapper.find( selector ).prop( 'href' ) ).to.equal( support.JETPACK_CONTACT_SUPPORT );
+			expect( wrapper.find( selector ).prop( 'href' ) ).to.equal( JETPACK_CONTACT_SUPPORT );
 		} );
 
 		test( 'should render translated content', () => {

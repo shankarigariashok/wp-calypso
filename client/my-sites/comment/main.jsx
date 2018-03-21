@@ -6,7 +6,7 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
-import { get } from 'lodash';
+import { get, includes } from 'lodash';
 
 /**
  * Internal dependencies
@@ -14,9 +14,11 @@ import { get } from 'lodash';
 import Main from 'components/main';
 import EmptyContent from 'components/empty-content';
 import DocumentHead from 'components/data/document-head';
+import QuerySiteCommentsTree from 'components/data/query-site-comments-tree';
 import ModerateComment from 'components/data/moderate-comment';
 import Comment from 'my-sites/comments/comment';
 import CommentPermalink from 'my-sites/comment/comment-permalink';
+import CommentDeleteWarning from 'my-sites/comment/comment-delete-warning';
 import CommentListHeader from 'my-sites/comments/comment-list/comment-list-header';
 import PageViewTracker from 'lib/analytics/page-view-tracker';
 import { preventWidows } from 'lib/formatting';
@@ -30,21 +32,38 @@ export class CommentView extends Component {
 		commentId: PropTypes.number.isRequired,
 		action: PropTypes.string,
 		canModerateComments: PropTypes.bool.isRequired,
+		hasPermalink: PropTypes.bool,
+		redirectToPostView: PropTypes.func.isRequired,
 		translate: PropTypes.func.isRequired,
 	};
 
 	render() {
-		const { siteId, postId, commentId, action, canModerateComments, translate } = this.props;
+		const {
+			siteId,
+			postId,
+			commentId,
+			action,
+			canModerateComments,
+			hasPermalink,
+			redirectToPostView,
+			translate,
+		} = this.props;
 
 		return (
 			// eslint-disable-next-line wpcalypso/jsx-classname-namespace
 			<Main className="comments" wideLayout>
 				<PageViewTracker path="/comment/:site" title="Comments" />
+				<QuerySiteCommentsTree siteId={ siteId } status={ 'all' } />
 				<DocumentHead title={ translate( 'Comment' ) } />
 				{ canModerateComments && (
-					<ModerateComment { ...{ siteId, postId, commentId, newStatus: action } } />
+					<ModerateComment
+						{ ...{ siteId, postId, commentId, newStatus: action, redirectToPostView } }
+					/>
 				) }
-				<CommentListHeader { ...{ postId } } />
+				{ 'delete' === action && (
+					<CommentDeleteWarning { ...{ siteId, postId, commentId, redirectToPostView } } />
+				) }
+				<CommentListHeader { ...{ postId, commentId } } />
 				{ ! canModerateComments && (
 					<EmptyContent
 						title={ preventWidows(
@@ -56,26 +75,37 @@ export class CommentView extends Component {
 						illustration="/calypso/images/illustrations/illustration-500.svg"
 					/>
 				) }
-				{ canModerateComments && <Comment commentId={ commentId } refreshCommentData={ true } /> }
-				{ canModerateComments && <CommentPermalink { ...{ siteId, commentId } } /> }
+				{ canModerateComments && (
+					<Comment
+						commentId={ commentId }
+						refreshCommentData={ true }
+						redirect={ redirectToPostView }
+						isPostView={ true }
+						isEditMode={ canModerateComments && 'edit' === action }
+					/>
+				) }
+				{ canModerateComments && hasPermalink && <CommentPermalink { ...{ siteId, commentId } } /> }
 			</Main>
 		);
 	}
 }
 
 const mapStateToProps = ( state, ownProps ) => {
-	const { commentId, siteFragment } = ownProps;
+	const { commentId, redirectToPostView, siteFragment } = ownProps;
 
 	const siteId = getSiteId( state, siteFragment );
 	const comment = getSiteComment( state, siteId, commentId );
 	const postId = get( comment, 'post.ID' );
 
 	const canModerateComments = canCurrentUser( state, siteId, 'moderate_comments' ) !== false;
+	const hasPermalink = includes( [ 'approved', 'unapproved' ], get( comment, 'status' ) );
 
 	return {
 		siteId,
 		postId,
 		canModerateComments,
+		hasPermalink,
+		redirectToPostView: redirectToPostView( postId ),
 	};
 };
 

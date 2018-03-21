@@ -11,7 +11,7 @@ import { assign, isEqual, map, omit } from 'lodash';
  */
 import Dispatcher from 'dispatcher';
 import MediaStore from './store';
-import MediaUtils from './utils';
+import { sortItemsByDate as utilSortItemsByDate } from './utils';
 import emitter from 'lib/mixins/emitter';
 
 /**
@@ -26,13 +26,11 @@ const MediaListStore = {
 	SAME_QUERY_IGNORE_PARAMS = Object.freeze( [ 'number', 'page_handle' ] );
 
 function sortItemsByDate( siteId ) {
-	var sortedItems;
-
 	if ( ! ( siteId in MediaListStore._media ) ) {
 		return;
 	}
 
-	sortedItems = MediaUtils.sortItemsByDate( MediaListStore.getAll( siteId ) );
+	const sortedItems = utilSortItemsByDate( MediaListStore.getAll( siteId ) );
 	MediaListStore._media[ siteId ] = map( sortedItems, 'ID' );
 }
 
@@ -43,7 +41,7 @@ function ensureMediaForSiteId( siteId ) {
 }
 
 function receiveSingle( siteId, item, itemId ) {
-	var existingIndex;
+	let existingIndex;
 
 	ensureMediaForSiteId( siteId );
 
@@ -63,7 +61,7 @@ function receiveSingle( siteId, item, itemId ) {
 }
 
 function removeSingle( siteId, item ) {
-	var index;
+	let index;
 
 	if ( ! ( siteId in MediaListStore._media ) ) {
 		return;
@@ -126,6 +124,11 @@ function isQuerySame( siteId, query ) {
 	);
 }
 
+function sourceHasDate( source ) {
+	const sourcesWithoutDate = [ 'pexels' ];
+	return -1 === sourcesWithoutDate.indexOf( source );
+}
+
 MediaListStore.isItemMatchingQuery = function( siteId, item ) {
 	var query, matches;
 
@@ -149,10 +152,10 @@ MediaListStore.isItemMatchingQuery = function( siteId, item ) {
 		matches = item.title && -1 !== item.title.toLowerCase().indexOf( query.search.toLowerCase() );
 	}
 
-	if ( query.source === 'google_photos' && matches ) {
+	if ( !! query.source && matches ) {
 		// On uploading external images, the stores will receive the CREATE_MEDIA_ITEM  event
 		// and will update the list of media including the new one, but we don't want this new media
-		// to be shown in the google photos list - hence the filtering.
+		// to be shown in the external source's list - hence the filtering.
 		//
 		// One use case where this happened was:
 		//
@@ -291,7 +294,13 @@ MediaListStore.dispatchToken = Dispatcher.register( function( payload ) {
 			}
 
 			receivePage( action.siteId, action.data.media );
-			sortItemsByDate( action.siteId );
+			// either, no query (so no external source), or there is a query and the source has date data
+			if (
+				action.query === undefined ||
+				( action.query !== undefined && sourceHasDate( action.query.source ) )
+			) {
+				sortItemsByDate( action.siteId );
+			}
 			MediaListStore.emit( 'change' );
 			break;
 

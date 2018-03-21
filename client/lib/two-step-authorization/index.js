@@ -14,9 +14,10 @@ import emitter from 'lib/mixins/emitter';
 import userSettings from 'lib/user-settings';
 import applicationPasswords from 'lib/application-passwords-data';
 import connectedApplications from 'lib/connected-applications-data';
-import profileLinks from 'lib/user-profile-links';
 import analytics from 'lib/analytics';
 import wp from 'lib/wp';
+import { reduxDispatch } from 'lib/redux-bridge';
+import { requestUserProfileLinks } from 'state/profile-links/actions';
 
 const wpcom = wp.undocumented();
 
@@ -34,6 +35,9 @@ function TwoStepAuthorization() {
 	this.smsResendThrottled = false;
 	this.bumpMCStat = function( eventAction ) {
 		analytics.mc.bumpStat( '2fa', eventAction );
+		analytics.tracks.recordEvent( 'calypso_login_twostep_authorize', {
+			event_action: eventAction,
+		} );
 	};
 
 	this.fetch();
@@ -47,10 +51,6 @@ TwoStepAuthorization.prototype.fetch = function( callback ) {
 		function( error, data ) {
 			if ( ! error ) {
 				this.data = data;
-
-				if ( this.isReauthRequired() && this.isTwoStepSMSEnabled() && ! this.initialized ) {
-					this.sendSMSCode();
-				}
 
 				if ( this.isReauthRequired() && ! this.initialized ) {
 					this.bumpMCStat( 'reauth-required' );
@@ -81,8 +81,7 @@ TwoStepAuthorization.prototype.validateCode = function( args, callback ) {
 					userSettings.fetchSettings();
 					applicationPasswords.fetch();
 					connectedApplications.fetch();
-					profileLinks.reAuthRequired = false;
-					profileLinks.fetchProfileLinks();
+					reduxDispatch( requestUserProfileLinks() );
 				}
 
 				this.data.two_step_reauthorization_required = false;

@@ -5,8 +5,8 @@
  */
 import PropTypes from 'prop-types';
 import React from 'react';
+import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
-import { isEmpty } from 'lodash';
 import classNames from 'classnames';
 import Gridicon from 'gridicons';
 
@@ -15,69 +15,81 @@ import Gridicon from 'gridicons';
  */
 import Button from 'components/button';
 import Card from 'components/card';
+import Notice from 'components/notice';
+import { recordTracksEvent } from 'state/analytics/actions';
 import FormattedHeader from 'components/formatted-header';
-import { checkInboundTransferStatus } from 'lib/domains';
-import support from 'lib/url/support';
+import {
+	CALYPSO_CONTACT,
+	INCOMING_DOMAIN_TRANSFER_PREPARE_AUTH_CODE,
+	INCOMING_DOMAIN_TRANSFER_PREPARE_PRIVACY,
+	INCOMING_DOMAIN_TRANSFER_PREPARE_UNLOCK,
+} from 'lib/url/support';
 
-class TransferDomainPrecheck extends React.PureComponent {
+class TransferDomainPrecheck extends React.Component {
 	static propTypes = {
 		domain: PropTypes.string,
+		email: PropTypes.string,
+		loading: PropTypes.bool,
+		losingRegistrar: PropTypes.string,
+		losingRegistrarIanaId: PropTypes.string,
+		privacy: PropTypes.bool,
+		refreshStatus: PropTypes.func,
+		selectedSiteSlug: PropTypes.string,
 		setValid: PropTypes.func,
+		supportsPrivacy: PropTypes.bool,
+		unlocked: PropTypes.bool,
 	};
 
 	state = {
-		unlocked: false,
-		privacy: false,
-		email: '',
-		loading: true,
 		currentStep: 1,
+		unlockCheckClicked: false,
 	};
 
 	componentWillMount() {
-		this.refreshStatus();
+		this.componentWillReceiveProps( this.props );
 	}
 
-	componentWillUpdate( nextProps ) {
-		if ( nextProps.domain !== this.props.domain ) {
-			this.refreshStatus();
+	componentWillReceiveProps( nextProps ) {
+		// Reset steps if domain became locked again
+		if ( false === nextProps.unlocked ) {
+			this.resetSteps();
+		}
+
+		if ( nextProps.unlocked && 1 === this.state.currentStep ) {
+			this.showNextStep();
 		}
 	}
 
 	onClick = () => {
-		this.props.setValid( this.props.domain );
+		const { losingRegistrar, losingRegistrarIanaId, domain, supportsPrivacy } = this.props;
+
+		this.props.recordContinueButtonClick( domain, losingRegistrar, losingRegistrarIanaId );
+
+		this.props.setValid( domain, supportsPrivacy );
 	};
 
-	refreshStatus = ( proceedToNextStep = true ) => {
-		this.setState( { loading: true } );
-
-		checkInboundTransferStatus( this.props.domain, ( error, result ) => {
-			if ( ! isEmpty( error ) ) {
-				return;
-			}
-
-			if ( proceedToNextStep && result.unlocked ) {
-				this.showNextStep();
-			}
-
-			this.setState( {
-				email: result.admin_email,
-				privacy: result.privacy,
-				unlocked: result.unlocked,
-				loading: false,
-			} );
-		} );
-	};
-
-	refreshStatusOnly = () => {
-		this.refreshStatus( false );
+	resetSteps = () => {
+		if ( this.state.currentStep !== 1 ) {
+			this.setState( { currentStep: 1 } );
+		}
 	};
 
 	showNextStep = () => {
+		this.props.recordNextStep( this.props.domain, this.state.currentStep + 1 );
 		this.setState( { currentStep: this.state.currentStep + 1 } );
 	};
 
+	statusRefreshed = () => {
+		this.setState( { unlockCheckClicked: true } );
+	};
+
+	refreshStatus = () => {
+		this.props.refreshStatus( this.statusRefreshed );
+	};
+
 	getSection( heading, message, buttonText, step, stepStatus ) {
-		const { currentStep, loading, unlocked } = this.state;
+		const { currentStep } = this.state;
+		const { loading, unlocked } = this.props;
 		const isAtCurrentStep = step === currentStep;
 		const isStepFinished = currentStep > step;
 		const sectionClasses = classNames( 'transfer-domain-step__section', {
@@ -86,6 +98,8 @@ class TransferDomainPrecheck extends React.PureComponent {
 		} );
 
 		const sectionIcon = isStepFinished ? <Gridicon icon="checkmark-circle" size={ 36 } /> : step;
+		const onButtonClick =
+			true === unlocked || null === unlocked ? this.showNextStep : this.refreshStatus;
 
 		return (
 			<Card compact>
@@ -100,11 +114,7 @@ class TransferDomainPrecheck extends React.PureComponent {
 							<div>
 								<div className="transfer-domain-step__section-message">{ message }</div>
 								<div className="transfer-domain-step__section-action">
-									<Button
-										compact
-										onClick={ unlocked ? this.showNextStep : this.refreshStatus }
-										busy={ loading }
-									>
+									<Button compact onClick={ onButtonClick } busy={ loading }>
 										{ buttonText }
 									</Button>
 									{ stepStatus }
@@ -118,34 +128,88 @@ class TransferDomainPrecheck extends React.PureComponent {
 	}
 
 	getStatusMessage() {
-		const { translate } = this.props;
-		const { currentStep, unlocked, loading } = this.state;
+		const { loading, translate, unlocked } = this.props;
+		const { currentStep, unlockCheckClicked } = this.state;
 		const step = 1;
 		const isStepFinished = currentStep > step;
 
-		const heading = unlocked
-			? translate( 'Domain is unlocked.' )
-			: translate( 'Unlock the domain.' );
-		const message = unlocked
-			? translate( 'Your domain is unlocked at your current registrar.' )
-			: translate(
-					"Your domain is locked to prevent unauthorized transfers. You'll need to unlock " +
-						'it at your current domain provider before we can move it. {{a}}Here are instructions for unlocking it{{/a}}. ' +
-						'It might take a few minutes for any changes to take effect.',
-					{
-						components: {
-							a: <a href="#" rel="noopener noreferrer" />,
-						},
-					}
-				);
-		const buttonText = translate( "I've unlocked my domain" );
+		let heading = translate( "Can't get the domain's lock status." );
+		if ( true === unlocked ) {
+			heading = translate( 'Domain is unlocked.' );
+		} else if ( false === unlocked ) {
+			heading = translate( 'Unlock the domain.' );
+		}
+		if ( loading && ! isStepFinished ) {
+			heading = translate( 'Checking domain lock status.' );
+		}
 
-		let lockStatusClasses = unlocked
-			? 'transfer-domain-step__lock-status transfer-domain-step__unlocked'
-			: 'transfer-domain-step__lock-status transfer-domain-step__locked';
+		let message = translate(
+			"{{notice}}We couldn't get the lock status of your domain from your current registrar.{{/notice}} If you're sure your " +
+				"domain is unlocked then, you can continue to the next step. If it's not unlocked, then the transfer won't work. " +
+				'{{a}}Here are instructions to make sure your domain is unlocked.{{/a}}',
+			{
+				components: {
+					notice: <Notice showDismiss={ false } status="is-warning" />,
+					br: <br />,
+					a: (
+						<a
+							href={ INCOMING_DOMAIN_TRANSFER_PREPARE_UNLOCK }
+							rel="noopener noreferrer"
+							target="_blank"
+						/>
+					),
+				},
+			}
+		);
 
-		let lockStatusIcon = unlocked ? 'checkmark' : 'cross';
-		let lockStatusText = unlocked ? translate( 'Unlocked' ) : translate( 'Locked' );
+		if ( true === unlocked ) {
+			message = translate( 'Your domain is unlocked at your current registrar.' );
+		} else if ( false === unlocked ) {
+			message = translate(
+				"Your domain is locked to prevent unauthorized transfers. You'll need to unlock " +
+					'it at your current domain provider before we can move it. {{a}}Here are instructions for unlocking it{{/a}}. ' +
+					'It might take a few minutes for any changes to take effect.',
+				{
+					components: {
+						a: (
+							<a
+								href={ INCOMING_DOMAIN_TRANSFER_PREPARE_UNLOCK }
+								rel="noopener noreferrer"
+								target="_blank"
+							/>
+						),
+					},
+				}
+			);
+		}
+		if ( loading && ! isStepFinished ) {
+			message = translate( 'Please wait while we check the lock staus of your domain.' );
+		}
+
+		const buttonText = unlockCheckClicked
+			? translate( 'Check again' )
+			: translate( "I've unlocked my domain" );
+
+		let lockStatusClasses = 'transfer-domain-step__lock-status transfer-domain-step__unavailable';
+		if ( true === unlocked ) {
+			lockStatusClasses = 'transfer-domain-step__lock-status transfer-domain-step__unlocked';
+		} else if ( false === unlocked ) {
+			lockStatusClasses = 'transfer-domain-step__lock-status transfer-domain-step__locked';
+		}
+
+		let lockStatusIcon = 'info';
+		if ( true === unlocked ) {
+			lockStatusIcon = 'checkmark';
+		} else if ( false === unlocked ) {
+			lockStatusIcon = 'cross';
+		}
+
+		let lockStatusText = translate( 'Status unavailable' );
+		if ( true === unlocked ) {
+			lockStatusText = translate( 'Unlocked' );
+		} else if ( false === unlocked ) {
+			lockStatusText = translate( 'Locked' );
+		}
 
 		if ( loading && ! isStepFinished ) {
 			lockStatusClasses = 'transfer-domain-step__lock-status transfer-domain-step__checking';
@@ -164,26 +228,97 @@ class TransferDomainPrecheck extends React.PureComponent {
 	}
 
 	getPrivacyMessage() {
-		const { translate } = this.props;
-		const { currentStep, email, loading } = this.state;
+		const { email, loading, privacy, translate } = this.props;
+		const { currentStep } = this.state;
 		const step = 2;
 		const isStepFinished = currentStep > step;
 
 		const heading = translate( 'Verify we can get in touch.' );
-		const message = translate(
-			"We'll send an email to {{strong}}%(email)s{{/strong}} to start the transfer process. Make sure " +
-				"you have access to that address. Don't recognize it? Then you have privacy protection enabled. " +
-				"You'll need to log in to your current domain provider and {{a}}turn it off{{/a}} before we start. " +
-				"Don't worry, you can re-enable it once the transfer is done.",
+		let message = translate(
+			"{{notice}}We couldn't get the email address listed for this domain's owner and we " +
+				'need to send an important email to start the process.{{/notice}}' +
+				'{{strong}}Make sure you can access the email address listed for your domain and ' +
+				'privacy protection is disabled.{{/strong}}' +
+				'{{br/}}{{br/}}' +
+				'Log in to your current domain provider to double check the domain contact email address and ' +
+				"make sure to disable privacy protection. {{a}}Here's how to do that{{/a}}.",
 			{
-				args: { email },
 				components: {
-					strong: <strong className="transfer-domain-step__admin-email" />,
-					a: <a href="#" rel="noopener noreferrer" />,
+					notice: <Notice showDismiss={ false } status="is-warning" />,
+					strong: <strong />,
+					br: <br />,
+					a: (
+						<a
+							href={ INCOMING_DOMAIN_TRANSFER_PREPARE_PRIVACY }
+							rel="noopener noreferrer"
+							target="_blank"
+						/>
+					),
 				},
 			}
 		);
-		const buttonText = translate( 'I can access this email address' );
+		let buttonText = translate( 'I can access the email address' );
+
+		if ( email ) {
+			message = translate(
+				"{{card}}Make sure you can access the email address listed for this domain's owner. " +
+					"We'll send a link to start the process to the following email address: {{strong}}%(email)s{{/strong}}{{/card}}" +
+					"Don't recognize that address? You may have privacy protection enabled. It has to be " +
+					'disabled temporarily for the transfer to work. Log in to your current domain provider to ' +
+					"disable privacy protection. {{a}}Here's how to do that{{/a}}.",
+				{
+					args: { email },
+					components: {
+						card: (
+							<Card
+								className="transfer-domain-step__section-callout"
+								compact={ true }
+								highlight="warning"
+							/>
+						),
+						strong: <strong className="transfer-domain-step__admin-email" />,
+						a: (
+							<a
+								href={ INCOMING_DOMAIN_TRANSFER_PREPARE_PRIVACY }
+								rel="noopener noreferrer"
+								target="_blank"
+							/>
+						),
+					},
+				}
+			);
+
+			buttonText = translate( 'I can access the email address listed' );
+		}
+
+		if ( privacy && email ) {
+			message = translate(
+				'{{notice}}It looks like you may have privacy protection enabled. It must be turned off to ' +
+					'transfer your domain.{{/notice}}' +
+					"{{card}}You must be able to access the email address listed for this domain's owner below. " +
+					"We'll send a link to start the process to the following email address: {{strong}}%(email)s{{/strong}}{{/card}}" +
+					'It looks like you have privacy protection enabled, which may prevent you from successfully ' +
+					'transferring your domain. Please contact your current domain provider or log into your ' +
+					"account to disable privacy protection. {{a}}Here's how to do that{{/a}}.",
+				{
+					args: { email },
+					components: {
+						notice: <Notice showDismiss={ false } status="is-error" />,
+						card: <Card className="transfer-domain-step__section-callout" compact={ true } />,
+						strong: <strong className="transfer-domain-step__admin-email" />,
+						a: (
+							<a
+								href={ INCOMING_DOMAIN_TRANSFER_PREPARE_PRIVACY }
+								rel="noopener noreferrer"
+								target="_blank"
+							/>
+						),
+					},
+				}
+			);
+
+			buttonText = translate( 'I can access the email address listed' );
+		}
 
 		const statusClasses = loading
 			? 'transfer-domain-step__lock-status transfer-domain-step__checking'
@@ -192,7 +327,7 @@ class TransferDomainPrecheck extends React.PureComponent {
 		const statusText = loading ? translate( 'Checking…' ) : translate( 'Refresh email address' );
 
 		const stepStatus = ! isStepFinished && (
-			<a className={ statusClasses } onClick={ this.refreshStatusOnly }>
+			<a className={ statusClasses } onClick={ this.props.refreshStatus }>
 				<Gridicon icon={ statusIcon } size={ 12 } />
 				<span>{ statusText }</span>
 			</a>
@@ -207,12 +342,18 @@ class TransferDomainPrecheck extends React.PureComponent {
 		const heading = translate( 'Get a domain authorization code.' );
 		const message = translate(
 			'A domain authorization code is a unique code linked only to your domain — kind of like a ' +
-				"password for your domain. Log in to your current registrar to get one. We'll send you an email " +
+				"password for your domain. Log in to your current domain provider to get one. We'll send you an email " +
 				'with a link to enter it and officially okay the transfer. We call it a domain authorization code, ' +
 				'but it might be called a secret code, auth code, or EPP code. {{a}}Learn more{{/a}}.',
 			{
 				components: {
-					a: <a href="#" rel="noopener noreferrer" />,
+					a: (
+						<a
+							href={ INCOMING_DOMAIN_TRANSFER_PREPARE_AUTH_CODE }
+							rel="noopener noreferrer"
+							target="_blank"
+						/>
+					),
 				},
 			}
 		);
@@ -232,7 +373,7 @@ class TransferDomainPrecheck extends React.PureComponent {
 						components: { strong: <strong /> },
 					} ) }
 					subHeaderText={ translate(
-						'Log into your current registrar to complete a few preliminary steps.'
+						'Log into your current domain provider to complete a few preliminary steps.'
 					) }
 				/>
 				<img
@@ -244,8 +385,8 @@ class TransferDomainPrecheck extends React.PureComponent {
 	}
 
 	render() {
-		const { translate } = this.props;
-		const { unlocked, currentStep } = this.state;
+		const { translate, unlocked } = this.props;
+		const { currentStep } = this.state;
 
 		return (
 			<div className="transfer-domain-step__precheck">
@@ -261,14 +402,14 @@ class TransferDomainPrecheck extends React.PureComponent {
 									'Need help? {{a}}Get in touch with one of our Happiness Engineers{{/a}}.',
 								{
 									components: {
-										a: <a href={ support.CALYPSO_CONTACT } rel="noopener noreferrer" />,
+										a: <a href={ CALYPSO_CONTACT } rel="noopener noreferrer" target="_blank" />,
 									},
 								}
 							) }
 						</p>
 					</div>
 					<Button
-						disabled={ ! unlocked || currentStep < 4 }
+						disabled={ false === unlocked || currentStep < 4 }
 						onClick={ this.onClick }
 						primary={ true }
 					>
@@ -280,4 +421,17 @@ class TransferDomainPrecheck extends React.PureComponent {
 	}
 }
 
-export default localize( TransferDomainPrecheck );
+const recordNextStep = ( domain_name, show_step ) =>
+	recordTracksEvent( 'calypso_transfer_domain_precheck_step_change', { domain_name, show_step } );
+
+const recordContinueButtonClick = ( domain_name, losing_registrar, losing_registrar_iana_id ) =>
+	recordTracksEvent( 'calypso_transfer_domain_precheck_continue_click', {
+		domain_name,
+		losing_registrar,
+		losing_registrar_iana_id,
+	} );
+
+export default connect( null, {
+	recordNextStep,
+	recordContinueButtonClick,
+} )( localize( TransferDomainPrecheck ) );

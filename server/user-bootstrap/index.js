@@ -1,18 +1,33 @@
 /** @format */
-var superagent = require( 'superagent' ),
-	debug = require( 'debug' )( 'calypso:bootstrap' ),
-	crypto = require( 'crypto' );
+/**
+ * External dependencies
+ */
+import { stringify } from 'qs';
+import superagent from 'superagent';
+import debugFactory from 'debug';
+import crypto from 'crypto';
 
-var config = require( 'config' ),
+/**
+ * Internal dependencies
+ */
+import { filterUserObject } from 'lib/user/shared-utils';
+import { getActiveTestNames } from 'lib/abtest/utility';
+import config from 'config';
+
+const debug = debugFactory( 'calypso:bootstrap' ),
 	API_KEY = config( 'wpcom_calypso_rest_api_key' ),
-	userUtils = require( './shared-utils' ),
 	AUTH_COOKIE_NAME = 'wordpress_logged_in',
 	/**
-	* WordPress.com REST API /me endpoint.
-	*/
-	url = 'https://public-api.wordpress.com/rest/v1/me?meta=flags';
+	 * WordPress.com REST API /me endpoint.
+	 */
+	API_PATH = 'https://public-api.wordpress.com/rest/v1/me',
+	apiQuery = {
+		meta: 'flags',
+		abtests: getActiveTestNames( { appendDatestamp: true, asCSV: true } ),
+	},
+	url = `${ API_PATH }?${ stringify( apiQuery ) }`;
 
-module.exports = function( authCookieValue, callback ) {
+module.exports = function( authCookieValue, geoCountry, callback ) {
 	// create HTTP Request object
 	var req = superagent.get( url ),
 		hmac,
@@ -22,13 +37,15 @@ module.exports = function( authCookieValue, callback ) {
 		authCookieValue = decodeURIComponent( authCookieValue );
 
 		if ( typeof API_KEY !== 'string' ) {
-			throw new Error( 'Unable to boostrap user because of invalid API key in secrets.json' );
+			callback( new Error( 'Unable to boostrap user because of invalid API key in secrets.json' ) );
+			return;
 		}
 
 		hmac = crypto.createHmac( 'md5', API_KEY );
 		hmac.update( authCookieValue );
 		hash = hmac.digest( 'hex' );
 
+		req.set( 'X-Forwarded-GeoIP-Country-Code', geoCountry );
 		req.set( 'Authorization', 'X-WPCALYPSO ' + hash );
 		req.set( 'Cookie', AUTH_COOKIE_NAME + '=' + authCookieValue );
 		req.set( 'User-Agent', 'WordPress.com Calypso' );
@@ -57,7 +74,7 @@ module.exports = function( authCookieValue, callback ) {
 			return callback( error );
 		}
 
-		user = userUtils.filterUserObject( body );
+		user = filterUserObject( body );
 		callback( null, user );
 	} );
 };

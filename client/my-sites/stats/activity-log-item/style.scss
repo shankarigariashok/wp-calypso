@@ -1,70 +1,76 @@
+/** @format */
 .activity-log-item {
 	display: flex;
 	position: relative;
 
-	@include breakpoint( "<480px" ) {
+	@include breakpoint( '<480px' ) {
 		margin-left: 8px;
 	}
+}
 
-	.card {
-		flex: 1;
-		margin-top: 8px;
-		margin-bottom: 16px;
+.activity-log-item .card {
+	flex: 1;
+	margin-top: 8px;
+	margin-bottom: 16px;
+}
+
+.activity-log-item .foldable-card {
+	.foldable-card__expand .gridicon {
+		transform: none;
 	}
 
-	.foldable-card {
+	&.is-expanded {
+		margin-bottom: 24px;
+
 		.foldable-card__expand .gridicon {
-			transform: none;
+			transform: rotate(180deg);
 		}
+	}
+}
 
-		&.is-expanded {
-			margin-bottom: 24px;
+.activity-log-item .foldable-card__header {
+	@include breakpoint( '<480px' ) {
+		padding: 12px;
+		display: block;
+	}
 
-			.foldable-card__expand .gridicon {
-				transform: rotate( 180deg );
-			}
+	// TODO: Remove when foldable cards become "expandable"
+	.is-clickable {
+		cursor: default;
+	}
+}
+
+.activity-log-item .foldable-card__secondary {
+	flex-grow: 0;
+
+	.foldable-card__summary-expanded {
+		margin-right: 0;
+	}
+}
+
+.activity-log-item .is-discarded {
+	margin-left: 80px;
+
+	@include breakpoint( '<480px' ) {
+		margin-left: 60px;
+	}
+
+	&:before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 33px;
+		height: 100%;
+		border-left: 2px dotted $gray-lighten-20;
+
+		@include breakpoint( '<480px' ) {
+			left: 22px;
 		}
 	}
 
-	.foldable-card__header {
-		@include breakpoint( "<480px" ) {
-			padding: 12px;
-		}
-
-		// TODO: Remove when foldable cards become "expandable"
-		.is-clickable {
-			cursor: default;
-		}
-	}
-
-	.foldable-card__secondary {
-		flex-grow: 0;
-	}
-
-	&.is-discarded {
-		margin-left: 80px;
-
-		@include breakpoint( "<480px" ) {
-			margin-left: 60px;
-		}
-
+	&:last-of-type {
 		&:before {
-			content: '';
-			position: absolute;
-				top: 0;
-				left: 33px;
-			height: 100%;
-			border-left: 2px dotted lighten( $gray, 20% );
-
-			@include breakpoint( "<480px" ) {
-				left: 22px;
-			}
-		}
-
-		&:last-of-type {
-			&:before {
-				display: none;
-			}
+			display: none;
 		}
 	}
 }
@@ -73,11 +79,11 @@
 	align-self: flex-start;
 	background: $gray-light;
 	text-align: center;
-	margin: -2px 22px 0 10px;
+	margin: 1px 22px 0 10px;
 	padding: 4px 0 6px;
 	z-index: 1;
 
-	@include breakpoint( "<480px" ) {
+	@include breakpoint( '<480px' ) {
 		margin: -2px 8px 0 0px;
 	}
 }
@@ -88,7 +94,7 @@
 	text-transform: uppercase;
 	white-space: nowrap;
 
-	@include breakpoint( "<480px" ) {
+	@include breakpoint( '<480px' ) {
 		letter-spacing: -1px;
 	}
 }
@@ -102,8 +108,17 @@
 	padding: 12px;
 	margin-top: 2px;
 
-	@include breakpoint( "<480px" ) {
-		padding: 10px;
+	@include breakpoint( '<480px' ) {
+		padding: 7px;
+		box-sizing: border-box;
+		width: 32px;
+		height: 32px;
+		display: inline-block;
+
+		.gridicon {
+			width: 18px;
+			height: 18px;
+		}
 	}
 
 	// Success
@@ -124,20 +139,31 @@
 	.is-discarded & {
 		color: $gray-text;
 		background: none;
-		border: 1px solid transparentize( lighten( $gray, 20% ), .5 );
+		border: 1px solid transparentize($gray-lighten-20, 0.5);
 	}
 }
 
 .activity-log-item__card {
+	min-width: 0;
+
+	.foldable-card__main {
+		min-width: 0;
+
+		@include breakpoint( '<480px' ) {
+			max-width: none;
+			margin: 0;
+		}
+	}
+
 	.foldable-card__content {
 		padding: 16px;
 		font-size: 14px;
-		color: darken( $gray, 20% );
+		color: $gray-darken-20;
 	}
 
 	.is-discarded & {
 		background: none;
-		box-shadow: 0 0 0 1px transparentize( lighten( $gray, 20% ), .5 );
+		box-shadow: 0 0 0 1px transparentize($gray-lighten-20, 0.5);
 	}
 }
 
@@ -145,17 +171,33 @@
 	display: flex;
 	flex-wrap: wrap;
 	margin-right: 32px;
+	padding-left: 56px;
+	align-items: center;
+	min-width: 0;
+	width: 100%;
 
-	@include breakpoint( "<960px" ) {
+	@include breakpoint( '<960px' ) {
 		flex-direction: column;
 		align-items: flex-start;
+		padding-left: 0;
+	}
+
+	@include breakpoint( '<480px' ) {
+		margin-right: 0;
 	}
 }
 
 .activity-log-item__actor {
 	display: flex;
 	flex-shrink: 0;
+	min-width: 180px;
+	max-width: 100%;
 	margin-right: 32px;
+	align-items: center;
+
+	@include breakpoint( '>960px' ) {
+		margin-left: -56px;
+	}
 
 	.gravatar,
 	.jetpack-logo {
@@ -163,11 +205,16 @@
 		width: 40px;
 		height: 40px;
 		margin-right: 16px;
-		fill: darken( $gray, 10% );
+		fill: $gray-darken-10;
 
-		@include breakpoint( "<960px" ) {
+		@include breakpoint( '<960px' ) {
 			width: 32px;
 			height: 32px;
+			margin-right: 8px;
+		}
+		@include breakpoint( '<480px' ) {
+			width: 24px;
+			height: 24px;
 			margin-right: 8px;
 		}
 	}
@@ -180,32 +227,86 @@
 
 	.jetpack-logo {
 		.is-discarded & {
-			opacity: .75;
+			opacity: 0.75;
 		}
 	}
 }
 
+.activity-log-item__actor-info {
+	min-width: 0;
+}
+
 .activity-log-item__actor-name {
 	font-size: 14px;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
 
-	@include breakpoint( "<960px" ) {
+	@include breakpoint( '<960px' ) {
 		margin-top: 2px;
 		line-height: 1;
+	}
+
+	@include breakpoint( '<480px' ) {
+		display: inline-block;
 	}
 }
 
 .activity-log-item__actor-role {
+	@include breakpoint( '<480px' ) {
+		display: inline-block;
+		margin-left: 8px;
+	}
+}
+
+.activity-log-item__actor-role,
+.activity-log-item__description-summary {
 	text-transform: capitalize;
 	font-size: 12px;
 	color: $gray-text-min;
+
+	@include breakpoint( '<480px' ) {
+		font-size: 14px;
+	}
 }
 
-.activity-log-item__title {
+.activity-log-item__description {
 	flex: 1 1 50%;
 	font-size: 14px;
 	word-break: break-word;
 
-	@include breakpoint( "<960px" ) {
+	@include breakpoint( '<960px' ) {
 		margin-top: 8px;
 	}
+}
+
+.activity-log-item__description-content {
+	margin-bottom: 8px;
+}
+
+.activity-log-item__action {
+	// Mild hack so split button doesn't break
+	white-space: pre;
+
+	@include breakpoint( '<480px' ) {
+		margin-top: 16px;
+		text-align: left;
+	}
+}
+
+.activity-log-item__help-action {
+	color: $gray;
+	width: 117px;
+	height: 29px;
+	font-weight: normal;
+	font-size: 1.3rem;
+	padding-top: 2px;
+
+	@include breakpoint( '<480px' ) {
+		display: block;
+		margin-top: 1.5rem;
+	}
+}
+
+.activity-log-item__help-action .gridicon {
+	margin-right: 5px;
 }

@@ -1,14 +1,13 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import PropTypes from 'prop-types';
 import { localize } from 'i18n-calypso';
 import React from 'react';
 import createReactClass from 'create-react-class';
 import { get, find, defer } from 'lodash';
+import { connect } from 'react-redux';
 
 /**
  * Internal dependencies
@@ -20,22 +19,22 @@ import FreeCartPaymentBox from './free-cart-payment-box';
 import CreditCardPaymentBox from './credit-card-payment-box';
 import PayPalPaymentBox from './paypal-payment-box';
 import SourcePaymentBox from './source-payment-box';
-import storeTransactions from 'lib/store-transactions';
+import { fullCreditsPayment, newCardPayment, storedCardPayment } from 'lib/store-transactions';
 import analytics from 'lib/analytics';
 import TransactionStepsMixin from './transaction-steps-mixin';
-import upgradesActions from 'lib/upgrades/actions';
-import countriesList from 'lib/countries-list';
+import { setPayment } from 'lib/upgrades/actions';
+import { forPayments as countriesListForPayments } from 'lib/countries-list';
 import debugFactory from 'debug';
 import cartValues, { isPaidForFullyInCredits, isFree, cartItems } from 'lib/cart-values';
 import Notice from 'components/notice';
 import { preventWidows } from 'lib/formatting';
 import PaymentBox from './payment-box';
+import isPresalesChatAvailable from 'state/happychat/selectors/is-presales-chat-available';
 
 /**
  * Module variables
  */
 const { hasFreeTrial } = cartItems;
-const countriesListForPayments = countriesList.forPayments();
 const debug = debugFactory( 'calypso:checkout:payment' );
 
 const SecurePaymentForm = createReactClass( {
@@ -119,14 +118,20 @@ const SecurePaymentForm = createReactClass( {
 				// FIXME: The endpoint doesn't currently support transactions with no
 				//   payment info, so for now we rely on the credits payment method for
 				//   free carts.
-				newPayment = storeTransactions.fullCreditsPayment();
+				newPayment = fullCreditsPayment;
 				break;
 
 			case 'credit-card':
+				// Set the payment information based on a stored card (if
+				// available) or for a new card otherwise. But for new cards,
+				// don't overwrite existing new card payment details (for
+				// example, if the user already has entered information on the
+				// new card form and is now switching back to it after visiting
+				// another payment method).
 				if ( this.getInitialCard() ) {
-					newPayment = storeTransactions.storedCardPayment( this.getInitialCard() );
-				} else {
-					newPayment = storeTransactions.newCardPayment();
+					newPayment = storedCardPayment( this.getInitialCard() );
+				} else if ( ! get( this.props.transaction, 'payment.newCardDetails', null ) ) {
+					newPayment = newCardPayment();
 				}
 				break;
 
@@ -137,9 +142,12 @@ const SecurePaymentForm = createReactClass( {
 		}
 
 		if ( newPayment ) {
-			// we need to defer this because this is mounted after `upgradesActions.setDomainDetails` is called
+			// We need to defer this because this is mounted after `setDomainDetails`
+			// is called.
+			// Note: If this defer() is ever able to be removed, the corresponding
+			// defer() in NewCardForm::handleFieldChange() can likely be removed too.
 			defer( function() {
-				upgradesActions.setPayment( newPayment );
+				setPayment( newPayment );
 			} );
 		}
 	},
@@ -157,6 +165,7 @@ const SecurePaymentForm = createReactClass( {
 				cart={ this.props.cart }
 				onSubmit={ this.handlePaymentBoxSubmit }
 				transactionStep={ this.props.transaction.step }
+				presaleChatAvailable={ this.props.presaleChatAvailable }
 			/>
 		);
 	},
@@ -201,6 +210,7 @@ const SecurePaymentForm = createReactClass( {
 					selectedSite={ this.props.selectedSite }
 					onSubmit={ this.handlePaymentBoxSubmit }
 					transactionStep={ this.props.transaction.step }
+					presaleChatAvailable={ this.props.presaleChatAvailable }
 				/>
 			</PaymentBox>
 		);
@@ -221,6 +231,7 @@ const SecurePaymentForm = createReactClass( {
 					countriesList={ countriesListForPayments }
 					selectedSite={ this.props.selectedSite }
 					redirectTo={ this.props.redirectTo }
+					presaleChatAvailable={ this.props.presaleChatAvailable }
 				/>
 			</PaymentBox>
 		);
@@ -241,6 +252,7 @@ const SecurePaymentForm = createReactClass( {
 					selectedSite={ this.props.selectedSite }
 					paymentType={ paymentType }
 					redirectTo={ this.props.redirectTo }
+					presaleChatAvailable={ this.props.presaleChatAvailable }
 				/>
 			</PaymentBox>
 		);
@@ -299,9 +311,12 @@ const SecurePaymentForm = createReactClass( {
 					</div>
 				);
 
-			case 'ideal':
-			case 'giropay':
+			case 'alipay':
 			case 'bancontact':
+			case 'eps':
+			case 'giropay':
+			case 'ideal':
+			case 'p24':
 				return (
 					<div>
 						{ this.renderGreatChoiceHeader() }
@@ -352,4 +367,8 @@ const SecurePaymentForm = createReactClass( {
 	},
 } );
 
-export default localize( SecurePaymentForm );
+export default connect( state => {
+	return {
+		presaleChatAvailable: isPresalesChatAvailable( state ),
+	};
+}, null )( localize( SecurePaymentForm ) );

@@ -14,7 +14,7 @@ import { localize } from 'i18n-calypso';
  */
 import PostTypeFilter from 'my-sites/post-type-filter';
 import SidebarNavigation from 'my-sites/sidebar-navigation';
-import PostListWrapper from './post-list-wrapper';
+import PostTypeList from 'my-sites/post-type-list';
 import PostTypeBulkEditBar from 'my-sites/post-type-list/bulk-edit-bar';
 import config from 'config';
 import Main from 'components/main';
@@ -47,12 +47,15 @@ class PostsMain extends React.Component {
 			'is-multisite': ! this.props.siteId,
 			'is-single-site': this.props.siteId,
 		} );
+		const status = mapStatus( statusSlug );
 		const query = {
 			author,
 			category,
+			number: 20, // max supported by /me/posts endpoint for all-sites mode
+			order: status === 'future' ? 'ASC' : 'DESC',
 			search,
 			site_visibility: ! siteId ? 'visible' : undefined,
-			status: mapStatus( statusSlug ),
+			status,
 			tag,
 			type: 'post',
 		};
@@ -63,7 +66,7 @@ class PostsMain extends React.Component {
 				<div className="posts__primary">
 					<PostTypeFilter query={ query } siteId={ siteId } statusSlug={ statusSlug } />
 					{ siteId && <PostTypeBulkEditBar /> }
-					<PostListWrapper { ...this.props } />
+					<PostTypeList query={ query } scrollContainer={ document.body } />
 				</div>
 			</Main>
 		);

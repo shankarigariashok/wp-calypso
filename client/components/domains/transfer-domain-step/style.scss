@@ -68,6 +68,12 @@
 .transfer-domain-step__domain-description {
 	font-size: 16px;
 	margin-bottom: 20px;
+
+	.transfer-domain-step__illustration {
+		display: block;
+		margin: 0 auto 20px;
+		max-width: 250px;
+	}
 }
 
 .transfer-domain-step__go {
@@ -78,7 +84,7 @@
 .transfer-domain-step__domain-heading {
 	font-size: 18px;
 	font-weight: 500;
-	margin-bottom: 10px;
+	margin-bottom: 5px;
 }
 
 .transfer-domain-step__add-domain {
@@ -88,7 +94,7 @@
 }
 
 .transfer-domain-step__map-option {
-	color: darken( $gray, 20% );
+	color: $gray-darken-20;
 }
 
 .transfer-domain-step__map-help {
@@ -102,9 +108,9 @@
 	height: 28px;
 	line-height: 28px;
 	border-radius: 50%;
-	border: 1px solid lighten( $gray, 20% );
+	border: 1px solid $gray-lighten-20;
 	background-color: $gray-light;
-	color: darken( $gray, 20% );
+	color: $gray-darken-20;
 	font-size: 18px;
 	text-align: center;
 	margin-right: 15px;
@@ -121,11 +127,16 @@
 	}
 
 	.transfer-domain-step__section-heading {
-		color: darken( $gray, 20% );
+		color: $gray-darken-20;
 		align-items: center;
 		display: flex;
 		font-size: 16px;
 		justify-content: space-between;
+	}
+
+	.transfer-domain-step__section-callout {
+		background: $gray-light;
+		margin: 14px 0;
 	}
 
 	&.is-expanded {
@@ -154,6 +165,10 @@
 	align-items: center;
 	display: flex;
 	margin-top: 20px;
+
+	.transfer-domain-step__section-action-button {
+		margin-right: 15px;
+	}
 }
 
 .transfer-domain-step__lock-status {
@@ -178,6 +193,10 @@
 		color: $alert-red;
 	}
 
+	&.transfer-domain-step__unknown {
+		color: $alert-yellow;
+	}
+
 	&.transfer-domain-step__refresh {
 		color: $blue-wordpress;
 		cursor: pointer;
@@ -185,6 +204,8 @@
 }
 
 .transfer-domain-step__admin-email {
+	display: block;
+	margin-top: 20px;
 	hyphens: auto;
 	overflow-wrap: break-word;
 	word-break: break-word;
@@ -193,7 +214,7 @@
 
 .transfer-domain-step__continue-text {
 	p {
-		color: darken( $gray, 10% );
+		color: $gray-darken-10;
 		font-size: 14px;
 	}
 }
@@ -222,7 +243,7 @@
 
 .transfer-domain-step__options {
 	label {
-		color: darken( $gray, 20% );
+		color: $gray-darken-20;
 	}
 
 	legend {

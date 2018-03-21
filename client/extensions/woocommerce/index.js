@@ -17,11 +17,13 @@ import App from './app';
 import Dashboard from './app/dashboard';
 import EmptyContent from 'components/empty-content';
 import { navigation, siteSelection, sites } from 'my-sites/controller';
-import { renderWithReduxStore } from 'lib/react-helpers';
 import installActionHandlers from './state/data-layer';
 import Order from './app/order';
-import OrderCreate from './app/order/order-create';
+import OrderCreate from './app/order/create';
 import Orders from './app/orders';
+import ProductCategories from './app/product-categories';
+import ProductCategoryCreate from './app/product-categories/create';
+import ProductCategoryUpdate from './app/product-categories/update';
 import Products from './app/products';
 import ProductCreate from './app/products/product-create';
 import ProductUpdate from './app/products/product-update';
@@ -36,6 +38,8 @@ import Shipping from './app/settings/shipping';
 import ShippingZone from './app/settings/shipping/shipping-zone';
 import StatsController from './app/store-stats/controller';
 import StoreSidebar from './store-sidebar';
+import { tracksStore } from './lib/analytics';
+import { makeLayout, render as clientRender } from 'controller';
 
 function initExtension() {
 	installActionHandlers();
@@ -65,6 +69,24 @@ const getStorePages = () => {
 			configKey: 'woocommerce/extension-products',
 			documentTitle: translate( 'Edit Product' ),
 			path: '/store/product/:site/:product',
+		},
+		{
+			container: ProductCategories,
+			configKey: 'woocommerce/extension-product-categories',
+			documentTitle: translate( 'Product Categories' ),
+			path: '/store/products/categories/:site',
+		},
+		{
+			container: ProductCategoryUpdate,
+			configKey: 'woocommerce/extension-product-categories',
+			documentTitle: translate( 'Edit Product Category' ),
+			path: '/store/products/category/:site/:category',
+		},
+		{
+			container: ProductCategoryCreate,
+			configKey: 'woocommerce/extension-product-categories',
+			documentTitle: translate( 'New Product Category' ),
+			path: '/store/products/category/:site',
 		},
 		{
 			container: Orders,
@@ -156,73 +178,73 @@ const getStorePages = () => {
 			documentTitle: translate( 'Tax Settings' ),
 			path: '/store/settings/taxes/:site',
 		},
-	];
-
-	if ( config.isEnabled( 'woocommerce/extension-settings-email' ) ) {
-		pages.push( {
+		{
 			container: SettingsEmail,
 			configKey: 'woocommerce/extension-settings-email',
 			documentTitle: translate( 'Email' ),
 			path: '/store/settings/email/:site/:setup?',
-		} );
-	}
+		},
+	];
 
 	return pages;
 };
 
 function addStorePage( storePage, storeNavigation ) {
-	page( storePage.path, siteSelection, storeNavigation, function( context ) {
-		const component = React.createElement( storePage.container, { params: context.params } );
-		const appProps =
-			( storePage.documentTitle && { documentTitle: storePage.documentTitle } ) || {};
+	page(
+		storePage.path,
+		siteSelection,
+		storeNavigation,
+		( context, next ) => {
+			const component = React.createElement( storePage.container, { params: context.params } );
+			const appProps =
+				( storePage.documentTitle && { documentTitle: storePage.documentTitle } ) || {};
 
-		let analyticsPath = storePage.path;
-		const { filter } = context.params;
-		if ( filter ) {
-			analyticsPath = analyticsPath.replace( ':filter', filter );
-		}
+			let analyticsPath = storePage.path;
+			const { filter } = context.params;
+			if ( filter ) {
+				analyticsPath = analyticsPath.replace( ':filter', filter );
+			}
 
-		let analyticsPageTitle = 'Store';
-		if ( storePage.documentTitle ) {
-			analyticsPageTitle += ` > ${ storePage.documentTitle }`;
-		} else {
-			analyticsPageTitle += ' > Dashboard';
-		}
+			let analyticsPageTitle = 'Store';
+			if ( storePage.documentTitle ) {
+				analyticsPageTitle += ` > ${ storePage.documentTitle }`;
+			} else {
+				analyticsPageTitle += ' > Dashboard';
+			}
 
-		analytics.pageView.record( analyticsPath, analyticsPageTitle );
+			analytics.pageView.record( analyticsPath, analyticsPageTitle );
 
-		renderWithReduxStore(
-			React.createElement( App, appProps, component ),
-			document.getElementById( 'primary' ),
-			context.store
-		);
-	} );
+			context.primary = React.createElement( App, appProps, component );
+			next();
+		},
+		addTracksContext,
+		makeLayout,
+		clientRender
+	);
 }
 
 function createStoreNavigation( context, next, storePage ) {
-	renderWithReduxStore(
-		React.createElement( StoreSidebar, {
-			path: context.path,
-			page: storePage,
-		} ),
-		document.getElementById( 'secondary' ),
-		context.store
-	);
+	context.secondary = React.createElement( StoreSidebar, {
+		path: context.path,
+		page: storePage,
+	} );
 
 	next();
 }
 
 function notFoundError( context, next ) {
-	renderWithReduxStore(
-		React.createElement( EmptyContent, {
-			className: 'content-404',
-			illustration: '/calypso/images/illustrations/illustration-404.svg',
-			title: translate( 'Uh oh. Page not found.' ),
-			line: translate( "Sorry, the page you were looking for doesn't exist or has been moved." ),
-		} ),
-		document.getElementById( 'content' ),
-		context.store
-	);
+	context.primary = React.createElement( EmptyContent, {
+		className: 'content-404',
+		illustration: '/calypso/images/illustrations/illustration-404.svg',
+		title: translate( 'Uh oh. Page not found.' ),
+		line: translate( "Sorry, the page you were looking for doesn't exist or has been moved." ),
+	} );
+	next();
+}
+
+function addTracksContext( context, next ) {
+	tracksStore.setReduxStore( context.store );
+
 	next();
 }
 
@@ -237,10 +259,25 @@ export default function() {
 	} );
 
 	// Add pages that use my-sites navigation instead
-	page( '/store/stats/:type/:unit', siteSelection, sites );
-	page( '/store/stats/:type/:unit/:site', siteSelection, navigation, StatsController );
+	page(
+		'/store/stats/:type/:unit',
+		siteSelection,
+		sites,
+		addTracksContext,
+		makeLayout,
+		clientRender
+	);
+	page(
+		'/store/stats/:type/:unit/:site',
+		siteSelection,
+		navigation,
+		addTracksContext,
+		StatsController,
+		makeLayout,
+		clientRender
+	);
 
-	page( '/store/*', notFoundError );
+	page( '/store/*', notFoundError, makeLayout, clientRender );
 }
 
 // TODO: This could probably be done in a better way through the same mechanisms

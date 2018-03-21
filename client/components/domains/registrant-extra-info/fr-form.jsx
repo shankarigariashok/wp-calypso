@@ -9,18 +9,7 @@ import React from 'react';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
 import debugFactory from 'debug';
-import {
-	castArray,
-	defaults,
-	get,
-	identity,
-	isEmpty,
-	isString,
-	map,
-	noop,
-	set,
-	toUpper,
-} from 'lodash';
+import { defaults, get, identity, isEmpty, isString, map, noop, set, toUpper } from 'lodash';
 
 /**
  * Internal dependencies
@@ -34,6 +23,7 @@ import FormRadio from 'components/forms/form-radio';
 import FormTextInput from 'components/forms/form-text-input';
 import FormInputValidation from 'components/forms/form-input-validation';
 import validateContactDetails from './fr-validate-contact-details';
+import { disableSubmitButton } from './with-contact-details-validation';
 
 const debug = debugFactory( 'calypso:domains:registrant-extra-info' );
 let defaultRegistrantType;
@@ -69,6 +59,7 @@ function renderValidationError( message ) {
 class RegistrantExtraInfoFrForm extends React.PureComponent {
 	static propTypes = {
 		contactDetails: PropTypes.object,
+		ccTldDetails: PropTypes.object,
 		contactDetailsValidationErrors: PropTypes.object,
 		isVisible: PropTypes.bool,
 		onSubmit: PropTypes.func,
@@ -96,7 +87,7 @@ class RegistrantExtraInfoFrForm extends React.PureComponent {
 
 		this.props.updateContactDetailsCache( {
 			extra: {
-				registrantType: defaultRegistrantType,
+				fr: { registrantType: defaultRegistrantType },
 			},
 		} );
 	}
@@ -112,12 +103,12 @@ class RegistrantExtraInfoFrForm extends React.PureComponent {
 	};
 
 	handleChangeContactExtraEvent = event => {
-		this.updateContactDetails( `extra.${ event.target.id }`, event.target.value );
+		this.updateContactDetails( `extra.fr.${ event.target.id }`, event.target.value );
 	};
 
 	render() {
-		const { contactDetails, contactDetailsValidationErrors, translate } = this.props;
-		const registrantType = get( contactDetails, 'extra.registrantType', defaultRegistrantType );
+		const { ccTldDetails, contactDetailsValidationErrors, translate } = this.props;
+		const registrantType = get( ccTldDetails, 'registrantType', defaultRegistrantType );
 		const formIsValid = isEmpty( contactDetailsValidationErrors );
 
 		return (
@@ -152,29 +143,19 @@ class RegistrantExtraInfoFrForm extends React.PureComponent {
 
 				{ 'organization' === registrantType && this.renderOrganizationFields() }
 
-				{ formIsValid
-					? this.props.children
-					: map(
-							castArray( this.props.children ),
-							child =>
-								child.props.className.match( /submit-button/ )
-									? React.cloneElement( child, {
-											disabled: true,
-										} )
-									: child
-						) }
+				{ formIsValid ? this.props.children : disableSubmitButton( this.props.children ) }
 			</form>
 		);
 	}
 
 	renderOrganizationFields() {
-		const { contactDetails, contactDetailsValidationErrors, translate } = this.props;
+		const { contactDetails, ccTldDetails, contactDetailsValidationErrors, translate } = this.props;
 		const { registrantVatId, sirenSiret, trademarkNumber } = defaults(
 			{},
-			contactDetails.extra,
+			ccTldDetails,
 			emptyValues
 		);
-		const validationErrors = get( contactDetailsValidationErrors, 'extra', {} );
+		const validationErrors = get( contactDetailsValidationErrors, 'extra.fr', {} );
 		const registrantVatIdValidationMessage =
 			validationErrors.registrantVatId &&
 			renderValidationError(
@@ -197,6 +178,7 @@ class RegistrantExtraInfoFrForm extends React.PureComponent {
 		const trademarkNumberStrings = {
 			maxLength: this.props.translate( 'Too long. An EU Trademark number has 9 digits.' ),
 			oneOf: this.props.translate( 'Too short. An EU Trademark number has 9 digits.' ),
+			pattern: this.props.translate( 'An EU Trademark number uses only digits.' ),
 		};
 
 		const trademarkNumberValidationMessage = map( validationErrors.trademarkNumber, error =>
@@ -320,6 +302,7 @@ export default connect(
 		const contactDetails = getContactDetailsCache( state );
 		return {
 			contactDetails,
+			ccTldDetails: get( contactDetails, 'extra.fr', {} ),
 			contactDetailsValidationErrors: validateContactDetails( contactDetails ),
 		};
 	},

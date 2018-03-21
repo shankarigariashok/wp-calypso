@@ -58,20 +58,22 @@ class Buttons extends React.PureComponent {
 				<Card>
 					<div className="docs__design-button-row">
 						<Button>Button</Button>
-						<Button icon>
-							<Gridicon icon="heart" /> Icon button
+						<Button>
+							<Gridicon icon="heart" />
+							<span className="button-text">Icon button</span>
 						</Button>
-						<Button icon>
+						<Button>
 							<Gridicon icon="plugins" />
 						</Button>
 						<Button disabled>Disabled button</Button>
 					</div>
 					<div className="docs__design-button-row">
 						<Button scary>Scary button</Button>
-						<Button scary icon>
-							<Gridicon icon="globe" /> Scary icon button
+						<Button scary>
+							<Gridicon icon="globe" />
+							<span className="button-text">Scary icon button</span>
 						</Button>
-						<Button scary icon>
+						<Button scary>
 							<Gridicon icon="pencil" />
 						</Button>
 						<Button scary disabled>
@@ -80,10 +82,11 @@ class Buttons extends React.PureComponent {
 					</div>
 					<div className="docs__design-button-row">
 						<Button primary>Primary button</Button>
-						<Button primary icon>
-							<Gridicon icon="camera" /> Primary icon button
+						<Button primary>
+							<Gridicon icon="camera" />
+							<span className="button-text">Primary icon button</span>
 						</Button>
-						<Button primary icon>
+						<Button primary>
 							<Gridicon icon="time" />
 						</Button>
 						<Button primary disabled>
@@ -94,10 +97,11 @@ class Buttons extends React.PureComponent {
 						<Button primary scary>
 							Primary scary button
 						</Button>
-						<Button primary scary icon>
-							<Gridicon icon="user-circle" /> Primary scary icon button
+						<Button primary scary>
+							<Gridicon icon="user-circle" />
+							<span className="button-text">Primary scary icon button</span>
 						</Button>
-						<Button primary scary icon>
+						<Button primary scary>
 							<Gridicon icon="cart" />
 						</Button>
 						<Button primary scary disabled>
@@ -106,48 +110,78 @@ class Buttons extends React.PureComponent {
 					</div>
 					<div className="docs__design-button-row">
 						<Button borderless>
-							<Gridicon icon="cross" /> Remove
+							<Gridicon icon="cross" />
+							<span className="button-text">Remove</span>
 						</Button>
 						<Button borderless>
-							<Gridicon icon="trash" /> Trash
+							<Gridicon icon="trash" />
+							<span className="button-text">Trash</span>
 						</Button>
 						<Button borderless>
-							<Gridicon icon="link-break" /> Disconnect
+							<Gridicon icon="link-break" />
+							<span className="button-text">Disconnect</span>
 						</Button>
 						<Button borderless>
 							<Gridicon icon="trash" />
 						</Button>
 						<Button borderless disabled>
-							<Gridicon icon="cross" /> Remove
+							<Gridicon icon="cross" />
+							<span className="button-text">Remove</span>
+						</Button>
+					</div>
+					<div className="docs__design-button-row">
+						<Button borderless primary>
+							<Gridicon icon="cross" />
+							<span className="button-text">Remove</span>
+						</Button>
+						<Button borderless primary>
+							<Gridicon icon="trash" />
+							<span className="button-text">Trash</span>
+						</Button>
+						<Button borderless primary>
+							<Gridicon icon="link-break" />
+							<span className="button-text">Disconnect</span>
+						</Button>
+						<Button borderless primary>
+							<Gridicon icon="trash" />
+						</Button>
+						<Button borderless primary disabled>
+							<Gridicon icon="cross" />
+							<span className="button-text">Remove</span>
 						</Button>
 					</div>
 					<div className="docs__design-button-row">
 						<Button borderless scary>
-							<Gridicon icon="cross" /> Remove
+							<Gridicon icon="cross" />
+							<span className="button-text">Remove</span>
 						</Button>
 						<Button borderless scary>
-							<Gridicon icon="trash" /> Trash
+							<Gridicon icon="trash" />
+							<span className="button-text">Trash</span>
 						</Button>
 						<Button borderless scary>
-							<Gridicon icon="link-break" /> Disconnect
+							<Gridicon icon="link-break" />
+							<span className="button-text">Disconnect</span>
 						</Button>
 						<Button borderless scary>
 							<Gridicon icon="trash" />
 						</Button>
 						<Button borderless scary disabled>
-							<Gridicon icon="cross" /> Remove
+							<Gridicon icon="cross" />
+							<span className="button-text">Remove</span>
 						</Button>
 					</div>
 					<div className="docs__design-button-row">
 						<Button busy>Busy button</Button>
-						<Button primary busy icon>
-							<Gridicon icon="camera" /> Primary icon button
-						</Button>
-						<Button primary busy icon>
+						<Button primary busy>
 							<Gridicon icon="time" />
 						</Button>
 						<Button primary busy>
 							Primary busy button
+						</Button>
+						<Button primary scary busy>
+							<Gridicon icon="trash" />
+							<span className="button-text">Primary scary busy button</span>
 						</Button>
 					</div>
 				</Card>
@@ -157,10 +191,11 @@ class Buttons extends React.PureComponent {
 				<Card>
 					<div className="docs__design-button-row">
 						<Button compact>Compact button</Button>
-						<Button compact icon>
-							<Gridicon icon="heart" /> Compact icon button
+						<Button compact>
+							<Gridicon icon="heart" />
+							<span className="button-text">Compact icon button</span>
 						</Button>
-						<Button compact icon>
+						<Button compact>
 							<Gridicon icon="plugins" />
 						</Button>
 						<Button compact disabled>
@@ -171,10 +206,11 @@ class Buttons extends React.PureComponent {
 						<Button compact scary>
 							Compact scary button
 						</Button>
-						<Button compact scary icon>
-							<Gridicon icon="globe" /> Compact scary icon button
+						<Button compact scary>
+							<Gridicon icon="globe" />
+							<span className="button-text">Compact scary icon button</span>
 						</Button>
-						<Button compact scary icon>
+						<Button compact scary>
 							<Gridicon icon="pencil" />
 						</Button>
 						<Button compact scary disabled>
@@ -185,10 +221,11 @@ class Buttons extends React.PureComponent {
 						<Button compact primary>
 							Compact primary button
 						</Button>
-						<Button compact primary icon>
-							<Gridicon icon="camera" /> Compact primary icon button
+						<Button compact primary>
+							<Gridicon icon="camera" />
+							<span className="button-text">Compact primary icon button</span>
 						</Button>
-						<Button compact primary icon>
+						<Button compact primary>
 							<Gridicon icon="time" />
 						</Button>
 						<Button compact primary disabled>
@@ -199,10 +236,11 @@ class Buttons extends React.PureComponent {
 						<Button compact primary scary>
 							Compact primary scary button
 						</Button>
-						<Button compact primary scary icon>
-							<Gridicon icon="user-circle" /> Compact primary scary icon button
+						<Button compact primary scary>
+							<Gridicon icon="user-circle" />
+							<span className="button-text">Compact primary scary icon button</span>
 						</Button>
-						<Button compact primary scary icon>
+						<Button compact primary scary>
 							<Gridicon icon="cart" />
 						</Button>
 						<Button compact primary scary disabled>
@@ -211,50 +249,80 @@ class Buttons extends React.PureComponent {
 					</div>
 					<div className="docs__design-button-row">
 						<Button compact borderless>
-							<Gridicon icon="cross" /> Remove
+							<Gridicon icon="cross" />
+							<span className="button-text">Remove</span>
 						</Button>
 						<Button compact borderless>
-							<Gridicon icon="trash" /> Trash
+							<Gridicon icon="trash" />
+							<span className="button-text">Trash</span>
 						</Button>
 						<Button compact borderless>
-							<Gridicon icon="link-break" /> Disconnect
+							<Gridicon icon="link-break" />
+							<span className="button-text">Disconnect</span>
 						</Button>
 						<Button compact borderless>
 							<Gridicon icon="trash" />
 						</Button>
 						<Button compact borderless disabled>
-							<Gridicon icon="cross" /> Remove
+							<Gridicon icon="cross" />
+							<span className="button-text">Remove</span>
+						</Button>
+					</div>
+					<div className="docs__design-button-row">
+						<Button compact primary borderless>
+							<Gridicon icon="cross" />
+							<span className="button-text">Remove</span>
+						</Button>
+						<Button compact primary borderless>
+							<Gridicon icon="trash" />
+							<span className="button-text">Trash</span>
+						</Button>
+						<Button compact primary borderless>
+							<Gridicon icon="link-break" />
+							<span className="button-text">Disconnect</span>
+						</Button>
+						<Button compact primary borderless>
+							<Gridicon icon="trash" />
+						</Button>
+						<Button compact primary borderless disabled>
+							<Gridicon icon="cross" />
+							<span className="button-text">Remove</span>
 						</Button>
 					</div>
 					<div className="docs__design-button-row">
 						<Button compact borderless scary>
-							<Gridicon icon="cross" /> Remove
+							<Gridicon icon="cross" />
+							<span className="button-text">Remove</span>
 						</Button>
 						<Button compact borderless scary>
-							<Gridicon icon="trash" /> Trash
+							<Gridicon icon="trash" />
+							<span className="button-text">Trash</span>
 						</Button>
 						<Button compact borderless scary>
-							<Gridicon icon="link-break" /> Disconnect
+							<Gridicon icon="link-break" />
+							<span className="button-text">Disconnect</span>
 						</Button>
 						<Button compact borderless scary>
 							<Gridicon icon="trash" />
 						</Button>
 						<Button compact borderless scary disabled>
-							<Gridicon icon="cross" /> Remove
+							<Gridicon icon="cross" />
+							<span className="button-text">Remove</span>
 						</Button>
 					</div>
 					<div className="docs__design-button-row">
 						<Button compact busy>
 							Busy button
 						</Button>
-						<Button compact primary busy icon>
-							<Gridicon icon="camera" /> Primary icon button
-						</Button>
-						<Button compact primary busy icon>
+						<Button compact primary busy>
 							<Gridicon icon="time" />
 						</Button>
 						<Button compact primary busy>
 							Primary busy button
+						</Button>
+						<Button compact primary scary busy>
+							<Gridicon icon="trash" />
+							<span className="button-text">Compact primary scary busy button</span>
 						</Button>
 					</div>
 				</Card>

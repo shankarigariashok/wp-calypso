@@ -9,7 +9,13 @@ import deepFreeze from 'deep-freeze';
 /**
  * Internal dependencies
  */
-import reducer, { items as unwrappedItems, requestingAll, requesting, deleting } from '../reducer';
+import reducer, {
+	items as unwrappedItems,
+	requestingAll,
+	requesting,
+	deleting,
+	hasAllSitesList,
+} from '../reducer';
 import {
 	MEDIA_DELETE,
 	SITE_DELETE,
@@ -25,11 +31,11 @@ import {
 	SITES_REQUEST,
 	SITES_REQUEST_FAILURE,
 	SITES_REQUEST_SUCCESS,
-	SITES_UPDATE,
 	SITE_SETTINGS_RECEIVE,
 	SITE_SETTINGS_UPDATE,
 	THEME_ACTIVATE_SUCCESS,
 	WORDADS_SITE_APPROVE_REQUEST_SUCCESS,
+	SITE_PLUGIN_UPDATED,
 	SERIALIZE,
 	DESERIALIZE,
 } from 'state/action-types';
@@ -55,10 +61,10 @@ describe( 'reducer', () => {
 			'guidedTransfer',
 			'monitor',
 			'vouchers',
-			'updates',
 			'requesting',
 			'sharingButtons',
 			'blogStickers',
+			'hasAllSitesList',
 		] );
 	} );
 
@@ -95,10 +101,10 @@ describe( 'reducer', () => {
 	} );
 
 	describe( '#items()', () => {
-		test( 'should default to an empty object', () => {
+		test( 'should default to null', () => {
 			const state = items( undefined, {} );
 
-			expect( state ).to.eql( {} );
+			expect( state ).to.be.null;
 		} );
 
 		test( 'can receive all sites', () => {
@@ -126,30 +132,6 @@ describe( 'reducer', () => {
 			} );
 			expect( state ).to.eql( {
 				77203074: { ID: 77203074, name: 'A Bowl of Pho' },
-			} );
-		} );
-
-		test( 'should not affect state to receive updates for untracked sites', () => {
-			const original = deepFreeze( {} );
-			const state = items( original, {
-				type: SITES_UPDATE,
-				sites: [ { ID: 2916284, name: 'WordPress.com Example Blog' } ],
-			} );
-
-			expect( state ).to.equal( original );
-		} );
-
-		test( 'should update sites which are already tracked', () => {
-			const original = deepFreeze( {
-				2916284: { ID: 2916284, name: 'WordPress.com Example Blog' },
-			} );
-			const state = items( original, {
-				type: SITES_UPDATE,
-				sites: [ { ID: 2916284, name: 'WordPress.com Example Blog!' } ],
-			} );
-
-			expect( state ).to.eql( {
-				2916284: { ID: 2916284, name: 'WordPress.com Example Blog!' },
 			} );
 		} );
 
@@ -632,7 +614,7 @@ describe( 'reducer', () => {
 			} );
 			const state = items( original, { type: DESERIALIZE } );
 
-			expect( state ).to.eql( {} );
+			expect( state ).to.be.null;
 		} );
 	} );
 
@@ -765,6 +747,103 @@ describe( 'reducer', () => {
 				2916284: false,
 				77203074: false,
 			} );
+		} );
+	} );
+
+	describe( 'hasAllSitesList()', () => {
+		test( 'should default false', () => {
+			const state = hasAllSitesList( undefined, {} );
+
+			expect( state ).to.be.false;
+		} );
+
+		test( 'should update on receiving all sites', () => {
+			const state = hasAllSitesList( undefined, {
+				type: SITES_RECEIVE,
+			} );
+
+			expect( state ).to.be.true;
+		} );
+
+		test( 'should not update on receiving a single site', () => {
+			const state = hasAllSitesList( false, {
+				type: SITE_RECEIVE,
+			} );
+
+			expect( state ).to.be.false;
+		} );
+	} );
+
+	describe( '#updates', () => {
+		const exampleUpdates = {
+			plugins: 1,
+			themes: 1,
+			total: 2,
+			translations: 0,
+			wordpress: 0,
+		};
+
+		test( 'should reduce plugins and total updates count after successful plugin update', () => {
+			const original = deepFreeze( {
+				2916284: {
+					updates: {
+						plugins: 1,
+						themes: 1,
+						total: 4,
+						translations: 1,
+						wordpress: 1,
+					},
+				},
+				77203074: {
+					updates: exampleUpdates,
+				},
+			} );
+
+			const state = items( original, {
+				type: SITE_PLUGIN_UPDATED,
+				siteId: 2916284,
+			} );
+
+			expect( state ).to.eql( {
+				2916284: {
+					updates: {
+						plugins: 0,
+						themes: 1,
+						total: 3,
+						translations: 1,
+						wordpress: 1,
+					},
+				},
+				77203074: {
+					updates: exampleUpdates,
+				},
+			} );
+		} );
+
+		test( 'should load persisted state with valid updates', () => {
+			const original = deepFreeze( {
+				2916284: {
+					ID: 2916284,
+					name: 'Test Blog',
+					updates: exampleUpdates,
+				},
+			} );
+
+			const state = items( original, { type: DESERIALIZE } );
+			expect( state ).to.eql( original );
+		} );
+
+		test( 'should return initial state when persisted state has invalid updates', () => {
+			const original = deepFreeze( {
+				2916284: {
+					ID: 2916284,
+					name: 'Test Blog',
+					updates: { plugins: false },
+				},
+			} );
+
+			const state = items( original, { type: DESERIALIZE } );
+			expect( state ).to.be.null;
 		} );
 	} );
 } );

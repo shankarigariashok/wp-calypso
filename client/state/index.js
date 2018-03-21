@@ -6,15 +6,20 @@
 
 import thunkMiddleware from 'redux-thunk';
 import { createStore, applyMiddleware, compose } from 'redux';
-import { reducer as form } from 'redux-form';
+// import the reducer directly from a submodule to prevent bundling the whole Redux Form
+// library into the `build` chunk.
+// TODO: change this back to `from 'redux-form'` after upgrade to Webpack 4.0 and a version
+//       of Redux Form that uses the `sideEffects: false` flag
+import form from 'redux-form/es/reducer';
+import { mapValues } from 'lodash';
 
 /**
  * Internal dependencies
  */
 import { combineReducers } from 'state/utils';
+import actionLogger from './action-log';
 import activityLog from './activity-log/reducer';
 import analyticsTracking from './analytics/reducer';
-import sitesSync from './sites/enhancer';
 import navigationMiddleware from './navigation/middleware';
 import noticesMiddleware from './notices/middleware';
 import extensionsModule from 'extensions';
@@ -36,8 +41,13 @@ import domains from './domains/reducer';
 import geo from './geo/reducer';
 import googleAppsUsers from './google-apps-users/reducer';
 import help from './help/reducer';
+import i18n from './i18n/reducer';
+import invites from './invites/reducer';
+import inlineHelpSearchResults from './inline-help/reducer';
 import jetpackConnect from './jetpack-connect/reducer';
+import jetpackOnboarding from './jetpack-onboarding/reducer';
 import jetpack from './jetpack/reducer';
+import jetpackRemoteInstall from './jetpack-remote-install/reducer';
 import jetpackSync from './jetpack-sync/reducer';
 import jitm from './jitm/reducer';
 import happinessEngineers from './happiness-engineers/reducer';
@@ -61,12 +71,14 @@ import pushNotifications from './push-notifications/reducer';
 import purchases from './purchases/reducer';
 import reader from './reader/reducer';
 import receipts from './receipts/reducer';
+import { rewindReducer as rewind } from './rewind';
 import sharing from './sharing/reducer';
 import shortcodes from './shortcodes/reducer';
 import signup from './signup/reducer';
 import simplePayments from './simple-payments/reducer';
 import sites from './sites/reducer';
 import siteRoles from './site-roles/reducer';
+import siteRename from './site-rename/reducer';
 import siteSettings from './site-settings/reducer';
 import stats from './stats/reducer';
 import storedCards from './stored-cards/reducer';
@@ -77,6 +89,7 @@ import themes from './themes/reducer';
 import ui from './ui/reducer';
 import users from './users/reducer';
 import userDevices from './user-devices/reducer';
+import userProfileLinks from './profile-links/reducer';
 import userSettings from './user-settings/reducer';
 import wordads from './wordads/reducer';
 import config from 'config';
@@ -86,7 +99,12 @@ import config from 'config';
  */
 
 // Consolidate the extension reducers under 'extensions' for namespacing.
-const extensions = combineReducers( extensionsModule.reducers() );
+const extensions = combineReducers(
+	mapValues(
+		extensionsModule.reducers(),
+		reducer => ( reducer.default ? reducer.default : reducer )
+	)
+);
 
 const reducers = {
 	analyticsTracking,
@@ -112,8 +130,13 @@ const reducers = {
 	happinessEngineers,
 	happychat,
 	help,
+	i18n,
+	inlineHelpSearchResults,
+	invites,
 	jetpackConnect,
+	jetpackOnboarding,
 	jetpack,
+	jetpackRemoteInstall,
 	jetpackSync,
 	jitm,
 	login,
@@ -135,11 +158,13 @@ const reducers = {
 	pushNotifications,
 	reader,
 	receipts,
+	rewind,
 	sharing,
 	shortcodes,
 	signup,
 	sites,
 	siteRoles,
+	siteRename,
 	siteSettings,
 	simplePayments,
 	stats,
@@ -151,6 +176,7 @@ const reducers = {
 	ui,
 	users,
 	userDevices,
+	userProfileLinks,
 	userSettings,
 	wordads,
 };
@@ -192,16 +218,14 @@ export function createReduxStore( initialState = {} ) {
 			config.isEnabled( 'restore-last-location' ) &&
 			require( './routing/middleware.js' ).default,
 		isAudioSupported && require( './audio/middleware.js' ).default,
-		isBrowser &&
-			config.isEnabled( 'automated-transfer' ) &&
-			require( './automated-transfer/middleware.js' ).default,
 		navigationMiddleware,
+		isBrowser && require( './comments/middleware.js' ).default,
 	].filter( Boolean );
 
 	const enhancers = [
 		isBrowser && window.app && window.app.isDebug && consoleDispatcher,
 		applyMiddleware( ...middlewares ),
-		isBrowser && sitesSync,
+		isBrowser && window.app && window.app.isDebug && actionLogger,
 		isBrowser && window.devToolsExtension && window.devToolsExtension(),
 	].filter( Boolean );
 

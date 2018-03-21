@@ -4,22 +4,23 @@
  */
 import { isEnabled } from 'config';
 import {
+	COMMENT_COUNTS_REQUEST,
+	COMMENT_REQUEST,
 	COMMENTS_CHANGE_STATUS,
 	COMMENTS_DELETE,
 	COMMENTS_EDIT,
-	COMMENTS_LIST_REQUEST,
-	COMMENTS_REQUEST,
 	COMMENTS_LIKE,
-	COMMENTS_UNLIKE,
-	COMMENTS_REPLY_WRITE,
-	COMMENTS_WRITE,
-	COMMENT_REQUEST,
-	COMMENTS_TREE_SITE_REQUEST,
-	READER_EXPAND_COMMENTS,
-	COMMENTS_SET_ACTIVE_REPLY,
+	COMMENTS_LIST_REQUEST,
 	COMMENTS_RECEIVE,
 	COMMENTS_RECEIVE_ERROR,
-} from '../action-types';
+	COMMENTS_REPLY_WRITE,
+	COMMENTS_REQUEST,
+	COMMENTS_SET_ACTIVE_REPLY,
+	COMMENTS_TREE_SITE_REQUEST,
+	COMMENTS_UNLIKE,
+	COMMENTS_WRITE,
+	READER_EXPAND_COMMENTS,
+} from 'state/action-types';
 import { NUMBER_OF_COMMENTS_PER_FETCH } from './constants';
 
 /**
@@ -123,6 +124,18 @@ export const requestCommentsTreeForSite = query => ( {
 } );
 
 /**
+ * Creates an action that requests comment counts for a given site.
+ * @param {Number} siteId Site identifier
+ * @param {Number} [postId] Post identifier
+ * @returns {Object} Action that requests comment counts by site.
+ */
+export const requestCommentCounts = ( siteId, postId ) => ( {
+	type: COMMENT_COUNTS_REQUEST,
+	siteId,
+	postId,
+} );
+
+/**
  * Creates an action that permanently deletes a comment
  * or removes a comment placeholder from the state
  * @param {Number} siteId site identifier
@@ -130,19 +143,27 @@ export const requestCommentsTreeForSite = query => ( {
  * @param {Number|String} commentId comment or comment placeholder identifier
  * @param {Object} options Action options
  * @param {Boolean} options.showSuccessNotice Announce the delete success with a notice (default: true)
+ * @param {Object} refreshCommentListQuery Forces requesting a fresh copy of a comments page with these query parameters.
  * @returns {Object} action that deletes a comment
  */
 export const deleteComment = (
 	siteId,
 	postId,
 	commentId,
-	options = { showSuccessNotice: true }
+	options = { showSuccessNotice: true },
+	refreshCommentListQuery = null
 ) => ( {
 	type: COMMENTS_DELETE,
 	siteId,
 	postId,
 	commentId,
 	options,
+	refreshCommentListQuery,
+	meta: {
+		dataLayer: {
+			trackRequest: true,
+		},
+	},
 } );
 
 /***
@@ -165,14 +186,22 @@ export const writeComment = ( commentText, siteId, postId ) => ( {
  * @param {Number} siteId site identifier
  * @param {Number} postId post identifier
  * @param {Number} parentCommentId parent comment identifier
+ * @param {Object} refreshCommentListQuery Forces requesting a fresh copy of a comments page with these query parameters.
  * @returns {Function} a thunk that creates a comment for a given post
  */
-export const replyComment = ( commentText, siteId, postId, parentCommentId ) => ( {
+export const replyComment = (
+	commentText,
+	siteId,
+	postId,
+	parentCommentId,
+	refreshCommentListQuery = null
+) => ( {
 	type: COMMENTS_REPLY_WRITE,
 	siteId,
 	postId,
 	parentCommentId,
 	commentText,
+	refreshCommentListQuery,
 } );
 
 /***
@@ -209,14 +238,27 @@ export const unlikeComment = ( siteId, postId, commentId ) => ( {
  * @param {Number} postId Post identifier
  * @param {Number} commentId Comment identifier
  * @param {String} status New status
+ * @param {Object} refreshCommentListQuery Forces requesting a fresh copy of a comments page with these query parameters.
  * @returns {Object} Action that changes a comment status
  */
-export const changeCommentStatus = ( siteId, postId, commentId, status ) => ( {
+export const changeCommentStatus = (
+	siteId,
+	postId,
+	commentId,
+	status,
+	refreshCommentListQuery = null
+) => ( {
 	type: COMMENTS_CHANGE_STATUS,
 	siteId,
 	postId,
 	commentId,
 	status,
+	refreshCommentListQuery,
+	meta: {
+		dataLayer: {
+			trackRequest: true,
+		},
+	},
 } );
 
 /**

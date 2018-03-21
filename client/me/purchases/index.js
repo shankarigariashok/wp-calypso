@@ -13,28 +13,56 @@ import billingController from 'me/billing-history/controller';
 import meController from 'me/controller';
 import { siteSelection } from 'my-sites/controller';
 import controller from './controller';
-import paths from './paths';
+import * as paths from './paths';
+import { makeLayout, render as clientRender } from 'controller';
 
 export default function() {
 	if ( config.isEnabled( 'manage/payment-methods' ) ) {
-		page( paths.addCreditCard(), meController.sidebar, controller.addCreditCard );
+		page(
+			paths.addCreditCard,
+			meController.sidebar,
+			controller.addCreditCard,
+			makeLayout,
+			clientRender
+		);
 
 		// redirect legacy urls
-		page( '/payment-methods/add-credit-card', () => page.redirect( paths.addCreditCard() ) );
+		page( '/payment-methods/add-credit-card', () => page.redirect( paths.addCreditCard ) );
 	}
 
-	page( paths.billingHistory(), meController.sidebar, billingController.billingHistory );
+	page(
+		paths.billingHistory,
+		meController.sidebar,
+		billingController.billingHistory,
+		makeLayout,
+		clientRender
+	);
 
-	page( paths.billingHistoryReceipt(), meController.sidebar, billingController.transaction );
+	page(
+		paths.billingHistoryReceipt(),
+		meController.sidebar,
+		billingController.transaction,
+		makeLayout,
+		clientRender
+	);
 
-	page( paths.purchasesRoot(), meController.sidebar, controller.noSitesMessage, controller.list );
+	page(
+		paths.purchasesRoot,
+		meController.sidebar,
+		controller.noSitesMessage,
+		controller.list,
+		makeLayout,
+		clientRender
+	);
 
 	page(
 		paths.managePurchase(),
 		meController.sidebar,
 		controller.noSitesMessage,
 		siteSelection,
-		controller.managePurchase
+		controller.managePurchase,
+		makeLayout,
+		clientRender
 	);
 
 	page(
@@ -42,7 +70,9 @@ export default function() {
 		meController.sidebar,
 		controller.noSitesMessage,
 		siteSelection,
-		controller.cancelPurchase
+		controller.cancelPurchase,
+		makeLayout,
+		clientRender
 	);
 
 	page(
@@ -50,7 +80,9 @@ export default function() {
 		meController.sidebar,
 		controller.noSitesMessage,
 		siteSelection,
-		controller.cancelPrivacyProtection
+		controller.cancelPrivacyProtection,
+		makeLayout,
+		clientRender
 	);
 
 	page(
@@ -58,7 +90,9 @@ export default function() {
 		meController.sidebar,
 		controller.noSitesMessage,
 		siteSelection,
-		controller.confirmCancelDomain
+		controller.confirmCancelDomain,
+		makeLayout,
+		clientRender
 	);
 
 	page(
@@ -66,7 +100,9 @@ export default function() {
 		meController.sidebar,
 		controller.noSitesMessage,
 		siteSelection,
-		controller.addCardDetails
+		controller.addCardDetails,
+		makeLayout,
+		clientRender
 	);
 
 	page(
@@ -74,11 +110,13 @@ export default function() {
 		meController.sidebar,
 		controller.noSitesMessage,
 		siteSelection,
-		controller.editCardDetails
+		controller.editCardDetails,
+		makeLayout,
+		clientRender
 	);
 
 	// redirect legacy urls
-	page( '/purchases', () => page.redirect( paths.purchasesRoot() ) );
+	page( '/purchases', () => page.redirect( paths.purchasesRoot ) );
 	page( '/purchases/:siteName/:purchaseId', ( { params: { siteName, purchaseId } } ) =>
 		page.redirect( paths.managePurchase( siteName, purchaseId ) )
 	);
@@ -103,7 +141,7 @@ export default function() {
 		( { params: { siteName, purchaseId, cardId } } ) =>
 			page.redirect( paths.editCardDetails( siteName, purchaseId, cardId ) )
 	);
-	page( '/me/billing', () => page.redirect( paths.billingHistory() ) );
+	page( '/me/billing', () => page.redirect( paths.billingHistory ) );
 	page( '/me/billing/:receiptId', ( { params: { receiptId } } ) =>
 		page.redirect( paths.billingHistoryReceipt( receiptId ) )
 	);

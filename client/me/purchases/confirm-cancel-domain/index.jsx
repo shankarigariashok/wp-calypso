@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import page from 'page';
 import { localize } from 'i18n-calypso';
 import PropTypes from 'prop-types';
@@ -34,9 +32,8 @@ import { isDomainRegistration } from 'lib/products-values';
 import { isRequestingSites } from 'state/sites/selectors';
 import Main from 'components/main';
 import notices from 'notices';
-import paths from 'me/purchases/paths';
+import { purchasesRoot } from 'me/purchases/paths';
 import QueryUserPurchases from 'components/data/query-user-purchases';
-import { receiveDeletedSite as receiveDeletedSiteDeprecated } from 'lib/sites-list/actions';
 import { receiveDeletedSite } from 'state/sites/actions';
 import { refreshSitePlans } from 'state/sites/plans/actions';
 import SelectDropdown from 'components/select-dropdown';
@@ -84,7 +81,7 @@ class ConfirmCancelDomain extends React.Component {
 		const purchase = getPurchase( props );
 
 		if ( ! purchase || ! isDomainRegistration( purchase ) || ! props.selectedSite ) {
-			page.redirect( paths.purchasesRoot() );
+			page.redirect( purchasesRoot );
 		}
 	};
 
@@ -125,11 +122,6 @@ class ConfirmCancelDomain extends React.Component {
 			const { isDomainOnlySite, translate, selectedSite } = this.props;
 
 			if ( isDomainOnlySite ) {
-				// Removing the domain from a domain-only site results
-				// in the site being deleted entirely. We need to call
-				// `receiveDeletedSiteDeprecated` here because the site
-				// exists in `sites-list` as well as the global store.
-				receiveDeletedSiteDeprecated( selectedSite );
 				this.props.receiveDeletedSite( selectedSite.ID );
 				this.props.setAllSitesSelected();
 			}
@@ -160,7 +152,7 @@ class ConfirmCancelDomain extends React.Component {
 				product_slug: purchase.productSlug,
 			} );
 
-			page.redirect( paths.purchasesRoot() );
+			page.redirect( purchasesRoot );
 		} );
 	};
 
@@ -267,9 +259,9 @@ class ConfirmCancelDomain extends React.Component {
 			);
 		}
 
-		const purchase = getPurchase( this.props ),
-			domain = getDomainName( purchase ),
-			selectedReason = this.state.selectedReason;
+		const purchase = getPurchase( this.props );
+		const domain = getDomainName( purchase );
+		const selectedReason = this.state.selectedReason;
 
 		return (
 			<Main className="confirm-cancel-domain">

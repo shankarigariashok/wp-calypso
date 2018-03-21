@@ -19,8 +19,7 @@ import { decodeEntities } from 'lib/formatting';
  */
 export function fromApi( apiResponse ) {
 	if ( ! apiResponse || ( ! apiResponse.tag && ! apiResponse.tags ) ) {
-		console.error( 'bad api response for /read/tags' ); // eslint-disable-line no-console
-		return [];
+		throw new Error( `invalid tags response: ${ JSON.stringify( apiResponse ) }` );
 	}
 
 	const tags = compact(

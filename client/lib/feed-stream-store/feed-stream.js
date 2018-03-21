@@ -21,15 +21,19 @@ import debugFactory from 'debug';
  * Internal Dependencies
  */
 import Emitter from 'lib/mixins/emitter';
-import FeedPostStore from 'lib/feed-post-store';
 import * as FeedStreamActions from './actions';
 import { action as ActionTypes } from './constants';
 import PollerPool from 'lib/data-poller';
 import { setLastStoreId } from 'reader/controller-helper';
 import * as stats from 'reader/stats';
-import { keyToString, keysAreEqual } from './post-key';
+import { keyToString, keysAreEqual } from 'reader/post-key';
+import { reduxDispatch, reduxGetState } from 'lib/redux-bridge';
+import { COMMENTS_RECEIVE } from 'state/action-types';
+import { getPostByKey } from 'state/reader/posts/selectors';
 
 const debug = debugFactory( 'calypso:feed-store:post-list-store' );
+
+const postKeyToString = postKey => `${ postKey.blogId }-${ postKey.postId }`;
 
 export default class FeedStream {
 	constructor( spec ) {
@@ -55,6 +59,7 @@ export default class FeedStream {
 			id: spec.id,
 			postKeys: [], // an array of keys, as determined by the key maker,
 			pendingPostKeys: [],
+			pendingComments: new Map(),
 			postById: new Set(),
 			errors: [],
 			fetcher: spec.fetcher,
@@ -137,7 +142,7 @@ export default class FeedStream {
 
 	getAll() {
 		return map( this.postKeys, function( key ) {
-			return key.isGap ? key : FeedPostStore.get( key );
+			return key.isGap ? key : getPostByKey( reduxGetState(), key );
 		} );
 	}
 
@@ -151,6 +156,10 @@ export default class FeedStream {
 
 	getUpdateCount() {
 		return this.pendingPostKeys.length;
+	}
+
+	getPendingPostKeys() {
+		return this.pendingPostKeys;
 	}
 
 	getSelectedPostKey() {
@@ -172,7 +181,7 @@ export default class FeedStream {
 		if ( postKey.isGap === true ) {
 			return true;
 		}
-		const post = FeedPostStore.get( postKey );
+		const post = getPostByKey( reduxGetState(), postKey );
 		return (
 			post && post._state !== 'error' && post._state !== 'pending' && post._state !== 'minimal'
 		);
@@ -491,6 +500,14 @@ export default class FeedStream {
 				this.emitChange();
 			}
 		}
+
+		// if conversations, then tuck away the comments into pending comments
+		if ( data && data.posts && data.posts[ 0 ] && data.posts[ 0 ].comments ) {
+			forEach( data.posts, post => {
+				const postKey = { blogId: post.site_ID, postId: post.ID };
+				this.pendingComments.set( postKeyToString( postKey ), post.comments );
+			} );
+		}
 	}
 
 	acceptUpdates() {
@@ -519,6 +536,22 @@ export default class FeedStream {
 			} );
 		}
 
+		// if conversations, then unleash the tucked away comments to redux
+		if ( !! get( this.pendingPostKeys, '0.comments' ) ) {
+			forEach( this.pendingPostKeys, postKey => {
+				const key = postKeyToString( postKey );
+				const comments = this.pendingComments.get( key );
+				this.pendingComments.delete( key );
+
+				reduxDispatch( {
+					type: COMMENTS_RECEIVE,
+					siteId: postKey.blogId,
+					postId: postKey.postId,
+					comments,
+				} );
+			} );
+		}
+
 		this.postKeys = uniqBy( this.pendingPostKeys.concat( this.postKeys ), postKey =>
 			keyToString( postKey )
 		);
@@ -528,6 +561,7 @@ export default class FeedStream {
 			this.selectedIndex = -1;
 		}
 		this.pendingPostKeys = [];
+		this.pendingComments.clear();
 		this.pendingDateAfter = null;
 		this.emitChange();
 	}

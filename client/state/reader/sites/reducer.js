@@ -2,7 +2,7 @@
 /**
  * External Dependencies
  */
-import { assign, keyBy, map, omit, omitBy, reduce, trim } from 'lodash';
+import { assign, includes, keyBy, map, omit, omitBy, reduce, trim } from 'lodash';
 
 /**
  * Internal Dependencies
@@ -12,45 +12,26 @@ import {
 	READER_SITE_REQUEST_SUCCESS,
 	READER_SITE_REQUEST_FAILURE,
 	READER_SITE_UPDATE,
-	DESERIALIZE,
 	SERIALIZE,
 } from 'state/action-types';
-import { combineReducers, createReducer, isValidStateWithSchema } from 'state/utils';
+import { combineReducers, createReducer } from 'state/utils';
 import { readerSitesSchema } from './schema';
 import { withoutHttp } from 'lib/url';
 import { decodeEntities } from 'lib/formatting';
-
-const actionMap = {
-	[ SERIALIZE ]: handleSerialize,
-	[ DESERIALIZE ]: handleDeserialize,
-	[ READER_SITE_REQUEST_SUCCESS ]: handleRequestSuccess,
-	[ READER_SITE_REQUEST_FAILURE ]: handleRequestFailure,
-	[ READER_SITE_UPDATE ]: handleSiteUpdate,
-};
-
-function defaultHandler( state ) {
-	return state;
-}
 
 function handleSerialize( state ) {
 	// remove errors from the serialized state
 	return omitBy( state, 'is_error' );
 }
 
-function handleDeserialize( state ) {
-	if ( isValidStateWithSchema( state, readerSitesSchema ) ) {
-		return state;
-	}
-	return {};
-}
-
 function handleRequestFailure( state, action ) {
-	// 410 means site moved. site used to be wpcom but is no longer
-	if ( action.error && action.error.statusCode !== 410 ) {
+	// 410 means site moved - site used to be on wpcom but is no longer
+	const handledStatusCodes = [ 403, 404, 410 ];
+
+	if ( action.error && ! includes( handledStatusCodes, action.error.statusCode ) ) {
 		return state;
 	}
 
-	// new object proceeds current state to prevent new errors from overwriting existing values
 	return assign( {}, state, {
 		[ action.payload.ID ]: {
 			ID: action.payload.ID,
@@ -62,7 +43,7 @@ function handleRequestFailure( state, action ) {
 
 function adaptSite( attributes ) {
 	// this also ends up cloning attributes, which is important since we mutate it
-	attributes = omit( attributes, [ 'meta' ] );
+	attributes = omit( attributes, [ 'meta', 'subscription' ] );
 
 	if ( attributes.URL ) {
 		attributes.domain = withoutHttp( attributes.URL );
@@ -102,11 +83,16 @@ function handleSiteUpdate( state, action ) {
 	return assign( {}, state, keyBy( sites, 'ID' ) );
 }
 
-export function items( state = {}, action ) {
-	const handler = actionMap[ action.type ] || defaultHandler;
-	return handler( state, action );
-}
-items.hasCustomPersistence = true;
+export const items = createReducer(
+	{},
+	{
+		[ SERIALIZE ]: handleSerialize,
+		[ READER_SITE_REQUEST_SUCCESS ]: handleRequestSuccess,
+		[ READER_SITE_REQUEST_FAILURE ]: handleRequestFailure,
+		[ READER_SITE_UPDATE ]: handleSiteUpdate,
+	},
+	readerSitesSchema
+);
 
 export function queuedRequests( state = {}, action ) {
 	switch ( action.type ) {

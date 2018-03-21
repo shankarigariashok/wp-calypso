@@ -10,6 +10,7 @@ import { groupBy, head, map, noop, values } from 'lodash';
 import PropTypes from 'prop-types';
 import page from 'page';
 import { localize } from 'i18n-calypso';
+import Gridicon from 'gridicons';
 
 /**
  * Internal dependencies
@@ -201,7 +202,7 @@ class MediaLibraryContent extends React.Component {
 		page( `/sharing/${ this.props.site.slug }` );
 	};
 
-	renderExternalMedia() {
+	renderGooglePhotosConnect() {
 		const connectMessage = this.props.translate(
 			'To show Photos from Google, you need to connect your Google account.'
 		);
@@ -209,13 +210,22 @@ class MediaLibraryContent extends React.Component {
 		return (
 			<div className="media-library__connect-message">
 				<p>
-					<img src="/calypso/images/sharing/google-photos-logo.svg" width="96" height="96" />
+					<Gridicon icon="image" size={ 72 } />
 				</p>
 				<p>{ connectMessage }</p>
 
 				<InlineConnection serviceName="google_photos" />
 			</div>
 		);
+	}
+
+	renderConnectExternalMedia() {
+		const { source } = this.props;
+		switch ( source ) {
+			case 'google_photos':
+				return this.renderGooglePhotosConnect();
+		}
+		return null;
 	}
 
 	getThumbnailType() {
@@ -230,6 +240,10 @@ class MediaLibraryContent extends React.Component {
 		return MEDIA_IMAGE_PHOTON;
 	}
 
+	needsToBeConnected() {
+		return this.props.source !== '' && ! this.props.isConnected;
+	}
+
 	renderMediaList() {
 		if ( ! this.props.site || ( this.props.isRequesting && ! this.hasRequested ) ) {
 			this.hasRequested = true; // We only want to do this once
@@ -241,8 +255,8 @@ class MediaLibraryContent extends React.Component {
 			);
 		}
 
-		if ( this.props.source !== '' && ! this.props.isConnected ) {
-			return this.renderExternalMedia();
+		if ( this.needsToBeConnected() ) {
+			return this.renderConnectExternalMedia();
 		}
 
 		return (
@@ -272,7 +286,7 @@ class MediaLibraryContent extends React.Component {
 	}
 
 	renderHeader() {
-		if ( ! this.props.isConnected ) {
+		if ( ! this.props.isConnected && this.needsToBeConnected() ) {
 			return null;
 		}
 
@@ -287,6 +301,8 @@ class MediaLibraryContent extends React.Component {
 					onSourceChange={ this.props.onSourceChange }
 					selectedItems={ this.props.selectedItems }
 					sticky={ ! this.props.scrollable }
+					hasAttribution={ 'pexels' === this.props.source }
+					hasRefreshButton={ 'pexels' !== this.props.source }
 				/>
 			);
 		}

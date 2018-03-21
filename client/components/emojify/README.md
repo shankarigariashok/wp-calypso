@@ -8,8 +8,9 @@ This is desirable since implementations are inconsistent or non-existant.
 ## Usage
 ```js
 // require the module
-var Emojify = require( 'components/emojify' ),
-	textToEmojify = 'This will be converted 🙈🙉🙊';
+import Emojify from 'components/emojify';
+
+const textToEmojify = 'This will be converted 🙈🙉🙊';
 
 	// more component stuff
 	// ...
@@ -19,22 +20,7 @@ var Emojify = require( 'components/emojify' ),
 
 ## Props
 
-### `children`
-
-<table>
-	<tr><th>Type</th><td>Text|Components</td></tr>
-	<tr><th>Required</th><td>Yes</td></tr>
-	<tr><th>Default</th><td><code>none</code></td></tr>
-</table>
-
-Typically a string that you want to search for UTF emoji
-
-### `imgClassName`
-
-<table>
-	<tr><th>Type</th><td>String</td></tr>
-	<tr><th>Required</th><td>No</td></tr>
-	<tr><th>Default</th><td><code>emojify__emoji</code></td></tr>
-</table>
-
-classname applied to the image
+| property       | type             | required | default            | comment |
+| -------------- | ---------------- | -------- | ------------------ | ------- |
+| `children`     | Text\|Components | yes      | none               | Typically a string that you want to search for UTF emoji |
+| `imgClassName` | String           | no       | `"emojify__emoji"` | classname applied to the image |

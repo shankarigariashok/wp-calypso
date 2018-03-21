@@ -59,11 +59,15 @@ class PrivacyPolicyBanner extends Component {
 	};
 
 	getDescription( date ) {
+		if ( ! date ) {
+			return null;
+		}
+
 		const { moment, translate } = this.props;
 
 		return translate( "We're updating our privacy policy on %(date)s.", {
 			args: {
-				date: moment( date ).format( 'LL' ),
+				date: moment.utc( date ).format( 'LL' ),
 			},
 		} );
 	}
@@ -94,8 +98,8 @@ class PrivacyPolicyBanner extends Component {
 		}
 
 		// check if the current policy is under the notification period.
-		const notifyFrom = moment( get( privacyPolicy, 'notification_period.from' ) );
-		const notifyTo = moment( get( privacyPolicy, 'notification_period.to' ) );
+		const notifyFrom = moment.utc( get( privacyPolicy, 'notification_period.from' ) );
+		const notifyTo = moment.utc( get( privacyPolicy, 'notification_period.to' ) );
 
 		if (
 			( ! notifyFrom.isBefore() || ! notifyTo.isAfter() ) &&
@@ -118,7 +122,7 @@ class PrivacyPolicyBanner extends Component {
 				{ showPrivacyPolicyBanner && (
 					<Banner
 						callToAction={ translate( 'Learn More' ) }
-						description={ this.getDescription( privacyPolicy.modified ) }
+						description={ this.getDescription( privacyPolicy.effective_date ) }
 						disableHref={ true }
 						icon="pages"
 						onClick={ this.openPrivacyPolicyDialog }
@@ -143,12 +147,12 @@ class PrivacyPolicyBanner extends Component {
 
 const mapStateToProps = state => {
 	const privacyPolicy = getPrivacyPolicyByEntity( state, AUTOMATTIC_ENTITY );
-	const privacyPolicyUserStatus = getPreference( state, PRIVACY_POLICY_PREFERENCE ) || {};
+	const privacyPolicyUserStatus = getPreference( state, PRIVACY_POLICY_PREFERENCE );
 	const privacyPolicyId = privacyPolicy.id;
 
 	return {
 		fetchingPreferences: isFetchingPreferences( state ),
-		isPolicyAlreadyAccepted: privacyPolicyUserStatus[ privacyPolicyId ] || false,
+		isPolicyAlreadyAccepted: get( privacyPolicyUserStatus, privacyPolicyId, false ),
 		privacyPolicyUserStatus,
 		privacyPolicy,
 		privacyPolicyId,
@@ -158,10 +162,10 @@ const mapStateToProps = state => {
 
 const mapDispatchToProps = {
 	acceptPrivacyPolicy: ( privacyPolicyId, privacyPolicyUserStatus ) =>
-		savePreference( PRIVACY_POLICY_PREFERENCE, {
-			...privacyPolicyUserStatus,
-			[ privacyPolicyId ]: true,
-		} ),
+		savePreference(
+			PRIVACY_POLICY_PREFERENCE,
+			Object.assign( {}, privacyPolicyUserStatus, { [ privacyPolicyId ]: true } )
+		),
 };
 
 export default connect( mapStateToProps, mapDispatchToProps )( localize( PrivacyPolicyBanner ) );

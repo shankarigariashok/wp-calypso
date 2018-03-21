@@ -25,13 +25,12 @@ import {
 	shufflePosts,
 } from 'lib/feed-stream-store/actions';
 import LikeStore from 'lib/like-store/like-store';
-import LikeStoreActions from 'lib/like-store/actions';
+import { likePost, unlikePost } from 'lib/like-store/actions';
 import LikeHelper from 'reader/like-helper';
 import ListEnd from 'components/list-end';
 import InfiniteList from 'components/infinite-list';
 import MobileBackToSidebar from 'components/mobile-back-to-sidebar';
 import PostPlaceholder from './post-placeholder';
-import PostStore from 'lib/feed-post-store';
 import UpdateNotice from 'reader/update-notice';
 import KeyboardShortcuts from 'lib/keyboard-shortcuts';
 import scrollTo from 'lib/scroll-to';
@@ -40,10 +39,11 @@ import PostLifecycle from './post-lifecycle';
 import { showSelectedPost } from 'reader/utils';
 import getBlockedSites from 'state/selectors/get-blocked-sites';
 import { getReaderFollows } from 'state/selectors';
-import { keysAreEqual } from 'lib/feed-stream-store/post-key';
+import { keysAreEqual, keyToString, keyForPost } from 'reader/post-key';
 import { resetCardExpansions } from 'state/ui/reader/card-expansions/actions';
 import { combineCards, injectRecommendations, RECS_PER_BLOCK } from './utils';
-import { keyToString, keyForPost } from 'lib/feed-stream-store/post-key';
+import { reduxGetState } from 'lib/redux-bridge';
+import { getPostByKey } from 'state/reader/posts/selectors';
 
 const GUESSED_POST_HEIGHT = 600;
 const HEADER_OFFSET_TOP = 46;
@@ -93,6 +93,7 @@ class ReaderStream extends React.Component {
 		transformStreamItems: PropTypes.func,
 		isMain: PropTypes.bool,
 		intro: PropTypes.object,
+		forcePlaceholders: PropTypes.bool,
 	};
 
 	static defaultProps = {
@@ -110,6 +111,7 @@ class ReaderStream extends React.Component {
 		isMain: true,
 		useCompactCards: false,
 		intro: null,
+		forcePlaceholders: false,
 	};
 
 	getStateFromStores( props = this.props ) {
@@ -143,6 +145,7 @@ class ReaderStream extends React.Component {
 			posts,
 			recs,
 			updateCount: store.getUpdateCount(),
+			pendingPostKeys: store.getPendingPostKeys(),
 			selectedPostKey: store.getSelectedPostKey(),
 			isFetchingNextPage: store.isFetchingNextPage && store.isFetchingNextPage(),
 			isLastPage: store.isLastPage(),
@@ -257,7 +260,7 @@ class ReaderStream extends React.Component {
 		let post;
 
 		if ( postKey && ! postKey.isGap ) {
-			post = PostStore.get( postKey );
+			post = getPostByKey( reduxGetState(), postKey );
 		}
 
 		// only toggle a like on a x-post if we have the appropriate metadata,
@@ -281,7 +284,9 @@ class ReaderStream extends React.Component {
 			// unknown... ignore for now
 			return;
 		}
-		LikeStoreActions[ liked ? 'unlikePost' : 'likePost' ]( siteId, postId );
+
+		const toggler = liked ? unlikePost : likePost;
+		toggler( siteId, postId );
 	}
 
 	isPostFullScreen() {
@@ -429,7 +434,7 @@ class ReaderStream extends React.Component {
 				isSelected={ isSelected }
 				handleClick={ showPost }
 				postKey={ postKey }
-				store={ this.props.postsStore }
+				postsStore={ this.props.postsStore }
 				suppressSiteNameLink={ this.props.suppressSiteNameLink }
 				showPostHeader={ this.props.showPostHeader }
 				showFollowInHeader={ this.props.showFollowInHeader }
@@ -447,9 +452,18 @@ class ReaderStream extends React.Component {
 	};
 
 	render() {
-		const store = this.props.postsStore,
-			hasNoPosts = store.isLastPage() && ( ! this.state.posts || this.state.posts.length === 0 );
+		const { forcePlaceholders, postsStore: store } = this.props;
+		let { items, isFetchingNextPage } = this.state;
+
+		const hasNoPosts =
+			store.isLastPage() && ( ! this.state.posts || this.state.posts.length === 0 );
 		let body, showingStream;
+
+		// trick an infinite list to showing placeholders
+		if ( forcePlaceholders ) {
+			items = [];
+			isFetchingNextPage = true;
+		}
 
 		if ( hasNoPosts || store.hasRecentError( 'invalid_tag' ) ) {
 			body = this.props.emptyContent;
@@ -462,9 +476,9 @@ class ReaderStream extends React.Component {
 				<InfiniteList
 					ref={ c => ( this._list = c ) }
 					className="reader__content"
-					items={ this.state.items }
+					items={ items }
 					lastPage={ this.state.isLastPage }
-					fetchingNextPage={ this.state.isFetchingNextPage }
+					fetchingNextPage={ isFetchingNextPage }
 					guessedItemHeight={ GUESSED_POST_HEIGHT }
 					fetchNextPage={ this.fetchNextPage }
 					getItemRef={ this.getPostRef }
@@ -484,7 +498,11 @@ class ReaderStream extends React.Component {
 						</MobileBackToSidebar>
 					) }
 
-				<UpdateNotice count={ this.state.updateCount } onClick={ this.showUpdates } />
+				<UpdateNotice
+					count={ this.state.updateCount }
+					onClick={ this.showUpdates }
+					pendingPostKeys={ this.state.pendingPostKeys }
+				/>
 				{ this.props.children }
 				{ showingStream && this.state.posts.length ? this.props.intro : null }
 				{ body }

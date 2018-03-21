@@ -19,6 +19,7 @@ import { http } from 'state/data-layer/wpcom-http/actions';
 import { dispatchRequest } from 'state/data-layer/wpcom-http/utils';
 import { errorNotice, successNotice } from 'state/notices/actions';
 import { getSitePost } from 'state/posts/selectors';
+import { requestCommentsList } from 'state/comments/actions';
 import { getPostOldestCommentDate, getPostNewestCommentDate } from 'state/comments/selectors';
 import getSiteComment from 'state/selectors/get-site-comment';
 import { decodeEntities } from 'lib/formatting';
@@ -213,19 +214,21 @@ export const deleteComment = ( { dispatch, getState }, action ) => {
 	);
 };
 
-export const announceDeleteSuccess = ( { dispatch }, { options } ) => {
+export const handleDeleteSuccess = ( { dispatch }, { options, refreshCommentListQuery } ) => {
 	const showSuccessNotice = get( options, 'showSuccessNotice', false );
-	if ( ! showSuccessNotice ) {
-		return;
+	if ( showSuccessNotice ) {
+		dispatch(
+			successNotice( translate( 'Comment deleted permanently.' ), {
+				duration: 5000,
+				id: 'comment-notice',
+				isPersistent: true,
+			} )
+		);
 	}
 
-	dispatch(
-		successNotice( translate( 'Comment deleted permanently.' ), {
-			duration: 5000,
-			id: 'comment-notice',
-			isPersistent: true,
-		} )
-	);
+	if ( !! refreshCommentListQuery ) {
+		dispatch( requestCommentsList( refreshCommentListQuery ) );
+	}
 };
 
 export const announceDeleteFailure = ( { dispatch }, action ) => {
@@ -245,6 +248,11 @@ export const announceDeleteFailure = ( { dispatch }, action ) => {
 			postId,
 			comments: [ comment ],
 			skipSort: !! get( comment, 'parent.ID' ),
+			meta: {
+				comment: {
+					context: 'add', //adds a hint for the counts reducer.
+				},
+			},
 		} );
 	}
 };
@@ -252,6 +260,6 @@ export const announceDeleteFailure = ( { dispatch }, action ) => {
 export default {
 	[ COMMENTS_REQUEST ]: [ dispatchRequest( fetchPostComments, addComments, announceFailure ) ],
 	[ COMMENTS_DELETE ]: [
-		dispatchRequest( deleteComment, announceDeleteSuccess, announceDeleteFailure ),
+		dispatchRequest( deleteComment, handleDeleteSuccess, announceDeleteFailure ),
 	],
 };

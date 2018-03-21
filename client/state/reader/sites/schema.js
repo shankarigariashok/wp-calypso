@@ -1,7 +1,7 @@
 /** @format */
 import { sitesSchema } from 'state/sites/schema';
 
-// we're based on the normal site endpoint schema, but we want to add in a feed_ID property
+// based on the normal site endpoint schema with a few extra properties
 export const readerSitesSchema = {
 	...sitesSchema,
 	patternProperties: {
@@ -11,6 +11,8 @@ export const readerSitesSchema = {
 			properties: {
 				...sitesSchema.patternProperties[ '^\\d+$' ].properties,
 				feed_ID: { type: 'number' },
+				subscription: { type: 'object' },
+				is_blocked: { type: 'boolean' },
 			},
 		},
 	},

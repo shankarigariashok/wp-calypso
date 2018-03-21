@@ -7,7 +7,7 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import url from 'url';
-import qs from 'querystring';
+import { parse, stringify } from 'qs';
 import { connect } from 'react-redux';
 import { get } from 'lodash';
 import classnames from 'classnames';
@@ -47,7 +47,7 @@ export class Gravatar extends Component {
 		const { imgSize } = this.props;
 		imageURL = imageURL || 'https://www.gravatar.com/avatar/0';
 		const parsedURL = url.parse( imageURL );
-		const query = qs.parse( parsedURL.query );
+		const query = parse( parsedURL.query );
 
 		if ( /^([-a-zA-Z0-9_]+\.)*(gravatar.com)$/.test( parsedURL.hostname ) ) {
 			query.s = imgSize;
@@ -57,14 +57,14 @@ export class Gravatar extends Component {
 			query.resize = imgSize + ',' + imgSize;
 		}
 
-		parsedURL.search = qs.stringify( query );
+		parsedURL.search = stringify( query );
 		return url.format( parsedURL );
 	}
 
 	onError = () => this.setState( { failedToLoad: true } );
 
 	render() {
-		const { alt, size, tempImage, user } = this.props;
+		const { alt, title, size, tempImage, user } = this.props;
 
 		if ( ! user ) {
 			return <span className="gravatar is-placeholder" style={ { width: size, height: size } } />;
@@ -81,6 +81,7 @@ export class Gravatar extends Component {
 		return (
 			<img
 				alt={ altText }
+				title={ title }
 				className={ classes }
 				src={ avatarURL }
 				width={ size }

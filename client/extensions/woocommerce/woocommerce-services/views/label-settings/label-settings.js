@@ -5,20 +5,44 @@
  */
 
 import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
 import { localize } from 'i18n-calypso';
-import { find } from 'lodash';
+import { find, isBoolean } from 'lodash';
+import Gridicon from 'gridicons';
 
 /**
  * Internal dependencies
  */
 import { getPaperSizes } from 'woocommerce/woocommerce-services/lib/pdf-label-utils';
 import Button from 'components/button';
+import FormCheckbox from 'components/forms/form-checkbox';
 import FormFieldSet from 'components/forms/form-fieldset';
 import FormLabel from 'components/forms/form-label';
 import FormSelect from 'components/forms/form-select';
+import Notice from 'components/notice';
 import PaymentMethod, { getPaymentMethodTitle } from './label-payment-method';
 import { getOrigin } from 'woocommerce/lib/nav-utils';
+import {
+	openAddCardDialog,
+	fetchSettings,
+} from 'woocommerce/woocommerce-services/state/label-settings/actions';
+import {
+	areSettingsFetching,
+	areSettingsLoaded,
+	getEmailReceipts,
+	getLabelSettingsStoreOptions,
+	getMasterUserInfo,
+	getPaperSize,
+	getPaymentMethods,
+	getSelectedPaymentMethodId,
+	isPristine,
+	userCanEditSettings,
+	userCanManagePayments,
+} from 'woocommerce/woocommerce-services/state/label-settings/selectors';
+import QueryStoredCards from 'components/data/query-stored-cards';
+import AddCardDialog from 'woocommerce/woocommerce-services/views/label-settings/add-credit-card-modal';
 
 class ShippingLabels extends Component {
 	componentWillMount() {
@@ -31,8 +55,8 @@ class ShippingLabels extends Component {
 		}
 	}
 
-	isExpanded( { pristine, selectedPaymentMethod } ) {
-		return ! selectedPaymentMethod || ! pristine;
+	isExpanded( { canEditPayments, pristine, selectedPaymentMethod } ) {
+		return canEditPayments && ( ! selectedPaymentMethod || ! pristine );
 	}
 
 	renderPlaceholder() {
@@ -57,8 +81,76 @@ class ShippingLabels extends Component {
 		);
 	}
 
+	renderPaymentPermissionNotice = () => {
+		const {
+			canEditPayments,
+			canEditSettings,
+			masterUserName,
+			masterUserLogin,
+			translate,
+		} = this.props;
+
+		// If the user can's edit any settings, there will be another notice for the whole section
+		if ( ! canEditSettings || canEditPayments ) {
+			return null;
+		}
+
+		return (
+			<Notice showDismiss={ false }>
+				{ translate(
+					'Only the site owner can manage shipping label payment methods. Please' +
+						' contact %(ownerName)s (%(ownerLogin)s) to manage payment methods.',
+					{
+						args: {
+							ownerName: masterUserName,
+							ownerLogin: masterUserLogin,
+						},
+					}
+				) }
+			</Notice>
+		);
+	};
+
+	renderSettingsPermissionNotice = () => {
+		const { canEditSettings, masterUserName, masterUserLogin, translate } = this.props;
+		if ( canEditSettings ) {
+			return null;
+		}
+
+		return (
+			<Notice showDismiss={ false }>
+				{ translate(
+					'Only the site owner can change these settings. Please contact %(ownerName)s (%(ownerLogin)s)' +
+						' to change the shipping label settings.',
+					{
+						args: {
+							ownerName: masterUserName,
+							ownerLogin: masterUserLogin,
+						},
+					}
+				) }
+			</Notice>
+		);
+	};
+
+	onVisibilityChange = () => {
+		if ( ! document.hidden ) {
+			this.props.fetchSettings( this.props.siteId );
+		}
+		if ( this.addCreditCardWindow && this.addCreditCardWindow.closed ) {
+			document.removeEventListener( 'visibilitychange', this.onVisibilityChange );
+		}
+	};
+
 	renderPaymentsSection = () => {
-		const { paymentMethods, setFormDataValue, selectedPaymentMethod, translate } = this.props;
+		const {
+			siteId,
+			canEditPayments,
+			paymentMethods,
+			selectedPaymentMethod,
+			isReloading,
+			translate,
+		} = this.props;
 
 		if ( ! this.state.expanded ) {
 			const expand = event => {
@@ -66,33 +158,43 @@ class ShippingLabels extends Component {
 				this.setState( { expanded: true } );
 			};
 
-			const { card_type: selectedType, card_digits: selectedDigits } = find( paymentMethods, {
-				payment_method_id: selectedPaymentMethod,
-			} );
+			let summary;
+
+			if ( selectedPaymentMethod ) {
+				const { card_type: selectedType, card_digits: selectedDigits } = find( paymentMethods, {
+					payment_method_id: selectedPaymentMethod,
+				} );
+
+				summary = translate(
+					"We'll charge the credit card on your " +
+						'account (%(card)s) to pay for the labels you print',
+					{
+						args: {
+							card: getPaymentMethodTitle( translate, selectedType, selectedDigits ),
+						},
+					}
+				);
+			} else {
+				summary = translate( 'To purchase shipping labels, add a credit card.' );
+			}
 
 			return (
 				<div>
-					<p className="label-settings__credit-card-description">
-						{ translate(
-							"We'll charge the credit card on your " +
-								'account (%(card)s) to pay for the labels you print',
-							{
-								args: {
-									card: getPaymentMethodTitle( translate, selectedType, selectedDigits ),
-								},
-							}
-						) }
-					</p>
-					<p className="label-settings__credit-card-description">
-						<a href="#" onClick={ expand }>
-							{ translate( 'Choose a different card' ) }
-						</a>
-					</p>
+					{ this.renderPaymentPermissionNotice() }
+					<p className="label-settings__credit-card-description">{ summary }</p>
+					{ canEditPayments && (
+						<p className="label-settings__credit-card-description">
+							<a href="#" onClick={ expand }>
+								{ translate( 'Choose a different card' ) }
+							</a>
+						</p>
+					) }
 				</div>
 			);
 		}
 
-		const onPaymentMethodChange = value => setFormDataValue( 'selected_payment_method_id', value );
+		const onPaymentMethodChange = value =>
+			this.props.setValue( 'selected_payment_method_id', value );
 
 		let description, buttonLabel;
 		if ( paymentMethods.length ) {
@@ -120,34 +222,110 @@ class ShippingLabels extends Component {
 			);
 		};
 
+		const openDialog = () => {
+			this.props.openAddCardDialog( siteId );
+		};
+
+		const onAddCardExternal = () => {
+			this.addCreditCardWindow = window.open( getOrigin() + '/me/purchases/add-credit-card' );
+			document.addEventListener( 'visibilitychange', this.onVisibilityChange );
+		};
+
 		return (
 			<div>
+				{ this.renderPaymentPermissionNotice() }
 				<p className="label-settings__credit-card-description">{ description }</p>
-				{ paymentMethods.map( renderPaymentMethod ) }
-				<Button href={ getOrigin() + '/me/purchases/add-credit-card' } target="_blank" compact>
+
+				<QueryStoredCards />
+				{ isReloading ? (
+					<div className="label-settings__placeholder">
+						<PaymentMethod selected={ false } isLoading={ true } />
+						<PaymentMethod selected={ false } isLoading={ true } />
+					</div>
+				) : (
+					paymentMethods.map( renderPaymentMethod )
+				) }
+
+				<AddCardDialog siteId={ siteId } />
+
+				{ /* Render two buttons with internal/external classNames to conditionally show them in Calypso or wp-admin using CSS */ }
+				<Button className="label-settings__internal" onClick={ openDialog } compact>
 					{ buttonLabel }
+				</Button>
+				<Button className="label-settings__external" onClick={ onAddCardExternal } compact>
+					{ buttonLabel } <Gridicon icon="external" />
 				</Button>
 			</div>
 		);
 	};
 
+	renderEmailReceiptsSection = () => {
+		const {
+			emailReceipts,
+			translate,
+			masterUserName,
+			masterUserLogin,
+			masterUserEmail,
+			canEditSettings,
+			canEditPayments,
+		} = this.props;
+
+		if ( ! isBoolean( emailReceipts ) ) {
+			return null;
+		}
+
+		const onChange = () => this.props.setValue( 'email_receipts', ! emailReceipts );
+
+		return (
+			<FormFieldSet>
+				<FormLabel className="label-settings__cards-label">
+					{ translate( 'Email Receipts' ) }
+				</FormLabel>
+				<FormLabel>
+					<FormCheckbox
+						checked={ emailReceipts }
+						onChange={ onChange }
+						disabled={ ! canEditPayments && ! canEditSettings }
+					/>
+					<span className="label-settings__credit-card-description">
+						{ translate(
+							'Email the label purchase receipts to %(ownerName)s (%(ownerLogin)s) at %(ownerEmail)s',
+							{
+								args: {
+									ownerName: masterUserName,
+									ownerLogin: masterUserLogin,
+									ownerEmail: masterUserEmail,
+								},
+							}
+						) }
+					</span>
+				</FormLabel>
+			</FormFieldSet>
+		);
+	};
+
 	renderContent = () => {
-		const { isLoading, setFormDataValue, paperSize, storeOptions, translate } = this.props;
+		const { canEditSettings, isLoading, paperSize, storeOptions, translate } = this.props;
 
 		if ( isLoading ) {
 			return this.renderPlaceholder();
 		}
 
-		const onPaperSizeChange = event => setFormDataValue( 'paper_size', event.target.value );
+		const onPaperSizeChange = event => this.props.setValue( 'paper_size', event.target.value );
 		const paperSizes = getPaperSizes( storeOptions.origin_country );
 
 		return (
 			<div>
 				<FormFieldSet>
+					{ this.renderSettingsPermissionNotice() }
 					<FormLabel className="label-settings__cards-label">
 						{ translate( 'Paper size' ) }
 					</FormLabel>
-					<FormSelect onChange={ onPaperSizeChange } value={ paperSize }>
+					<FormSelect
+						onChange={ onPaperSizeChange }
+						value={ paperSize }
+						disabled={ ! canEditSettings }
+					>
 						{ Object.keys( paperSizes ).map( size => (
 							<option value={ size } key={ size }>
 								{ paperSizes[ size ] }
@@ -159,6 +337,7 @@ class ShippingLabels extends Component {
 					<FormLabel className="label-settings__cards-label">{ translate( 'Payment' ) }</FormLabel>
 					{ this.renderPaymentsSection() }
 				</FormFieldSet>
+				{ this.renderEmailReceiptsSection() }
 			</div>
 		);
 	};
@@ -169,13 +348,33 @@ class ShippingLabels extends Component {
 }
 
 ShippingLabels.propTypes = {
-	isLoading: PropTypes.bool,
-	pristine: PropTypes.bool,
-	paymentMethods: PropTypes.array,
-	setFormDataValue: PropTypes.func,
-	selectedPaymentMethod: PropTypes.number,
-	paperSize: PropTypes.string,
-	storeOptions: PropTypes.object,
+	siteId: PropTypes.number.isRequired,
+	setValue: PropTypes.func.isRequired,
 };
 
-export default localize( ShippingLabels );
+export default connect(
+	( state, { siteId } ) => {
+		return {
+			isLoading: areSettingsFetching( state, siteId ) && ! areSettingsLoaded( state, siteId ),
+			isReloading: areSettingsFetching( state, siteId ) && areSettingsLoaded( state, siteId ),
+			pristine: isPristine( state, siteId ),
+			paymentMethods: getPaymentMethods( state, siteId ),
+			selectedPaymentMethod: getSelectedPaymentMethodId( state, siteId ),
+			paperSize: getPaperSize( state, siteId ),
+			storeOptions: getLabelSettingsStoreOptions( state, siteId ),
+			canEditPayments: userCanManagePayments( state, siteId ),
+			canEditSettings:
+				userCanManagePayments( state, siteId ) || userCanEditSettings( state, siteId ),
+			emailReceipts: getEmailReceipts( state, siteId ),
+			...getMasterUserInfo( state, siteId ),
+		};
+	},
+	dispatch =>
+		bindActionCreators(
+			{
+				openAddCardDialog,
+				fetchSettings,
+			},
+			dispatch
+		)
+)( localize( ShippingLabels ) );

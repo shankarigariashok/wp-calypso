@@ -4,7 +4,8 @@
 	max-width: 410px;
 	z-index: z-index( 'root', '.guided-tours__step' );
 	background: darken( $gray, 52 );
-	box-shadow: 0 2px 24px 0 rgba( darken( $gray, 52 ), 0.5 );
+	box-shadow: 0 0 0 1px rgbs( 255, 255, 255, 0.6 ),
+		0 2px 24px 0 rgba( darken( $gray, 52 ), 0.5 );
 	border-radius: 4px;
 	padding-top: 19px;
 	margin-left: 5px;
@@ -40,6 +41,29 @@
 	.gridicon[height="18"] {
 		position: relative;
 		top: 3px;
+	}
+
+	.tours__title {
+		font-size: 140%;
+	    font-weight: 300;
+	    display: flex;
+	    align-items: center;
+	    color: $white;
+	    margin-bottom: 10px;
+	}
+
+	.tours__completed-icon-wrapper {
+		background: $alert-green;
+		border-radius: 100%;
+		display: inline-block;
+		margin-right: 10px;
+		width: 25px;
+		height: 25px;
+	}
+
+	.tours__completed-icon {
+		margin-top: -10px;
+		margin-left: 2px;
 	}
 }
 
@@ -85,6 +109,15 @@
 }
 
 .guided-tours__choice-button-row {
+	display: flex;
+	align-items: center;
+}
+
+.guided-tours__single-button-row {
+	text-align: center;
+}
+
+.guided-tours__choice-button-row, .guided-tours__single-button-row {
 	.button {
 		width: 48%;
 	}
@@ -94,21 +127,23 @@
 	.button:nth-child(1) {
 		margin-right: 4%;
 	}
-	.button:nth-child(2) {
+	.guided-tours__quit-button {
 		color: darken( $white, 20% );
 		background: none;
-		border: none;
+		border: 1px rgba( $white, 0.2 ) solid;
 	}
 }
 
-.guided-tours__single-button-row {
-	.button {
-		width: 100%;
+a.config-elements__text-link,
+.config-elements__text-link {
+	color: $white;
+
+	&:hover {
+		text-decoration: none;
 	}
-	.guided-tours__subtle-button, {
-		color: darken( $white, 20% );
-		background: none;
-		border: none;
+
+	&:visited {
+		color: $white;
 	}
 }
 
@@ -117,11 +152,12 @@
 	color: lighten( $gray, 10 );
 	margin-bottom: 0;
 	font-style: italic;
-	line-height: 24px;
+	line-height: 1.3em;
 	min-height: 24px;
 
 	.external-link {
 		font-style: normal;
+		color: $white;
 		border-top: 1px solid $gray-dark;
 		display: block;
 		padding-top: 12px;

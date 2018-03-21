@@ -3,54 +3,25 @@
 /**
  * Internal dependencies
  */
-
-import wp from 'lib/wp';
-import { setError } from '../status/wc-api/actions';
+import { getNormalizedProductCategoriesQuery } from './utils';
 import {
 	WOOCOMMERCE_PRODUCT_CATEGORIES_REQUEST,
-	WOOCOMMERCE_PRODUCT_CATEGORIES_REQUEST_SUCCESS,
 	WOOCOMMERCE_PRODUCT_CATEGORY_CREATE,
+	WOOCOMMERCE_PRODUCT_CATEGORY_UPDATE,
 	WOOCOMMERCE_PRODUCT_CATEGORY_UPDATED,
+	WOOCOMMERCE_PRODUCT_CATEGORY_DELETE,
 } from 'woocommerce/state/action-types';
 
-export function fetchProductCategories( siteId ) {
+export function fetchProductCategories( siteId, query = {} ) {
+	const normalizedQuery = getNormalizedProductCategoriesQuery( query );
 	return dispatch => {
 		const getAction = {
 			type: WOOCOMMERCE_PRODUCT_CATEGORIES_REQUEST,
 			siteId,
+			query: normalizedQuery,
 		};
 
 		dispatch( getAction );
-
-		const jpPath = `/jetpack-blogs/${ siteId }/rest-api/`;
-		const apiPath = '/wc/v3/products/categories';
-
-		// TODO: Modify this to use the extensions data layer.
-		return wp.req
-			.get( { path: jpPath }, { path: apiPath } )
-			.then( ( { data } ) => {
-				dispatch( fetchProductCategoriesSuccess( siteId, data ) );
-			} )
-			.catch( err => {
-				dispatch( setError( siteId, getAction, err ) );
-			} );
-	};
-}
-
-export function fetchProductCategoriesSuccess( siteId, data ) {
-	if ( ! isValidCategoriesArray( data ) ) {
-		const originalAction = {
-			type: WOOCOMMERCE_PRODUCT_CATEGORIES_REQUEST,
-			siteId,
-		};
-
-		return setError( siteId, originalAction, { message: 'Invalid Categories Array', data } );
-	}
-
-	return {
-		type: WOOCOMMERCE_PRODUCT_CATEGORIES_REQUEST_SUCCESS,
-		siteId,
-		data,
 	};
 }
 
@@ -78,6 +49,46 @@ export function createProductCategory( siteId, category, successAction, failureA
 }
 
 /**
+ * Action Creator: Update a product category.
+ *
+ * @param {Number} siteId The id of the site upon which to create.
+ * @param {Object} category The product category object.
+ * @param {Object|Function} [successAction] action with extra props { sentData, receivedData }
+ * @param {Object|Function} [failureAction] action with extra props { error }
+ * @return {Object} Action object
+ */
+export function updateProductCategory( siteId, category, successAction, failureAction ) {
+	const action = {
+		type: WOOCOMMERCE_PRODUCT_CATEGORY_UPDATE,
+		siteId,
+		category,
+		successAction,
+		failureAction,
+	};
+
+	return action;
+}
+
+/**
+ * Action Creator: Delete a product category.
+ *
+ * @param {Number} siteId The id of the site upon which to delete.
+ * @param {Object} category The product category object.
+ * @param {Object|Function} [successAction] action with extra props { sentData, receivedData }
+ * @param {Object|Function} [failureAction] action with extra props { error }
+ * @return {Object} Action object
+ */
+export function deleteProductCategory( siteId, category, successAction, failureAction ) {
+	return {
+		type: WOOCOMMERCE_PRODUCT_CATEGORY_DELETE,
+		siteId,
+		category,
+		successAction,
+		failureAction,
+	};
+}
+
+/**
  * Action Creator: This action prompts the state to update itself after a product category has changed.
  *
  * @param {Number} siteId The id of the site to which the category belongs.
@@ -92,26 +103,4 @@ export function productCategoryUpdated( siteId, data, originatingAction ) {
 		data,
 		originatingAction,
 	};
-}
-
-function isValidCategoriesArray( categories ) {
-	for ( let i = 0; i < categories.length; i++ ) {
-		if ( ! isValidProductCategory( categories[ i ] ) ) {
-			// Short-circuit the loop and return now.
-			return false;
-		}
-	}
-	return true;
-}
-
-function isValidProductCategory( category ) {
-	return (
-		category &&
-		category.id &&
-		'number' === typeof category.id &&
-		category.name &&
-		'string' === typeof category.name &&
-		category.slug &&
-		'string' === typeof category.slug
-	);
 }

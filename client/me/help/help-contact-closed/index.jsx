@@ -7,32 +7,53 @@
 import React from 'react';
 import i18n, { localize } from 'i18n-calypso';
 
+const christmas2017ClosureStartsAt = i18n.moment( 'Sun, 24 Dec 2017 00:00:00 +0000' );
+const newYear2018NoticeStartsAt = i18n.moment( 'Fri, 29 Dec 2017 00:00:00 +0000' );
+const newYear2018ClosureStartsAt = i18n.moment( 'Sun, 31 Dec 2017 00:00:00 +0000' );
+
 /**
  * Internal dependencies
  */
 import FormSectionHeading from 'components/forms/form-section-heading';
 
-// In the translated dates 7am UTC is 12am/midnight PT
-const closedStartDate = i18n.moment( 'Thu, 23 Nov 2017 00:00:00 +0000' );
-const closedEndDate = i18n.moment( 'Fri, 24 Nov 2017 00:00:00 +0000' );
-
 const HelpContactClosed = ( { translate } ) => {
+	const currentDate = i18n.moment();
+	let closureHeading;
+	let closureMessage;
+
+	if ( currentDate >= newYear2018ClosureStartsAt ) {
+		closureHeading = translate( "Limited Support New Year's Day" );
+		closureMessage = translate(
+			"Live chat is closed today for the New Year's Day holiday. If you need to get in touch with us, submit " +
+				"a support request below and we'll respond by email. Live chat will reopen on January 2nd. Thank you!"
+		);
+	} else if ( currentDate >= newYear2018NoticeStartsAt ) {
+		closureHeading = translate( "Limited Support New Year's Day" );
+		closureMessage = translate(
+			"Live chat will be closed on Monday, January 1, 2018 for the New Year's Day holiday. If you need " +
+				"to get in touch with us, you’ll be able to submit a support request from this page and we'll " +
+				'respond by email. Live chat will reopen on January 2nd. Thank you!'
+		);
+	} else if ( currentDate >= christmas2017ClosureStartsAt ) {
+		closureHeading = translate( 'Limited Support over Christmas' );
+		closureMessage = translate(
+			'Live chat is closed today for the Christmas holiday. If you need to get in touch with us, submit ' +
+				"a support request below and we'll respond by email. Live chat will reopen on December 26. Thank you!"
+		);
+	} else {
+		closureHeading = translate( 'Limited Support over Christmas' );
+		closureMessage = translate(
+			'Live chat will be closed on Sunday, December 24th and Monday, December 25th for the Christmas holiday. ' +
+				'If you need to get in touch with us, you’ll be able to submit a support request from this page and ' +
+				"we'll respond by email. Live chat will reopen on December 26th. Thank you!"
+		);
+	}
+
 	return (
 		<div className="help-contact-closed">
-			<FormSectionHeading>{ translate( 'Limited Support on Thanksgiving' ) }</FormSectionHeading>
+			<FormSectionHeading>{ closureHeading }</FormSectionHeading>
 			<div>
-				<p>
-					{ translate(
-						'Live chat support will be closed for the Thanksgiving holiday on %(closed_start_date)s. ' +
-							'Email support will be open during that time, and we will reopen live chat on %(closed_end_date)s.',
-						{
-							args: {
-								closed_start_date: closedStartDate.format( 'dddd, MMMM D' ),
-								closed_end_date: closedEndDate.format( 'dddd, MMMM D' ),
-							},
-						}
-					) }
-				</p>
+				<p>{ closureMessage }</p>
 			</div>
 			<hr />
 		</div>

@@ -83,13 +83,11 @@ import wpEmojiPlugin from './plugins/wpemoji/plugin';
 /**
  * Internal Dependencies
  */
-import userFactory from 'lib/user';
-
-const user = userFactory();
 import i18n from './i18n';
-import viewport from 'lib/viewport';
+import { isMobile } from 'lib/viewport';
 import config from 'config';
 import { decodeEntities, wpautop, removep } from 'lib/formatting';
+import { isRtl as isRtlSelector, getCurrentLocaleSlug } from 'state/selectors';
 
 /**
  * Internal Variables
@@ -244,18 +242,29 @@ export default class extends React.Component {
 			);
 		}.bind( this );
 
-		this.localize();
+		const store = this.context.store;
+		let isRtl = false;
+		let localeSlug = 'en';
 
-		const ltrButton = user.isRTL() ? 'ltr,' : '';
+		if ( store ) {
+			const state = store.getState();
+
+			isRtl = isRtlSelector( state );
+			localeSlug = getCurrentLocaleSlug( state );
+		}
+
+		this.localize( isRtl, localeSlug );
+
+		const ltrButton = isRtl ? 'ltr,' : '';
 
 		tinymce.init( {
 			selector: '#' + this._id,
 			skin_url: '//s1.wp.com/wp-includes/js/tinymce/skins/lightgray',
 			skin: 'lightgray',
 			content_css: CONTENT_CSS,
-			language: user.get() ? user.get().localeSlug : 'en',
+			language: localeSlug,
 			language_url: DUMMY_LANG_URL,
-			directionality: user.isRTL() ? 'rtl' : 'ltr',
+			directionality: isRtl ? 'rtl' : 'ltr',
 			formats: {
 				alignleft: [
 					{
@@ -319,7 +328,7 @@ export default class extends React.Component {
 			// minus the surrounding editor chrome to avoid scrollbars. In the
 			// future, we should calculate from the rendered editor bounds.
 			autoresize_min_height: Math.max( document.documentElement.clientHeight - 300, 300 ),
-			autoresize_bottom_margin: viewport.isMobile() ? 10 : 50,
+			autoresize_bottom_margin: isMobile() ? 10 : 50,
 
 			toolbar1: `wpcom_insert_menu,formatselect,bold,italic,bullist,numlist,link,blockquote,alignleft,aligncenter,alignright,spellchecker,wp_more,${ ltrButton }wpcom_advanced`,
 			toolbar2:
@@ -512,19 +521,14 @@ export default class extends React.Component {
 		this.setState( { content }, this.doAutosizeUpdate );
 	};
 
-	localize = () => {
-		const userData = user.get();
+	localize = ( isRtl, localeSlug ) => {
 		let i18nStrings = i18n;
 
-		if ( ! userData ) {
-			return;
-		}
-
-		if ( user.isRTL() ) {
+		if ( isRtl ) {
 			i18nStrings = assign( { _dir: 'rtl' }, i18nStrings );
 		}
 
-		tinymce.addI18n( userData.localeSlug, i18nStrings );
+		tinymce.addI18n( localeSlug, i18nStrings );
 
 		// Stop TinyMCE from trying to load the lang script by marking as done
 		tinymce.ScriptLoader.markDone( DUMMY_LANG_URL );

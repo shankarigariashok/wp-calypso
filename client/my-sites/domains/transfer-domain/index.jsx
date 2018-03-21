@@ -1,5 +1,4 @@
 /** @format */
-
 /**
  * External dependencies
  */
@@ -7,16 +6,14 @@ import page from 'page';
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
-import { localize } from 'i18n-calypso';
 
 /**
  * Internal dependencies
  */
-import HeaderCake from 'components/header-cake';
 import TransferDomainStep from 'components/domains/transfer-domain-step';
 import { DOMAINS_WITH_PLANS_ONLY } from 'state/current-user/constants';
 import { cartItems } from 'lib/cart-values';
-import upgradesActions from 'lib/upgrades/actions';
+import { addItem, addItems } from 'lib/upgrades/actions';
 import Notice from 'components/notice';
 import { currentUserHasFlag } from 'state/current-user/selectors';
 import { isSiteUpgradeable } from 'state/selectors';
@@ -35,7 +32,6 @@ export class TransferDomain extends Component {
 		selectedSite: PropTypes.object,
 		selectedSiteId: PropTypes.number,
 		selectedSiteSlug: PropTypes.string,
-		translate: PropTypes.func.isRequired,
 	};
 
 	state = {
@@ -56,7 +52,7 @@ export class TransferDomain extends Component {
 	handleRegisterDomain = suggestion => {
 		const { selectedSiteSlug } = this.props;
 
-		upgradesActions.addItem(
+		addItem(
 			cartItems.domainRegistration( {
 				productSlug: suggestion.product_slug,
 				domain: suggestion.domain_name,
@@ -66,7 +62,7 @@ export class TransferDomain extends Component {
 		page( '/checkout/' + selectedSiteSlug );
 	};
 
-	handleTransferDomain = domain => {
+	handleTransferDomain = ( domain, supportsPrivacy ) => {
 		const { selectedSiteSlug } = this.props;
 
 		this.setState( { errorMessage: null } );
@@ -76,16 +72,19 @@ export class TransferDomain extends Component {
 		transferItems.push(
 			cartItems.domainTransfer( {
 				domain,
+				extra: { privacy_available: supportsPrivacy },
 			} )
 		);
 
-		transferItems.push(
-			cartItems.domainTransferPrivacy( {
-				domain,
-			} )
-		);
+		if ( supportsPrivacy ) {
+			transferItems.push(
+				cartItems.domainTransferPrivacy( {
+					domain,
+				} )
+			);
+		}
 
-		upgradesActions.addItems( transferItems );
+		addItems( transferItems );
 
 		page( '/checkout/' + selectedSiteSlug );
 	};
@@ -105,31 +104,21 @@ export class TransferDomain extends Component {
 	}
 
 	render() {
-		const {
-			cart,
-			domainsWithPlansOnly,
-			initialQuery,
-			productsList,
-			selectedSite,
-			translate,
-		} = this.props;
+		const { cart, domainsWithPlansOnly, initialQuery, selectedSite } = this.props;
 
 		const { errorMessage } = this.state;
 
 		return (
 			<span>
 				<QueryProductsList />
-
-				<HeaderCake onClick={ this.goBack }>{ translate( 'Use My Own Domain' ) }</HeaderCake>
-
 				{ errorMessage && <Notice status="is-error" text={ errorMessage } /> }
 
 				<TransferDomainStep
 					basePath={ this.props.basePath }
 					cart={ cart }
 					domainsWithPlansOnly={ domainsWithPlansOnly }
+					goBack={ this.goBack }
 					initialQuery={ initialQuery }
-					products={ productsList }
 					selectedSite={ selectedSite }
 					onRegisterDomain={ this.handleRegisterDomain }
 					onTransferDomain={ this.handleTransferDomain }
@@ -147,4 +136,4 @@ export default connect( state => ( {
 	domainsWithPlansOnly: currentUserHasFlag( state, DOMAINS_WITH_PLANS_ONLY ),
 	isSiteUpgradeable: isSiteUpgradeable( state, getSelectedSiteId( state ) ),
 	productsList: getProductsList( state ),
-} ) )( localize( TransferDomain ) );
+} ) )( TransferDomain );

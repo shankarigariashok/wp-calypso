@@ -20,6 +20,7 @@ import {
 	getTriedCustomizerDuringInitialSetup,
 	isDefaultShippingZoneCreated,
 	isStoreSetupComplete,
+	isTestSite,
 	getCheckedTaxSetup,
 } from '../selectors';
 import { LOADING } from 'woocommerce/state/constants';
@@ -46,6 +47,7 @@ const loadedState = {
 			sites: {
 				123: {
 					setupChoices: {
+						is_test_site: true,
 						finished_initial_setup: true,
 						finished_page_setup: true,
 						opted_out_of_shipping_setup: true,
@@ -59,6 +61,7 @@ const loadedState = {
 				},
 				124: {
 					setupChoices: {
+						is_test_site: false,
 						finished_initial_setup: false,
 						finished_page_setup: false,
 						opted_out_of_shipping_setup: false,
@@ -69,6 +72,17 @@ const loadedState = {
 						set_store_address_during_initial_setup: false,
 						checked_tax_setup: false,
 					},
+				},
+			},
+		},
+	},
+};
+const loadedStateEmptySettings = {
+	extensions: {
+		woocommerce: {
+			sites: {
+				123: {
+					setupChoices: {},
 				},
 			},
 		},
@@ -90,6 +104,10 @@ describe( 'selectors', () => {
 
 		test( 'should be true when setup choices are loaded.', () => {
 			expect( areSetupChoicesLoaded( loadedState, 123 ) ).to.be.true;
+		} );
+
+		test( 'should be false when setup choices object is empty.', () => {
+			expect( areSetupChoicesLoaded( loadedStateEmptySettings, 123 ) ).to.be.false;
 		} );
 
 		test( 'should be false when setup choices are loaded only for a different site.', () => {
@@ -260,6 +278,20 @@ describe( 'selectors', () => {
 
 		test( 'should get the siteId from the UI tree if not provided.', () => {
 			expect( getSetStoreAddressDuringInitialSetup( loadedStateWithUi ) ).to.eql( true );
+		} );
+	} );
+
+	describe( '#isTestSite', () => {
+		test( 'should get whether initial setup was completed from the state (123-true).', () => {
+			expect( isTestSite( loadedState, 123 ) ).to.eql( true );
+		} );
+
+		test( 'should get whether initial setup was completed from the state (124-false).', () => {
+			expect( isTestSite( loadedState, 124 ) ).to.eql( false );
+		} );
+
+		test( 'should get the siteId from the UI tree if not provided.', () => {
+			expect( isTestSite( loadedStateWithUi ) ).to.eql( true );
 		} );
 	} );
 } );

@@ -120,8 +120,10 @@ export class Theme extends Component {
 		if ( this.props.screenshotClickUrl || this.props.onScreenshotClick ) {
 			return (
 				<a
+					aria-label={ this.props.theme.name }
+					title={ this.props.theme.description }
 					className="theme__active-focus"
-					href={ this.props.screenshotClickUrl }
+					href={ this.props.screenshotClickUrl || '#' }
 					onClick={ this.onScreenshotClick }
 				>
 					<span>{ this.props.actionLabel }</span>
@@ -149,7 +151,7 @@ export class Theme extends Component {
 
 	render() {
 		const { active, price, theme, translate, upsellUrl } = this.props;
-		const { name, screenshot } = theme;
+		const { name, description, screenshot } = theme;
 		const themeClass = classNames( 'theme', {
 			'is-active': active,
 			'is-actionable': !! ( this.props.screenshotClickUrl || this.props.onScreenshotClick ),
@@ -203,9 +205,10 @@ export class Theme extends Component {
 		const fit = '479,360';
 		const themeImgSrc = photon( screenshot, { fit } );
 		const themeImgSrcDoubleDpi = photon( screenshot, { fit, zoom: 2 } );
+		const e2eThemeName = name.toLowerCase().replace( /\s+/g, '-' );
 
 		return (
-			<Card className={ themeClass }>
+			<Card className={ themeClass } data-e2e-theme={ e2eThemeName }>
 				{ this.isBeginnerTheme() && (
 					<Ribbon className="theme__ribbon" color="green">
 						{ translate( 'Beginner' ) }
@@ -218,6 +221,7 @@ export class Theme extends Component {
 						{ this.renderInstalling() }
 						{ screenshot ? (
 							<img
+								alt={ description }
 								className="theme__img"
 								src={ themeImgSrc }
 								srcSet={ `${ themeImgSrcDoubleDpi } 2x` }

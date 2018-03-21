@@ -10,12 +10,17 @@ import PropTypes from 'prop-types';
 import { bindActionCreators } from 'redux';
 import classNames from 'classnames';
 import { connect } from 'react-redux';
+import { get } from 'lodash';
 import { localize } from 'i18n-calypso';
 
 /**
  * Internal dependencies
  */
 import Count from 'components/count';
+import {
+	areSettingsGeneralLoaded,
+	getStoreLocation,
+} from 'woocommerce/state/sites/settings/general/selectors';
 import { fetchOrders } from 'woocommerce/state/sites/orders/actions';
 import { fetchProducts } from 'woocommerce/state/sites/products/actions';
 import { fetchReviews } from 'woocommerce/state/sites/reviews/actions';
@@ -25,12 +30,14 @@ import { getSelectedSiteWithFallback } from 'woocommerce/state/sites/selectors';
 import { getSetStoreAddressDuringInitialSetup } from 'woocommerce/state/sites/setup-choices/selectors';
 import { getTotalProducts, areProductsLoaded } from 'woocommerce/state/sites/products/selectors';
 import { getTotalReviews } from 'woocommerce/state/sites/reviews/selectors';
+import { isStoreManagementSupportedInCalypsoForCountry } from 'woocommerce/lib/countries';
 import Sidebar from 'layout/sidebar';
 import SidebarButton from 'layout/sidebar/button';
 import SidebarItem from 'layout/sidebar/item';
 import SidebarMenu from 'layout/sidebar/menu';
 import SidebarSeparator from 'layout/sidebar/separator';
 import StoreGroundControl from './store-ground-control';
+import QuerySettingsGeneral from 'woocommerce/components/query-settings-general';
 
 class StoreSidebar extends Component {
 	static propTypes = {
@@ -42,38 +49,29 @@ class StoreSidebar extends Component {
 		const { productsLoaded, site } = this.props;
 
 		if ( site && site.ID ) {
-			this.props.fetchSetupChoices( site.ID );
-			this.props.fetchOrders( site.ID );
-
-			// TODO This check can be removed when we launch reviews.
-			if ( config.isEnabled( 'woocommerce/extension-reviews' ) ) {
-				this.props.fetchReviews( site.ID, { status: 'pending' } );
-			}
-
-			if ( ! productsLoaded ) {
-				this.props.fetchProducts( site.ID, { page: 1 } );
-			}
+			this.fetchData( { siteId: site.ID, productsLoaded } );
 		}
 	};
 
 	componentWillReceiveProps = newProps => {
-		const { productsLoaded, site } = this.props;
+		const { site } = this.props;
 
 		const newSiteId = newProps.site ? newProps.site.ID : null;
 		const oldSiteId = site ? site.ID : null;
 
 		if ( newSiteId && oldSiteId !== newSiteId ) {
-			this.props.fetchSetupChoices( newSiteId );
-			this.props.fetchOrders( newSiteId );
+			this.fetchData( { ...newProps, siteId: newSiteId } );
+		}
+	};
 
-			// TODO This check can be removed when we launch reviews.
-			if ( config.isEnabled( 'woocommerce/extension-reviews' ) ) {
-				this.props.fetchReviews( newSiteId, { status: 'pending' } );
-			}
+	fetchData = ( { siteId, productsLoaded } ) => {
+		this.props.fetchSetupChoices( siteId );
+		this.props.fetchOrders( siteId );
 
-			if ( ! productsLoaded ) {
-				this.props.fetchProducts( newSiteId, { page: 1 } );
-			}
+		this.props.fetchReviews( siteId, { status: 'pending' } );
+
+		if ( ! productsLoaded ) {
+			this.props.fetchProducts( siteId, { page: 1 } );
 		}
 	};
 
@@ -111,7 +109,11 @@ class StoreSidebar extends Component {
 		const { site, siteSuffix, translate } = this.props;
 		const link = '/store/products' + siteSuffix;
 		const addLink = '/store/product' + siteSuffix;
-		const selected = this.isItemLinkSelected( [ link, addLink ] );
+		const selected = this.isItemLinkSelected( [
+			link,
+			addLink,
+			'/store/products/categories' + siteSuffix,
+		] );
 		const classes = classNames( {
 			products: true,
 			'is-placeholder': ! site,
@@ -133,10 +135,6 @@ class StoreSidebar extends Component {
 	};
 
 	reviews = () => {
-		if ( ! config.isEnabled( 'woocommerce/extension-reviews' ) ) {
-			return null;
-		}
-
 		const { site, siteSuffix, translate, totalPendingReviews } = this.props;
 		const link = '/store/reviews' + siteSuffix;
 		const selected = this.isItemLinkSelected( [ '/store/reviews' ] );
@@ -184,9 +182,8 @@ class StoreSidebar extends Component {
 
 		const { site, siteSuffix, translate } = this.props;
 		const link = '/store/promotions' + siteSuffix;
-		const validLinks = [ '/store/promotions', '/store/promotion' ];
-
-		const selected = this.isItemLinkSelected( validLinks );
+		const addLink = '/store/promotion' + siteSuffix;
+		const selected = this.isItemLinkSelected( [ link, addLink ] );
 		const classes = classNames( {
 			promotions: true,
 			'is-placeholder': ! site,
@@ -199,7 +196,11 @@ class StoreSidebar extends Component {
 				icon="gift"
 				label={ translate( 'Promotions' ) }
 				link={ link }
-			/>
+			>
+				<SidebarButton disabled={ ! site } href={ addLink }>
+					{ translate( 'Add' ) }
+				</SidebarButton>
+			</SidebarItem>
 		);
 	};
 
@@ -230,11 +231,30 @@ class StoreSidebar extends Component {
 	};
 
 	render = () => {
-		const { finishedAddressSetup, hasProducts, path, site, siteSuffix } = this.props;
+		const {
+			finishedAddressSetup,
+			hasProducts,
+			path,
+			settingsGeneralLoaded,
+			site,
+			siteId,
+			siteSuffix,
+			storeLocation,
+		} = this.props;
 
 		// Show all items if: we're not on the dashboard, we have finished setup, or we have products.
 		const notOnDashboard = 0 !== path.indexOf( '/store' + siteSuffix );
-		const showAllSidebarItems = notOnDashboard || finishedAddressSetup || hasProducts;
+		let showAllSidebarItems = notOnDashboard || finishedAddressSetup || hasProducts;
+
+		// Don't show all the sidebar items if we don't know what country the store is in
+		if ( showAllSidebarItems ) {
+			if ( ! settingsGeneralLoaded ) {
+				showAllSidebarItems = false;
+			} else {
+				const storeCountry = get( storeLocation, 'country' );
+				showAllSidebarItems = isStoreManagementSupportedInCalypsoForCountry( storeCountry );
+			}
+		}
 
 		return (
 			<Sidebar className="store-sidebar__sidebar">
@@ -250,6 +270,7 @@ class StoreSidebar extends Component {
 						{ showAllSidebarItems && this.settings() }
 					</ul>
 				</SidebarMenu>
+				<QuerySettingsGeneral siteId={ siteId } />
 			</Sidebar>
 		);
 	};
@@ -261,7 +282,10 @@ function mapStateToProps( state ) {
 	const orders = getNewOrdersWithoutPayPalPending( state );
 	const productsLoaded = areProductsLoaded( state );
 	const site = getSelectedSiteWithFallback( state );
+	const siteId = site ? site.ID : null;
 	const totalPendingReviews = getTotalReviews( state, { status: 'pending' } );
+	const settingsGeneralLoaded = areSettingsGeneralLoaded( state, siteId );
+	const storeLocation = getStoreLocation( state, siteId );
 
 	return {
 		finishedAddressSetup,
@@ -269,8 +293,11 @@ function mapStateToProps( state ) {
 		orders,
 		totalPendingReviews,
 		productsLoaded,
+		settingsGeneralLoaded,
 		site,
+		siteId,
 		siteSuffix: site ? '/' + site.slug : '',
+		storeLocation,
 	};
 }
 

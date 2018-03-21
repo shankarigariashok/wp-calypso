@@ -14,7 +14,9 @@ import moment from 'moment';
 import ReaderAvatar from 'blocks/reader-avatar';
 import FollowButton from 'reader/follow-button';
 import { getStreamUrl } from 'reader/route';
-import EmailSettings from 'blocks/reader-email-settings';
+import ReaderEmailSettings from 'blocks/reader-email-settings';
+import ReaderSiteNotificationSettings from 'blocks/reader-site-notification-settings';
+import config from 'config';
 import {
 	getSiteName,
 	getSiteDescription,
@@ -22,9 +24,10 @@ import {
 	getFeedUrl,
 	getSiteUrl,
 } from 'reader/get-helpers';
-import untrailingslashit from 'lib/route/untrailingslashit';
+import { untrailingslashit } from 'lib/route';
 import ReaderSubscriptionListItemPlaceholder from 'blocks/reader-subscription-list-item/placeholder';
 import { recordTrack, recordTrackWithRailcar } from 'reader/stats';
+import ExternalLink from 'components/external-link';
 
 /**
  * Takes in a string and removes the starting https, www., and removes a trailing slash
@@ -43,7 +46,7 @@ function ReaderSubscriptionListItem( {
 	className = '',
 	translate,
 	followSource,
-	showEmailSettings,
+	showNotificationSettings,
 	showLastUpdatedDate,
 	isFollowing,
 	railcar,
@@ -83,12 +86,14 @@ function ReaderSubscriptionListItem( {
 	const recordSiteUrlClick = () => recordEvent( 'calypso_reader_site_url_clicked' );
 	const recordAvatarClick = () => recordEvent( 'calypso_reader_avatar_clicked' );
 
+	const notificationSettings = config.isEnabled( 'reader/new-post-notifications' ) ? (
+		<ReaderSiteNotificationSettings siteId={ siteId } />
+	) : (
+		<ReaderEmailSettings siteId={ siteId } />
+	);
+
 	return (
-		<div
-			className={ classnames( 'reader-subscription-list-item', className, {
-				'has-email-settings': showEmailSettings && isFollowing,
-			} ) }
-		>
+		<div className={ classnames( 'reader-subscription-list-item', className ) }>
 			<div className="reader-subscription-list-item__avatar">
 				<ReaderAvatar
 					siteIcon={ siteIcon }
@@ -134,15 +139,15 @@ function ReaderSubscriptionListItem( {
 					) }
 				{ siteUrl && (
 					<div className="reader-subscription-list-item__site-url-timestamp">
-						<a
+						<ExternalLink
 							href={ siteUrl }
-							target="_blank"
-							rel="noopener noreferrer"
 							className="reader-subscription-list-item__site-url"
 							onClick={ recordSiteUrlClick }
+							icon={ true }
+							iconSize={ 14 }
 						>
 							{ formatUrlForDisplay( siteUrl ) }
-						</a>
+						</ExternalLink>
 						{ showLastUpdatedDate && (
 							<span className="reader-subscription-list-item__timestamp">
 								{ feed && feed.last_update && translate( 'updated %s', { args: lastUpdatedDate } ) }
@@ -159,7 +164,7 @@ function ReaderSubscriptionListItem( {
 					siteId={ siteId }
 					railcar={ railcar }
 				/>
-				{ isFollowing && showEmailSettings && <EmailSettings siteId={ siteId } /> }
+				{ isFollowing && showNotificationSettings && notificationSettings }
 			</div>
 		</div>
 	);

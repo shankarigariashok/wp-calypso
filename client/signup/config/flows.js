@@ -10,11 +10,9 @@ import i18n from 'i18n-calypso';
 /**
  * Internal dependencies
  */
-import { abtest } from 'lib/abtest';
 import config from 'config';
 import stepConfig from './steps';
 import userFactory from 'lib/user';
-
 const user = userFactory();
 
 function getCheckoutUrl( dependencies ) {
@@ -61,50 +59,43 @@ const flows = {
 	},
 
 	business: {
-		steps: [ 'design-type', 'themes', 'domains', 'user' ],
+		steps: [ 'about', 'themes', 'domains', 'user' ],
 		destination: function( dependencies ) {
 			return '/plans/select/business/' + dependencies.siteSlug;
 		},
 		description: 'Create an account and a blog and then add the business plan to the users cart.',
-		lastModified: '2016-06-02',
+		lastModified: '2018-01-24',
 		meta: {
 			skipBundlingPlan: true,
 		},
 	},
 
-	segment: {
-		steps: [ 'about', 'domains', 'plans', 'user' ],
-		destination: getSiteDestination,
-		description: 'A new signup flow for segmenting our users',
-		lastModified: '2017-11-11',
-	},
-
 	premium: {
-		steps: [ 'design-type', 'themes', 'domains', 'user' ],
+		steps: [ 'about', 'themes', 'domains', 'user' ],
 		destination: function( dependencies ) {
 			return '/plans/select/premium/' + dependencies.siteSlug;
 		},
 		description: 'Create an account and a blog and then add the premium plan to the users cart.',
-		lastModified: '2016-06-02',
+		lastModified: '2018-01-24',
 		meta: {
 			skipBundlingPlan: true,
 		},
 	},
 
 	personal: {
-		steps: [ 'design-type', 'themes', 'domains', 'user' ],
+		steps: [ 'about', 'themes', 'domains', 'user' ],
 		destination: function( dependencies ) {
 			return '/plans/select/personal/' + dependencies.siteSlug;
 		},
 		description: 'Create an account and a blog and then add the personal plan to the users cart.',
-		lastModified: '2016-01-21',
+		lastModified: '2018-01-24',
 	},
 
 	free: {
-		steps: [ 'design-type', 'themes', 'domains', 'user' ],
+		steps: [ 'about', 'themes', 'domains', 'user' ],
 		destination: getSiteDestination,
 		description: 'Create an account and a blog and default to the free plan.',
-		lastModified: '2016-06-02',
+		lastModified: '2018-01-24',
 	},
 
 	blog: {
@@ -129,10 +120,10 @@ const flows = {
 	},
 
 	store: {
-		steps: [ 'design-type-with-store', 'domains', 'plans', 'user' ],
+		steps: [ 'about', 'domains', 'plans', 'user' ],
 		destination: getSiteDestination,
 		description: 'Signup flow for creating an online store',
-		lastModified: '2016-06-27',
+		lastModified: '2018-01-24',
 	},
 
 	'rebrand-cities': {
@@ -169,10 +160,10 @@ const flows = {
 	},
 
 	main: {
-		steps: [ 'design-type', 'domains', 'plans', 'user' ],
+		steps: [ 'about', 'domains', 'plans', 'user' ],
 		destination: getSiteDestination,
 		description: 'The current best performing flow in AB tests',
-		lastModified: '2016-05-23',
+		lastModified: '2018-01-24',
 	},
 
 	surveystep: {
@@ -183,7 +174,7 @@ const flows = {
 	},
 
 	'test-site': {
-		steps: config( 'env' ) === 'development' ? [ 'site', 'user' ] : [ 'user' ],
+		steps: process.env.NODE_ENV === 'development' ? [ 'site', 'user' ] : [ 'user' ],
 		destination: '/',
 		description: 'This flow is used to test the site step.',
 		lastModified: '2015-09-22',
@@ -199,28 +190,28 @@ const flows = {
 	},
 
 	'delta-blog': {
-		steps: [ 'design-type', 'themes', 'domains', 'plans', 'user' ],
+		steps: [ 'about', 'themes', 'domains', 'plans', 'user' ],
 		destination: getSiteDestination,
 		description:
 			'A copy of the `blog` flow for the Delta email campaigns. Half of users who go ' +
 			'through this flow receive a blogging-specific drip email series.',
-		lastModified: '2016-03-09',
+		lastModified: '2018-01-24',
 	},
 
 	'delta-site': {
-		steps: [ 'design-type', 'themes', 'domains', 'plans', 'user' ],
+		steps: [ 'about', 'themes', 'domains', 'plans', 'user' ],
 		destination: getSiteDestination,
 		description:
 			'A copy of the `website` flow for the Delta email campaigns. Half of users who go ' +
 			'through this flow receive a website-specific drip email series.',
-		lastModified: '2016-03-09',
+		lastModified: '2018-01-24',
 	},
 
 	desktop: {
-		steps: [ 'design-type', 'themes', 'domains', 'plans', 'user' ],
+		steps: [ 'about', 'themes', 'domains', 'plans', 'user' ],
 		destination: getPostsDestination,
 		description: 'Signup flow for desktop app',
-		lastModified: '2016-05-30',
+		lastModified: '2018-01-24',
 	},
 
 	developer: {
@@ -260,14 +251,52 @@ const flows = {
 		allowContinue: false,
 		hideFlowProgress: true,
 	},
+
+	'rewind-switch': {
+		steps: [ 'rewind-migrate', 'rewind-were-backing' ],
+		destination: () => {
+			return '/stats/activity';
+		},
+		description:
+			'Allows users with Jetpack plan with VaultPress credentials to migrate credentials',
+		lastModified: '2018-01-27',
+		disallowResume: true,
+		allowContinue: false,
+		hideFlowProgress: true,
+	},
+
+	'rewind-setup': {
+		steps: [ 'rewind-add-creds', 'rewind-form-creds', 'rewind-were-backing' ],
+		destination: () => {
+			return '/stats/activity';
+		},
+		description: 'Allows users with Jetpack plan to setup credentials',
+		lastModified: '2018-01-27',
+		disallowResume: true,
+		allowContinue: false,
+		hideFlowProgress: true,
+	},
+
+	'rewind-auto-config': {
+		steps: [ 'creds-permission', 'creds-confirm', 'rewind-were-backing' ],
+		destination: () => {
+			return '/stats/activity';
+		},
+		description:
+			'Allow users of sites that can auto-config to grant permission to server credentials',
+		lastModified: '2018-02-13',
+		disallowResume: true,
+		allowContinue: false,
+		hideFlowProgress: true,
+	},
 };
 
 if ( config.isEnabled( 'signup/atomic-store-flow' ) ) {
 	flows[ 'store-nux' ] = {
-		steps: [ 'design-type-with-store-nux', 'themes', 'domains', 'plans-store-nux', 'user' ],
+		steps: [ 'about', 'themes', 'domains', 'plans-store-nux', 'user' ],
 		destination: getSiteDestination,
 		description: 'Signup flow for creating an online store with an Atomic site',
-		lastModified: '2017-09-27',
+		lastModified: '2018-01-24',
 	};
 }
 
@@ -302,7 +331,7 @@ if ( config.isEnabled( 'signup/domain-first-flow' ) ) {
 	};
 }
 
-if ( config( 'env' ) === 'development' ) {
+if ( process.env.NODE_ENV === 'development' ) {
 	flows[ 'test-plans' ] = {
 		steps: [ 'site', 'plans', 'user' ],
 		destination: getSiteDestination,
@@ -428,6 +457,10 @@ const Flows = {
 		return flows;
 	},
 
+	isValidFlow( flowName ) {
+		return Boolean( Flows.getFlows()[ flowName ] );
+	},
+
 	/**
 	 * Preload AB Test variations after a certain step has been completed.
 	 *
@@ -439,7 +472,7 @@ const Flows = {
 	 * @param {String} flowName The current flow
 	 * @param {String} stepName The step that is being completed right now
 	 */
-	preloadABTestVariationsForStep( flowName, stepName ) {
+	preloadABTestVariationsForStep() {
 		/**
 		 * In cases where the flow is being resumed, the flow must not be changed from what the user
 		 * has seen before.
@@ -455,15 +488,10 @@ const Flows = {
 		 * If there is need to test the first step in a flow,
 		 * the best way to do it is to check for:
 		 *
-		 * 	if ( '' === stepName ) { ... }
+		 * 	if ( 'main' === flowName && '' === stepName ) { ... }
 		 *
 		 * This will be fired at the beginning of the signup flow.
 		 */
-		if ( 'main' === flowName ) {
-			if ( '' === stepName ) {
-				abtest( 'signupSurveyStep' );
-			}
-		}
 	},
 
 	/**
@@ -480,11 +508,8 @@ const Flows = {
 	 */
 	getABTestFilteredFlow( flowName, flow ) {
 		// Only do this on the main flow
-		if ( 'main' === flowName ) {
-			if ( abtest( 'signupSurveyStep' ) === 'showSurveyStep' ) {
-				return Flows.insertStepIntoFlow( 'survey', flow );
-			}
-		}
+		// if ( 'main' === flowName ) {
+		// }
 
 		return flow;
 	},

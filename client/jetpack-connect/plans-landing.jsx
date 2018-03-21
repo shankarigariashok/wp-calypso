@@ -4,23 +4,25 @@
  */
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { connect } from 'react-redux';
 import page from 'page';
+import { connect } from 'react-redux';
 
 /**
  * Internal dependencies
  */
+import { addQueryArgs } from 'lib/route';
 import HelpButton from './help-button';
 import JetpackConnectHappychatButton from './happychat-button';
 import LoggedOutFormLinks from 'components/logged-out-form/links';
+import Placeholder from './plans-placeholder';
 import PlansGrid from './plans-grid';
 import PlansSkipButton from './plans-skip-button';
-import { recordTracksEvent } from 'state/analytics/actions';
-import { selectPlanInAdvance } from 'state/jetpack-connect/actions';
+import QueryPlans from 'components/data/query-plans';
 import { getJetpackSiteByUrl } from 'state/jetpack-connect/selectors';
 import { getSite, isRequestingSites } from 'state/sites/selectors';
-import QueryPlans from 'components/data/query-plans';
-import addQueryArgs from 'lib/route/add-query-args';
+import { PLAN_JETPACK_FREE } from 'lib/plans/constants';
+import { recordTracksEvent } from 'state/analytics/actions';
+import { storePlan } from './persistence-utils';
 
 const CALYPSO_JETPACK_CONNECT = '/jetpack/connect';
 
@@ -66,7 +68,8 @@ class PlansLanding extends Component {
 		this.props.recordTracksEvent( 'calypso_jpc_plans_store_plan', {
 			plan: cartItem ? cartItem.product_slug : 'free',
 		} );
-		this.props.selectPlanInAdvance( cartItem ? cartItem.product_slug : 'free', '*' );
+
+		storePlan( cartItem ? cartItem.product_slug : PLAN_JETPACK_FREE );
 
 		setTimeout( () => {
 			page.redirect( redirectUrl );
@@ -84,12 +87,12 @@ class PlansLanding extends Component {
 	};
 
 	render() {
-		const { basePlansPath, interval, requestingSites, site } = this.props;
+		const { basePlansPath, interval, requestingSites, site, url } = this.props;
 
 		// We're redirecting in componentDidMount if the site is already connected
 		// so don't bother rendering any markup if this is the case
-		if ( site || requestingSites ) {
-			return null;
+		if ( url && ( site || requestingSites ) ) {
+			return <Placeholder />;
 		}
 
 		return (
@@ -128,6 +131,5 @@ export default connect(
 	},
 	{
 		recordTracksEvent,
-		selectPlanInAdvance,
 	}
 )( PlansLanding );

@@ -7,7 +7,7 @@ import React from 'react';
 /**
  * Internal dependencies
  */
-import route from 'lib/route';
+import { sectionify } from 'lib/route';
 import feedStreamFactory from 'lib/feed-stream-store';
 import {
 	ensureStoreLoading,
@@ -16,13 +16,12 @@ import {
 	trackScrollPage,
 } from 'reader/controller-helper';
 import LikedPostsStream from 'reader/liked-stream/main';
-import { renderWithReduxStore } from 'lib/react-helpers';
 
 const analyticsPageTitle = 'Reader';
 
 const exported = {
-	likes( context ) {
-		const basePath = route.sectionify( context.path ),
+	likes( context, next ) {
+		const basePath = sectionify( context.path ),
 			fullAnalyticsPageTitle = analyticsPageTitle + ' > My Likes',
 			likedPostsStore = feedStreamFactory( 'likes' ),
 			mcKey = 'postlike';
@@ -31,22 +30,19 @@ const exported = {
 
 		trackPageLoad( basePath, fullAnalyticsPageTitle, mcKey );
 
-		renderWithReduxStore(
-			React.createElement( LikedPostsStream, {
-				key: 'liked',
-				postsStore: likedPostsStore,
-				trackScrollPage: trackScrollPage.bind(
-					null,
-					basePath,
-					fullAnalyticsPageTitle,
-					analyticsPageTitle,
-					mcKey
-				),
-				onUpdatesShown: trackUpdatesLoaded.bind( null, mcKey ),
-			} ),
-			document.getElementById( 'primary' ),
-			context.store
-		);
+		context.primary = React.createElement( LikedPostsStream, {
+			key: 'liked',
+			postsStore: likedPostsStore,
+			trackScrollPage: trackScrollPage.bind(
+				null,
+				basePath,
+				fullAnalyticsPageTitle,
+				analyticsPageTitle,
+				mcKey
+			),
+			onUpdatesShown: trackUpdatesLoaded.bind( null, mcKey ),
+		} );
+		next();
 	},
 };
 

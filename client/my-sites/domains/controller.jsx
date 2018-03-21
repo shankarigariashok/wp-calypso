@@ -1,11 +1,9 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import page from 'page';
-import qs from 'qs';
+import { stringify } from 'qs';
 import { translate } from 'i18n-calypso';
 import React from 'react';
 import { get } from 'lodash';
@@ -15,14 +13,21 @@ import { get } from 'lodash';
  */
 import analytics from 'lib/analytics';
 import DocumentHead from 'components/data/document-head';
-import route from 'lib/route';
+import { sectionify } from 'lib/route';
 import Main from 'components/main';
-import upgradesActions from 'lib/upgrades/actions';
+import { addItem } from 'lib/upgrades/actions';
 import productsFactory from 'lib/products-list';
-import { renderWithReduxStore } from 'lib/react-helpers';
 import { canCurrentUser } from 'state/selectors';
 import { getSelectedSiteId, getSelectedSite, getSelectedSiteSlug } from 'state/ui/selectors';
 import { getCurrentUser } from 'state/current-user/selectors';
+import CartData from 'components/data/cart';
+import DomainSearch from './domain-search';
+import SiteRedirect from './domain-search/site-redirect';
+import MapDomain from 'my-sites/domains/map-domain';
+import TransferDomain from 'my-sites/domains/transfer-domain';
+import TransferDomainStep from 'components/domains/transfer-domain-step';
+import GoogleApps from 'components/upgrades/google-apps';
+import { domainManagementTransferIn } from 'my-sites/domains/paths';
 
 /**
  * Module variables
@@ -45,10 +50,14 @@ const domainsAddRedirectHeader = ( context, next ) => {
 	next();
 };
 
-const domainSearch = context => {
-	const CartData = require( 'components/data/cart' );
-	const DomainSearch = require( './domain-search' );
-	const basePath = route.sectionify( context.path );
+const redirectToDomainSearchSuggestion = context => {
+	return page.redirect(
+		`/domains/add/${ context.params.domain }?suggestion=${ context.params.suggestion }`
+	);
+};
+
+const domainSearch = ( context, next ) => {
+	const basePath = sectionify( context.path );
 
 	analytics.pageView.record( basePath, 'Domain Search > Domain Registration' );
 
@@ -57,83 +66,97 @@ const domainSearch = context => {
 		window.scrollTo( 0, 0 );
 	}
 
-	renderWithReduxStore(
+	context.primary = (
 		<Main>
 			<DocumentHead title={ translate( 'Domain Search' ) } />
 			<CartData>
 				<DomainSearch basePath={ basePath } context={ context } />
 			</CartData>
-		</Main>,
-		document.getElementById( 'primary' ),
-		context.store
+		</Main>
 	);
+	next();
 };
 
-const siteRedirect = context => {
-	const CartData = require( 'components/data/cart' );
-	const SiteRedirect = require( './domain-search/site-redirect' );
-	const basePath = route.sectionify( context.path );
+const siteRedirect = ( context, next ) => {
+	const basePath = sectionify( context.path );
 
 	analytics.pageView.record( basePath, 'Domain Search > Site Redirect' );
 
-	renderWithReduxStore(
+	context.primary = (
 		<Main>
 			<DocumentHead title={ translate( 'Redirect a Site' ) } />
 			<CartData>
 				<SiteRedirect />
 			</CartData>
-		</Main>,
-		document.getElementById( 'primary' ),
-		context.store
+		</Main>
 	);
+	next();
 };
 
-const mapDomain = context => {
-	const CartData = require( 'components/data/cart' );
-	const MapDomain = require( 'my-sites/domains/map-domain' ).default;
-	const basePath = route.sectionify( context.path );
+const mapDomain = ( context, next ) => {
+	const basePath = sectionify( context.path );
 
 	analytics.pageView.record( basePath, 'Domain Search > Domain Mapping' );
-	renderWithReduxStore(
+	context.primary = (
 		<Main>
 			<DocumentHead title={ translate( 'Map a Domain' ) } />
 
 			<CartData>
 				<MapDomain initialQuery={ context.query.initialQuery } />
 			</CartData>
-		</Main>,
-		document.getElementById( 'primary' ),
-		context.store
+		</Main>
 	);
+	next();
 };
 
-const transferDomain = context => {
-	const CartData = require( 'components/data/cart' );
-	const TransferDomain = require( 'my-sites/domains/transfer-domain' ).default;
-	const basePath = route.sectionify( context.path );
+const transferDomain = ( context, next ) => {
+	const basePath = sectionify( context.path );
 
 	analytics.pageView.record( basePath, 'Domain Search > Domain Transfer' );
-	renderWithReduxStore(
+	context.primary = (
 		<Main>
 			<DocumentHead title={ translate( 'Transfer a Domain' ) } />
 			<CartData>
 				<TransferDomain basePath={ basePath } initialQuery={ context.query.initialQuery } />
 			</CartData>
-		</Main>,
-		document.getElementById( 'primary' ),
-		context.store
+		</Main>
 	);
+	next();
 };
 
-const googleAppsWithRegistration = context => {
-	const CartData = require( 'components/data/cart' );
-	const GoogleApps = require( 'components/upgrades/google-apps' );
+const transferDomainPrecheck = ( context, next ) => {
+	const basePath = sectionify( context.path );
+	const state = context.store.getState();
+	const siteSlug = getSelectedSiteSlug( state ) || '';
+	const domain = get( context, 'params.domain', '' );
 
+	const handleGoBack = () => {
+		page( domainManagementTransferIn( siteSlug, domain ) );
+	};
+
+	analytics.pageView.record( basePath, 'My Sites > Domains > Selected Domain' );
+	context.primary = (
+		<Main>
+			<CartData>
+				<div>
+					<TransferDomainStep
+						forcePrecheck={ true }
+						initialQuery={ domain }
+						goBack={ handleGoBack }
+					/>
+				</div>
+			</CartData>
+		</Main>
+	);
+	next();
+};
+
+const googleAppsWithRegistration = ( context, next ) => {
 	const state = context.store.getState();
 	const siteSlug = getSelectedSiteSlug( state ) || '';
 
 	const handleAddGoogleApps = googleAppsCartItem => {
-		upgradesActions.addItem( googleAppsCartItem );
+		addItem( googleAppsCartItem );
 		page( '/checkout/' + siteSlug );
 	};
 
@@ -150,7 +173,7 @@ const googleAppsWithRegistration = context => {
 		'Domain Search > Domain Registration > Google Apps'
 	);
 
-	renderWithReduxStore(
+	context.primary = (
 		<Main>
 			<DocumentHead
 				title={ translate( 'Register %(domain)s', {
@@ -166,10 +189,9 @@ const googleAppsWithRegistration = context => {
 					onClickSkip={ handleClickSkip }
 				/>
 			</CartData>
-		</Main>,
-		document.getElementById( 'primary' ),
-		context.store
+		</Main>
 	);
+	next();
 };
 
 const redirectIfNoSite = redirectTo => {
@@ -194,7 +216,7 @@ const redirectToAddMappingIfVipSite = () => {
 		const state = context.store.getState();
 		const selectedSite = getSelectedSite( state );
 		const domain = context.params.domain ? `/${ context.params.domain }` : '';
-		const query = qs.stringify( { initialQuery: context.params.suggestion } );
+		const query = stringify( { initialQuery: context.params.suggestion } );
 
 		if ( selectedSite && selectedSite.is_vip ) {
 			return page.redirect( `/domains/add/mapping${ domain }?${ query }` );
@@ -213,5 +235,7 @@ export default {
 	googleAppsWithRegistration,
 	redirectIfNoSite,
 	redirectToAddMappingIfVipSite,
+	redirectToDomainSearchSuggestion,
 	transferDomain,
+	transferDomainPrecheck,
 };

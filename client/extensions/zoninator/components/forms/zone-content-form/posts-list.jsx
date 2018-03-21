@@ -90,8 +90,10 @@ class PostsList extends Component {
 							<SortableList direction="vertical" onChange={ this.changePostOrder( fields ) }>
 								{ posts.map( ( post, index ) => (
 									<PostCard
-										key={ index }
-										post={ post }
+										key={ post.id }
+										postId={ post.id }
+										postTitle={ post.title }
+										siteId={ post.siteId }
 										remove={ this.removePost( fields, index ) }
 									/>
 								) ) }

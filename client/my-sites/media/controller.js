@@ -10,18 +10,17 @@ import i18n from 'i18n-calypso';
 /**
  * Internal Dependencies
  */
-import route from 'lib/route';
+import { sectionify } from 'lib/route';
 import analytics from 'lib/analytics';
 import { setDocumentHeadTitle as setTitle } from 'state/document-head/actions';
-import { renderWithReduxStore } from 'lib/react-helpers';
 import { getSelectedSite } from 'state/ui/selectors';
+import MediaComponent from 'my-sites/media/main';
 
 export default {
-	media: function( context ) {
-		var MediaComponent = require( 'my-sites/media/main' ),
-			filter = context.params.filter,
-			search = context.query.s,
-			baseAnalyticsPath = route.sectionify( context.path );
+	media: function( context, next ) {
+		const filter = context.params.filter;
+		const search = context.query.s;
+		let baseAnalyticsPath = sectionify( context.path );
 
 		const state = context.store.getState();
 		const selectedSite = getSelectedSite( state );
@@ -37,14 +36,11 @@ export default {
 		context.store.dispatch( setTitle( i18n.translate( 'Media', { textOnly: true } ) ) );
 
 		// Render
-		renderWithReduxStore(
-			React.createElement( MediaComponent, {
-				selectedSite,
-				filter: filter,
-				search: search,
-			} ),
-			document.getElementById( 'primary' ),
-			context.store
-		);
+		context.primary = React.createElement( MediaComponent, {
+			selectedSite,
+			filter: filter,
+			search: search,
+		} );
+		next();
 	},
 };

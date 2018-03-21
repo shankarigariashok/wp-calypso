@@ -1,5 +1,4 @@
 {
-	"additionalProperties": false,
 	"type": "object",
 	"required": [ "itemsPerPage", "page", "totalItems", "totalPages" ],
 	"properties": {
@@ -9,14 +8,16 @@
 		"itemsPerPage": { "type": "integer" },
 		"last": { "type": "string" },
 		"page": { "type": "integer" },
+		"nextAfter": { "type": "array" },
+		"prevBefore": { "type": "array" },
 		"summary": { "type": "string" },
 		"totalItems": { "type": "integer" },
 		"totalPages": { "type": "integer" },
+		"oldestItemTs": { "type": "integer" },
 		"type": { "type": "string" },
 		"current": {
-			"additionalProperties": false,
 			"type": "object",
-			"required": [ "orderedItems", "totalItems" ],
+			"required": [ "totalItems" ],
 			"properties": {
 				"id": { "type": "string" },
 				"next": { "type": "string" },
@@ -37,7 +38,6 @@
 			"properties": {
 				"activity_id": { "type": "string" },
 				"actor": {
-					"additionalProperties": false,
 					"type": "object",
 					"required": [ "type", "name" ],
 					"properties": {
@@ -57,8 +57,14 @@
 						"wpcom_user_id": { "type": "integer" }
 					}
 				},
+				"content": { "type": "object" },
+				"formatted_content": {
+					"name": { "type": "string" },
+					"content": { "type": "object" }
+				},
 				"generator": { "type": "object" },
 				"gridicon": { "type": "string" },
+				"is_discarded": { "type": "boolean" },
 				"is_rewindable": { "type": "boolean" },
 				"rewind_id": { "type": [ "null", "string" ] },
 				"items": {
@@ -77,15 +83,14 @@
 						}
 					]
 				},
-				"summary": { "type": "string" },
+				"summary": { "type": [ "object", "string" ] },
 				"target": { "type": "object" },
 				"target_ts": { "type": "number" },
 				"totalItems": {
 					"min": 0,
 					"type": "integer"},
 				"type": { "type": "string" }
-			},
-			"additionalProperties": false
+			}
 		}
 	}
 }

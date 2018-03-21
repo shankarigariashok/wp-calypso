@@ -1,28 +1,31 @@
 /** @format */
+/**
+ * External dependencies
+ */
+import { defer } from 'lodash';
 
 /**
  * Internal dependencies
  */
-
 import { action as ActionTypes } from '../constants';
 import Dispatcher from 'dispatcher';
-import storeTransactions from 'lib/store-transactions';
+import { submit } from 'lib/store-transactions';
 
-function setDomainDetails( domainDetails ) {
+export function setDomainDetails( domainDetails ) {
 	Dispatcher.handleViewAction( {
 		type: ActionTypes.TRANSACTION_DOMAIN_DETAILS_SET,
 		domainDetails,
 	} );
 }
 
-function setPayment( payment ) {
+export function setPayment( payment ) {
 	Dispatcher.handleViewAction( {
 		type: ActionTypes.TRANSACTION_PAYMENT_SET,
 		payment,
 	} );
 }
 
-function setNewCreditCardDetails( options ) {
+export function setNewCreditCardDetails( options ) {
 	const { rawDetails, maskedDetails } = options;
 
 	Dispatcher.handleViewAction( {
@@ -32,35 +35,32 @@ function setNewCreditCardDetails( options ) {
 	} );
 }
 
-function submitTransaction( { cart, transaction }, onComplete ) {
-	const steps = storeTransactions.submit( {
-		cart: cart,
-		payment: transaction.payment,
-		domainDetails: transaction.domainDetails,
-	} );
+export function submitTransaction( { cart, transaction }, onComplete ) {
+	submit(
+		{
+			cart: cart,
+			payment: transaction.payment,
+			domainDetails: transaction.domainDetails,
+		},
+		// Execute every step handler in its own event loop tick, so that a complete React
+		// rendering cycle happens on each step and `componentWillReceiveProps` of objects
+		// like the `TransactionStepsMixin` are called with every step.
+		step =>
+			defer( () => {
+				Dispatcher.handleViewAction( {
+					type: ActionTypes.TRANSACTION_STEP_SET,
+					step,
+				} );
 
-	steps.on( 'data', step => {
-		Dispatcher.handleViewAction( {
-			type: ActionTypes.TRANSACTION_STEP_SET,
-			step,
-		} );
-
-		if ( onComplete && step.name === 'received-wpcom-response' ) {
-			onComplete( step.error, step.data );
-		}
-	} );
+				if ( onComplete && step.name === 'received-wpcom-response' ) {
+					onComplete( step.error, step.data );
+				}
+			} )
+	);
 }
 
-function resetTransaction() {
+export function resetTransaction() {
 	Dispatcher.handleViewAction( {
 		type: ActionTypes.TRANSACTION_RESET,
 	} );
 }
-
-export {
-	resetTransaction,
-	setDomainDetails,
-	setNewCreditCardDetails,
-	setPayment,
-	submitTransaction,
-};

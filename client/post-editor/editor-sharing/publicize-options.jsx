@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import PropTypes from 'prop-types';
 import { localize } from 'i18n-calypso';
 import React from 'react';
@@ -18,20 +16,18 @@ import Gridicon from 'gridicons';
 import QueryPostTypes from 'components/data/query-post-types';
 import PublicizeMessage from './publicize-message';
 import PublicizeServices from './publicize-services';
-import * as paths from 'lib/paths';
+import { publicizeConnections } from 'lib/paths';
 import PostMetadata from 'lib/post-metadata';
 import PopupMonitor from 'lib/popup-monitor';
 import Button from 'components/button';
-import siteUtils from 'lib/site/utils';
 import { recordStat, recordEvent } from 'lib/posts/stats';
 import { getSelectedSiteId } from 'state/ui/selectors';
 import { getEditorPostId } from 'state/ui/editor/selectors';
-import { isJetpackModuleActive } from 'state/sites/selectors';
 import { getEditedPostValue } from 'state/posts/selectors';
-import { postTypeSupports } from 'state/post-types/selectors';
 import { getCurrentUserId } from 'state/current-user/selectors';
 import { getSiteUserConnections } from 'state/sharing/publicize/selectors';
 import { fetchConnections as requestConnections } from 'state/sharing/publicize/actions';
+import { canCurrentUser, isPublicizeEnabled } from 'state/selectors';
 
 class EditorSharingPublicizeOptions extends React.Component {
 	static propTypes = {
@@ -44,7 +40,6 @@ class EditorSharingPublicizeOptions extends React.Component {
 	};
 
 	connectionPopupMonitor = false;
-	jetpackModulePopupMonitor = false;
 
 	hasConnections = () => {
 		return this.props.connections && this.props.connections.length;
@@ -54,20 +49,14 @@ class EditorSharingPublicizeOptions extends React.Component {
 		if ( this.connectionPopupMonitor ) {
 			this.connectionPopupMonitor.off( 'close', this.onNewConnectionPopupClosed );
 		}
-
-		if ( this.jetpackModulePopupMonitor ) {
-			this.jetpackModulePopupMonitor.off( 'close', this.onModuleConnectionPopupClosed );
-		}
 	}
 
 	newConnectionPopup = () => {
-		let href;
-
 		if ( ! this.props.site ) {
 			return;
 		}
 
-		href = paths.publicizeConnections( this.props.site );
+		const href = publicizeConnections( this.props.site );
 
 		if ( ! this.connectionPopupMonitor ) {
 			this.connectionPopupMonitor = new PopupMonitor();
@@ -87,38 +76,6 @@ class EditorSharingPublicizeOptions extends React.Component {
 		recordEvent( 'Opened Create New Sharing Service Dialog' );
 	};
 
-	jetpackModulePopup = () => {
-		let href;
-
-		if ( ! this.props.site || ! this.props.site.jetpack ) {
-			return;
-		}
-
-		href = paths.jetpackModules( this.props.site, 'publicize' );
-
-		if ( ! this.jetpackModulePopupMonitor ) {
-			this.jetpackModulePopupMonitor = new PopupMonitor();
-		}
-
-		this.jetpackModulePopupMonitor.open( href );
-		this.jetpackModulePopupMonitor.once( 'close', this.onModuleConnectionPopupClosed );
-	};
-
-	onModuleConnectionPopupClosed = () => {
-		if ( ! this.props.site || ! this.props.site.jetpack ) {
-			return;
-		}
-
-		// Refresh the list of connections so that the user is given the latest
-		// possible state.  Also prevents a possible infinite loading state due
-		// to connections previously returning a 400 error
-		this.props.site.once( 'change', () => {
-			if ( this.props.isPublicizeEnabled ) {
-				this.props.requestConnections( this.props.site.ID );
-			}
-		} );
-	};
-
 	renderServices = () => {
 		if ( ! this.props.site || ! this.hasConnections() ) {
 			return;
@@ -132,12 +89,12 @@ class EditorSharingPublicizeOptions extends React.Component {
 	renderMessage = () => {
 		const skipped = this.hasConnections() ? PostMetadata.publicizeSkipped( this.props.post ) : [],
 			targeted = this.hasConnections()
-				? this.props.connections.filter( function( connection ) {
-						return skipped && -1 === skipped.indexOf( connection.keyring_connection_ID );
-					} )
+				? this.props.connections.filter(
+						connection => skipped && -1 === skipped.indexOf( connection.keyring_connection_ID )
+					)
 				: [],
 			requireCount = includes( map( targeted, 'service' ), 'twitter' ),
-			acceptableLength = requireCount ? 140 - 23 - 23 : null;
+			acceptableLength = requireCount ? 280 - 23 - 23 : null;
 
 		if ( ! this.hasConnections() ) {
 			return;
@@ -154,7 +111,7 @@ class EditorSharingPublicizeOptions extends React.Component {
 
 	renderAddNewButton = () => {
 		// contributors cannot create publicize connections
-		if ( ! siteUtils.userCan( 'publish_posts', this.props.site ) ) {
+		if ( ! this.props.canUserPublishPosts ) {
 			return;
 		}
 
@@ -171,7 +128,7 @@ class EditorSharingPublicizeOptions extends React.Component {
 	renderInfoNotice = () => {
 		// don't show the message if the are no connections
 		// and the user is not allowed to add any
-		if ( ! this.hasConnections() && ! siteUtils.userCan( 'publish_posts', this.props.site ) ) {
+		if ( ! this.hasConnections() && ! this.props.canUserPublishPosts ) {
 			return;
 		}
 
@@ -184,48 +141,14 @@ class EditorSharingPublicizeOptions extends React.Component {
 		);
 	};
 
-	dismissRepublicizeMessage = () => {
-		this.props.dismissShareConfirmation( this.props.siteId, this.props.post.ID );
-	};
-
 	render() {
 		if ( ! this.props.isPublicizeEnabled ) {
 			return null;
 		}
 
-		if ( this.props.site && this.props.site.options.publicize_permanently_disabled ) {
-			return (
-				<div className="editor-sharing__publicize-disabled">
-					<p>
-						<span>{ this.props.translate( 'Publicize is disabled on this site.' ) }</span>
-					</p>
-				</div>
-			);
-		}
-
-		if ( this.props.site && this.props.site.jetpack && ! this.props.isPublicizeEnabled ) {
-			return (
-				<div className="editor-sharing__publicize-disabled">
-					<p>
-						<span>
-							{ this.props.translate(
-								'Enable the Publicize module to automatically share new posts to social networks.'
-							) }
-						</span>
-					</p>
-					<button
-						className="editor-sharing__jetpack-modules-button button is-secondary"
-						onClick={ this.jetpackModulePopup }
-					>
-						{ this.props.translate( 'View Module Settings' ) }
-					</button>
-				</div>
-			);
-		}
-
 		const classes = classNames( 'editor-sharing__publicize-options', {
 			'has-connections': this.hasConnections(),
-			'has-add-option': siteUtils.userCan( 'publish_posts', this.props.site ),
+			'has-add-option': this.props.canUserPublishPosts,
 		} );
 
 		return (
@@ -246,13 +169,13 @@ export default connect(
 		const userId = getCurrentUserId( state );
 		const postId = getEditorPostId( state );
 		const postType = getEditedPostValue( state, siteId, postId, 'type' );
-		const isPublicizeEnabled =
-			false !== isJetpackModuleActive( state, siteId, 'publicize' ) &&
-			postTypeSupports( state, siteId, postType, 'publicize' );
+
+		const canUserPublishPosts = canCurrentUser( state, siteId, 'publish_posts' );
 
 		return {
 			siteId,
-			isPublicizeEnabled,
+			isPublicizeEnabled: isPublicizeEnabled( state, siteId, postType ),
+			canUserPublishPosts,
 			connections: getSiteUserConnections( state, siteId, userId ),
 		};
 	},

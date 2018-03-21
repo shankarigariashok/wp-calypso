@@ -5,10 +5,12 @@
  */
 
 import { get, isObject, merge } from 'lodash';
+import { translate } from 'i18n-calypso';
 
 /**
  * Internal dependencies
  */
+import { getCurrencyFormatString } from 'woocommerce/lib/currency';
 import { getOrder } from 'woocommerce/state/sites/orders/selectors';
 import { getSelectedSiteId } from 'state/ui/selectors';
 
@@ -52,6 +54,38 @@ export const getOrdersCurrentSearch = ( state, siteId = getSelectedSiteId( state
 };
 
 /**
+ * Get a default order "frame", so we have values for components.
+ * @return {Object} The local edits made to the current order
+ */
+export const getDefaultEmptyOrder = () => {
+	const currency = 'USD';
+	const zero = getCurrencyFormatString( 0, currency );
+
+	return {
+		status: 'pending',
+		currency: currency,
+		discount_total: zero,
+		discount_tax: zero,
+		shipping_total: zero,
+		shipping_tax: zero,
+		cart_tax: zero,
+		total: zero,
+		total_tax: zero,
+		prices_include_tax: false,
+		billing: {},
+		shipping: {},
+		payment_method: 'calypso_manual',
+		payment_method_title: translate( 'Manual Payment' ),
+		line_items: [],
+		tax_lines: [],
+		shipping_lines: [],
+		fee_lines: [],
+		coupon_lines: [],
+		refunds: [],
+	};
+};
+
+/**
  * @param {Object} state Whole Redux state tree
  * @param {Number} [siteId] Site ID to check. If not provided, the Site ID selected in the UI will be used
  * @return {Object} The local edits made to the current order
@@ -75,7 +109,8 @@ export const getOrderWithEdits = ( state, siteId = getSelectedSiteId( state ) ) 
 
 	// If there is no existing order, the edits are returned as the entire order.
 	if ( isObject( orderId ) ) {
-		return { ...orderEdits, id: orderId };
+		const emptyOrder = getDefaultEmptyOrder();
+		return { ...emptyOrder, ...orderEdits, id: orderId };
 	}
 
 	const order = getOrder( state, orderId, siteId );

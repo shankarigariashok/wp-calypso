@@ -10,6 +10,8 @@ import { without } from 'lodash';
  * Internal dependencies
  */
 import {
+	POST_TYPE_LIST_LIKES_POPOVER_HIDE,
+	POST_TYPE_LIST_LIKES_POPOVER_TOGGLE,
 	POST_TYPE_LIST_MULTI_SELECTION_MODE_TOGGLE,
 	POST_TYPE_LIST_SELECTION_TOGGLE,
 	POST_TYPE_LIST_SHARE_PANEL_HIDE,
@@ -18,7 +20,8 @@ import {
 } from 'state/action-types';
 
 const initialState = {
-	activeSharePanels: [],
+	postIdWithActiveSharePanel: null,
+	postIdWithActiveLikesPopover: null,
 	isMultiSelectEnabled: false,
 	selectedPosts: [],
 };
@@ -48,25 +51,44 @@ export const postTypeList = ( state = initialState, action ) => {
 			return {
 				...state,
 				isMultiSelectEnabled: false,
+				postIdWithActiveLikesPopover: null,
 				selectedPosts: [],
+			};
+
+		case POST_TYPE_LIST_LIKES_POPOVER_HIDE:
+			return {
+				...state,
+				postIdWithActiveLikesPopover: null,
+			};
+
+		case POST_TYPE_LIST_LIKES_POPOVER_TOGGLE:
+			if ( state.postIdWithActiveLikesPopover === action.postGlobalId ) {
+				return {
+					...state,
+					postIdWithActiveLikesPopover: null,
+				};
+			}
+			return {
+				...state,
+				postIdWithActiveLikesPopover: action.postGlobalId,
 			};
 
 		case POST_TYPE_LIST_SHARE_PANEL_HIDE:
 			return {
 				...state,
-				activeSharePanels: without( state.activeSharePanels, action.postGlobalId ),
+				postIdWithActiveSharePanel: null,
 			};
 
 		case POST_TYPE_LIST_SHARE_PANEL_TOGGLE:
-			if ( state.activeSharePanels.indexOf( action.postGlobalId ) > -1 ) {
+			if ( state.postIdWithActiveSharePanel === action.postGlobalId ) {
 				return {
 					...state,
-					activeSharePanels: without( state.activeSharePanels, action.postGlobalId ),
+					postIdWithActiveSharePanel: null,
 				};
 			}
 			return {
 				...state,
-				activeSharePanels: [ action.postGlobalId ],
+				postIdWithActiveSharePanel: action.postGlobalId,
 			};
 	}
 

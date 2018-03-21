@@ -30,10 +30,13 @@ function getExistingLineItem( item, order ) {
 	const existingLineItem = find( lineItems, matchedItem );
 	if ( existingLineItem ) {
 		const quantity = existingLineItem.quantity + 1;
-		const subtotal = getOrderItemCost( order, existingLineItem.id ) * quantity;
-		existingLineItem.quantity = quantity;
+		let subtotal = getOrderItemCost( order, existingLineItem.id ) * quantity;
+		if ( 0 === subtotal ) {
+			subtotal = item.price * quantity;
+		}
 		existingLineItem.subtotal = subtotal;
 		existingLineItem.total = subtotal;
+		existingLineItem.quantity = quantity;
 		return existingLineItem;
 	}
 	return false;
@@ -41,7 +44,7 @@ function getExistingLineItem( item, order ) {
 
 function createLineItem( item, allProducts ) {
 	const line = {
-		id: uniqueId( 'fee_' ),
+		id: uniqueId( 'product_' ),
 		name: item.name || '',
 		price: item.price,
 		subtotal: item.price,
@@ -67,7 +70,10 @@ class OrderProductDialog extends Component {
 		isVisible: PropTypes.bool.isRequired,
 		editOrder: PropTypes.func.isRequired,
 		order: PropTypes.shape( {
-			id: PropTypes.number.isRequired,
+			id: PropTypes.oneOfType( [
+				PropTypes.number, // A number indicates an existing order
+				PropTypes.shape( { id: PropTypes.string } ), // Placeholders have format { id: 'order_1' }
+			] ).isRequired,
 		} ),
 		siteId: PropTypes.number.isRequired,
 		translate: PropTypes.func.isRequired,

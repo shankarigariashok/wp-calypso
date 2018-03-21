@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import React from 'react'; // eslint-disable-line no-unused-vars
 import debugFactory from 'debug';
 import { defer, isEqual, pick } from 'lodash';
@@ -14,17 +12,19 @@ const debug = debugFactory( 'calypso:my-sites:upgrades:checkout:transaction-step
  * Internal dependencies
  */
 import analytics from 'lib/analytics';
-import adTracking from 'lib/analytics/ad-tracking';
+import { recordOrder } from 'lib/analytics/ad-tracking';
+import { getTld } from 'lib/domains';
 import { cartItems } from 'lib/cart-values';
 import { displayError, clear } from 'lib/upgrades/notices';
-import upgradesActions from 'lib/upgrades/actions';
+import { submitTransaction } from 'lib/upgrades/actions';
 import { removeNestedProperties } from 'lib/cart/store/cart-analytics';
+import { INPUT_VALIDATION } from 'lib/store-transactions/step-types';
 
 const TransactionStepsMixin = {
 	submitTransaction: function( event ) {
 		event.preventDefault();
 
-		upgradesActions.submitTransaction( pick( this.props, [ 'cart', 'transaction' ] ) );
+		submitTransaction( pick( this.props, [ 'cart', 'transaction' ] ) );
 	},
 
 	componentWillReceiveProps: function( nextProps ) {
@@ -49,7 +49,7 @@ const TransactionStepsMixin = {
 
 	_displayNotices: function( cart, step ) {
 		if ( step.error ) {
-			displayError( step.error );
+			step.name !== INPUT_VALIDATION && displayError( step.error );
 			return;
 		}
 
@@ -80,7 +80,7 @@ const TransactionStepsMixin = {
 			case 'received-wpcom-response':
 				if ( step.error ) {
 					analytics.tracks.recordEvent( 'calypso_checkout_payment_error', {
-						reason: step.error.message,
+						reason: this._formatError( step.error ),
 					} );
 
 					this._recordDomainRegistrationAnalytics( {
@@ -91,7 +91,7 @@ const TransactionStepsMixin = {
 					// Makes sure free trials are not recorded as purchases in ad trackers since they are products with
 					// zero-value cost and would thus lead to a wrong computation of conversions
 					if ( ! cartItems.hasFreeTrial( cartValue ) ) {
-						adTracking.recordOrder( cartValue, step.data.receipt_id );
+						recordOrder( cartValue, step.data.receipt_id );
 					}
 
 					analytics.tracks.recordEvent( 'calypso_checkout_payment_success', {
@@ -118,7 +118,7 @@ const TransactionStepsMixin = {
 			default:
 				if ( step.error ) {
 					analytics.tracks.recordEvent( 'calypso_checkout_payment_error', {
-						reason: step.error.message,
+						reason: this._formatError( step.error ),
 					} );
 				}
 		}
@@ -130,7 +130,8 @@ const TransactionStepsMixin = {
 
 		cartItems.getDomainRegistrations( cart ).forEach( function( cartItem ) {
 			analytics.tracks.recordEvent( 'calypso_domain_registration', {
-				domain_tld: cartItems.getDomainRegistrationTld( cartItem ),
+				domain_name: cartItem.meta,
+				domain_tld: getTld( cartItem.meta ),
 				success: success,
 			} );
 		} );
@@ -145,6 +146,22 @@ const TransactionStepsMixin = {
 			// The Thank You page throws a rendering error if this is not in a defer.
 			this.props.handleCheckoutCompleteRedirect();
 		} );
+	},
+
+	_formatError: function( error ) {
+		let formatedMessage = '';
+
+		if ( typeof error.message === 'object' ) {
+			formatedMessage += Object.keys( error.message ).join( ', ' );
+		} else if ( typeof error.message === 'string' ) {
+			formatedMessage += error.message;
+		}
+
+		if ( error.error ) {
+			formatedMessage = error.error + ': ' + formatedMessage;
+		}
+
+		return formatedMessage;
 	},
 };
 

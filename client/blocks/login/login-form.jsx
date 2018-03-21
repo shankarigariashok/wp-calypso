@@ -3,14 +3,16 @@
 /**
  * External dependencies
  */
-
 import classNames from 'classnames';
-import { capitalize, defer } from 'lodash';
+import { capitalize, defer, includes } from 'lodash';
+import page from 'page';
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import ReactDom from 'react-dom';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
-import qs from 'qs';
+import Gridicon from 'gridicons';
+import { stringify } from 'qs';
 
 /**
  * Internal dependencies
@@ -19,76 +21,93 @@ import config from 'config';
 import FormsButton from 'components/forms/form-button';
 import FormInputValidation from 'components/forms/form-input-validation';
 import Card from 'components/card';
+import { fetchMagicLoginRequestEmail } from 'state/login/magic-login/actions';
 import FormPasswordInput from 'components/forms/form-password-input';
 import FormTextInput from 'components/forms/form-text-input';
-import { getCurrentQueryArguments } from 'state/ui/selectors';
+import getInitialQueryArguments from 'state/selectors/get-initial-query-arguments';
 import { getCurrentUserId } from 'state/current-user/selectors';
 import { getCurrentOAuth2Client } from 'state/ui/oauth2-clients/selectors';
-import { loginUser, formUpdate } from 'state/login/actions';
-import { preventWidows } from 'lib/formatting';
-import { recordTracksEvent } from 'state/analytics/actions';
 import {
+	formUpdate,
+	getAuthAccountType,
+	loginUser,
+	resetAuthAccountType,
+} from 'state/login/actions';
+import { login } from 'lib/paths';
+import { preventWidows } from 'lib/formatting';
+import { recordTracksEventWithClientId as recordTracksEvent } from 'state/analytics/actions';
+import {
+	getAuthAccountType as getAuthAccountTypeSelector,
+	getRedirectToOriginal,
 	getRequestError,
-	isFormDisabled,
 	getSocialAccountIsLinking,
 	getSocialAccountLinkEmail,
 	getSocialAccountLinkService,
+	isFormDisabled as isFormDisabledSelector,
 } from 'state/login/selectors';
+import { isPasswordlessAccount, isRegularAccount } from 'state/login/utils';
 import Notice from 'components/notice';
 import SocialLoginForm from './social';
 
 export class LoginForm extends Component {
 	static propTypes = {
+		accountType: PropTypes.string,
+		disableAutoFocus: PropTypes.bool,
+		fetchMagicLoginRequestEmail: PropTypes.func.isRequired,
 		formUpdate: PropTypes.func.isRequired,
+		getAuthAccountType: PropTypes.func.isRequired,
+		hasAccountTypeLoaded: PropTypes.bool.isRequired,
+		isFormDisabled: PropTypes.bool,
 		isLoggedIn: PropTypes.bool.isRequired,
 		loginUser: PropTypes.func.isRequired,
+		oauth2Client: PropTypes.object,
 		onSuccess: PropTypes.func.isRequired,
 		privateSite: PropTypes.bool,
 		redirectTo: PropTypes.string,
 		requestError: PropTypes.object,
+		resetAuthAccountType: PropTypes.func.isRequired,
 		socialAccountIsLinking: PropTypes.bool,
 		socialAccountLinkEmail: PropTypes.string,
 		socialAccountLinkService: PropTypes.string,
-		userEmail: PropTypes.string,
-		translate: PropTypes.func.isRequired,
-		isFormDisabled: PropTypes.bool,
-		oauth2Client: PropTypes.object,
 		socialService: PropTypes.string,
 		socialServiceResponse: PropTypes.object,
+		translate: PropTypes.func.isRequired,
+		userEmail: PropTypes.string,
 	};
 
 	state = {
-		isDisabledWhileLoading: true,
+		isFormDisabledWhileLoading: true,
 		usernameOrEmail: this.props.socialAccountLinkEmail || this.props.userEmail || '',
 		password: '',
 	};
 
 	componentDidMount() {
+		const { disableAutoFocus } = this.props;
 		// eslint-disable-next-line react/no-did-mount-set-state
-		this.setState( { isDisabledWhileLoading: false }, () => {
-			if ( this.usernameOrEmail ) {
-				this.usernameOrEmail.focus();
-			}
+		this.setState( { isFormDisabledWhileLoading: false }, () => {
+			! disableAutoFocus && this.usernameOrEmail && this.usernameOrEmail.focus();
 		} );
 	}
 
 	componentDidUpdate( prevProps ) {
-		const { requestError } = this.props;
+		const { disableAutoFocus, requestError } = this.props;
 
 		if ( prevProps.requestError || ! requestError ) {
 			return;
 		}
 
 		if ( requestError.field === 'password' ) {
-			defer( () => this.password.focus() );
+			! disableAutoFocus && defer( () => this.password && this.password.focus() );
 		}
 
 		if ( requestError.field === 'usernameOrEmail' ) {
-			defer( () => this.usernameOrEmail && this.usernameOrEmail.focus() );
+			! disableAutoFocus && defer( () => this.usernameOrEmail && this.usernameOrEmail.focus() );
 		}
 	}
 
 	componentWillReceiveProps( nextProps ) {
+		const { disableAutoFocus } = this.props;
+
 		if (
 			this.props.socialAccountIsLinking !== nextProps.socialAccountIsLinking &&
 			nextProps.socialAccountIsLinking
@@ -97,19 +116,72 @@ export class LoginForm extends Component {
 				this.setState( { usernameOrEmail: nextProps.socialAccountLinkEmail } );
 			}
 		}
+
+		if ( this.props.hasAccountTypeLoaded && ! nextProps.hasAccountTypeLoaded ) {
+			this.setState( { password: '' } );
+
+			! disableAutoFocus && defer( () => this.usernameOrEmail && this.usernameOrEmail.focus() );
+		}
+
+		if ( ! this.props.hasAccountTypeLoaded && isRegularAccount( nextProps.accountType ) ) {
+			! disableAutoFocus && defer( () => this.password && this.password.focus() );
+		}
+
+		if ( ! this.props.hasAccountTypeLoaded && isPasswordlessAccount( nextProps.accountType ) ) {
+			this.props.recordTracksEvent( 'calypso_login_block_login_form_send_magic_link' );
+
+			this.props
+				.fetchMagicLoginRequestEmail( this.state.usernameOrEmail, nextProps.redirectTo )
+				.then( () => {
+					this.props.recordTracksEvent( 'calypso_login_block_login_form_send_magic_link_success' );
+				} )
+				.catch( error => {
+					this.props.recordTracksEvent( 'calypso_login_block_login_form_send_magic_link_failure', {
+						error_code: error.error,
+						error_message: error.message,
+					} );
+				} );
+
+			page( login( { isNative: true, twoFactorAuthType: 'link' } ) );
+		}
 	}
 
 	onChangeField = event => {
 		this.props.formUpdate();
+
 		this.setState( {
 			[ event.target.name ]: event.target.value,
 		} );
 	};
 
-	onSubmitForm = event => {
+	isFullView() {
+		const { accountType, hasAccountTypeLoaded, socialAccountIsLinking } = this.props;
+
+		return socialAccountIsLinking || ( hasAccountTypeLoaded && isRegularAccount( accountType ) );
+	}
+
+	isPasswordView() {
+		const { accountType, hasAccountTypeLoaded, socialAccountIsLinking } = this.props;
+
+		return ! socialAccountIsLinking && hasAccountTypeLoaded && isRegularAccount( accountType );
+	}
+
+	isUsernameOrEmailView() {
+		const { hasAccountTypeLoaded, socialAccountIsLinking } = this.props;
+
+		return ! socialAccountIsLinking && ! hasAccountTypeLoaded;
+	}
+
+	resetView = event => {
 		event.preventDefault();
 
-		const { usernameOrEmail, password } = this.state;
+		this.props.recordTracksEvent( 'calypso_login_block_login_form_change_username_or_email' );
+
+		this.props.resetAuthAccountType();
+	};
+
+	loginUser() {
+		const { password, usernameOrEmail } = this.state;
 		const { onSuccess, redirectTo } = this.props;
 
 		this.props.recordTracksEvent( 'calypso_login_block_login_form_submit' );
@@ -127,6 +199,27 @@ export class LoginForm extends Component {
 					error_message: error.message,
 				} );
 			} );
+	}
+
+	onSubmitForm = event => {
+		event.preventDefault();
+
+		if ( ! this.props.hasAccountTypeLoaded ) {
+			// Google Chrome on iOS will autofill without sending events, leading the user
+			// to see a filled box but getting an error. We fetch the value directly from
+			// the DOM as a workaround.
+			const usernameOrEmail = ReactDom.findDOMNode( this.usernameOrEmail ).value;
+
+			this.props.getAuthAccountType( usernameOrEmail );
+
+			this.setState( {
+				usernameOrEmail,
+			} );
+
+			return;
+		}
+
+		this.loginUser();
 	};
 
 	shouldUseRedirectLoginFlow() {
@@ -134,12 +227,8 @@ export class LoginForm extends Component {
 		// If calypso is loaded in a popup, we don't want to open a second popup for social login
 		// let's use the redirect flow instead in that case
 		const isPopup = typeof window !== 'undefined' && window.opener && window.opener !== window;
-		// also disable the popup flow for all safari versions
-		// See https://github.com/google/google-api-javascript-client/issues/297#issuecomment-333869742
-		const isSafari =
-			typeof window !== 'undefined' && /^(?!.*chrome).*safari/i.test( window.navigator.userAgent );
 		// disable for oauth2 flows for now
-		return ! oauth2Client && ( isPopup || isSafari );
+		return ! oauth2Client && isPopup;
 	}
 
 	savePasswordRef = input => {
@@ -165,21 +254,22 @@ export class LoginForm extends Component {
 	}
 
 	render() {
-		const isDisabled = {};
+		const isFormDisabled = this.state.isFormDisabledWhileLoading || this.props.isFormDisabled;
 
-		if ( this.state.isDisabledWhileLoading || this.props.isFormDisabled ) {
-			isDisabled.disabled = true;
-		}
-
-		const { requestError, redirectTo, oauth2Client } = this.props;
-		const linkingSocialUser = this.props.socialAccountIsLinking;
+		const {
+			oauth2Client,
+			redirectTo,
+			requestError,
+			socialAccountIsLinking: linkingSocialUser,
+		} = this.props;
 		const isOauthLogin = !! oauth2Client;
+
 		let signupUrl = config( 'signup_url' );
 
 		if ( isOauthLogin && config.isEnabled( 'signup/wpcc' ) ) {
 			signupUrl =
 				'/start/wpcc?' +
-				qs.stringify( {
+				stringify( {
 					oauth2_client_id: oauth2Client.id,
 					oauth2_redirect: redirectTo,
 				} );
@@ -192,30 +282,38 @@ export class LoginForm extends Component {
 				<Card className="login__form">
 					<div className="login__form-userdata">
 						{ linkingSocialUser && (
-							<div className="login__form-link-social-notice">
-								<p>
-									{ this.props.translate(
-										'We found a WordPress.com account with the email address "%(email)s". ' +
-											'Log in to this account to connect it to your %(service)s profile, ' +
-											'or choose a different %(service)s profile.',
-										{
-											args: {
-												email: this.props.socialAccountLinkEmail,
-												service: capitalize( this.props.socialAccountLinkService ),
-											},
-										}
-									) }
-								</p>
-							</div>
+							<p>
+								{ this.props.translate(
+									'We found a WordPress.com account with the email address "%(email)s". ' +
+										'Log in to this account to connect it to your %(service)s profile, ' +
+										'or choose a different %(service)s profile.',
+									{
+										args: {
+											email: this.props.socialAccountLinkEmail,
+											service: capitalize( this.props.socialAccountLinkService ),
+										},
+									}
+								) }
+							</p>
 						) }
 
-						<label htmlFor="usernameOrEmail" className="login__form-userdata-username">
-							{ this.props.translate( 'Email Address or Username' ) }
+						<label htmlFor="usernameOrEmail">
+							{ this.isPasswordView() ? (
+								<a href="#" className="login__form-change-username" onClick={ this.resetView }>
+									<Gridicon icon="arrow-left" size={ 18 } />
+
+									{ includes( this.state.usernameOrEmail, '@' )
+										? this.props.translate( 'Change Email Address' )
+										: this.props.translate( 'Change Username' ) }
+								</a>
+							) : (
+								this.props.translate( 'Email Address or Username' )
+							) }
 						</label>
 
 						<FormTextInput
 							autoCapitalize="off"
-							className={ classNames( 'login__form-userdata-username-input', {
+							className={ classNames( {
 								'is-error': requestError && requestError.field === 'usernameOrEmail',
 							} ) }
 							onChange={ this.onChangeField }
@@ -223,7 +321,7 @@ export class LoginForm extends Component {
 							name="usernameOrEmail"
 							ref={ this.saveUsernameOrEmailRef }
 							value={ this.state.usernameOrEmail }
-							{ ...isDisabled }
+							disabled={ isFormDisabled || this.isPasswordView() }
 						/>
 
 						{ requestError &&
@@ -231,28 +329,32 @@ export class LoginForm extends Component {
 								<FormInputValidation isError text={ requestError.message } />
 							) }
 
-						<label htmlFor="password" className="login__form-userdata-username">
-							{ this.props.translate( 'Password' ) }
-						</label>
-
-						<FormPasswordInput
-							autoCapitalize="off"
-							autoComplete="off"
-							className={ classNames( 'login__form-userdata-username-password', {
-								'is-error': requestError && requestError.field === 'password',
+						<div
+							className={ classNames( 'login__form-password', {
+								'is-hidden': this.isUsernameOrEmailView(),
 							} ) }
-							onChange={ this.onChangeField }
-							id="password"
-							name="password"
-							ref={ this.savePasswordRef }
-							value={ this.state.password }
-							{ ...isDisabled }
-						/>
+						>
+							<label htmlFor="password">{ this.props.translate( 'Password' ) }</label>
 
-						{ requestError &&
-							requestError.field === 'password' && (
-								<FormInputValidation isError text={ requestError.message } />
-							) }
+							<FormPasswordInput
+								autoCapitalize="off"
+								autoComplete="off"
+								className={ classNames( {
+									'is-error': requestError && requestError.field === 'password',
+								} ) }
+								onChange={ this.onChangeField }
+								id="password"
+								name="password"
+								ref={ this.savePasswordRef }
+								value={ this.state.password }
+								disabled={ isFormDisabled }
+							/>
+
+							{ requestError &&
+								requestError.field === 'password' && (
+									<FormInputValidation isError text={ requestError.message } />
+								) }
+						</div>
 					</div>
 
 					{ config.isEnabled( 'signup/social' ) && (
@@ -276,8 +378,10 @@ export class LoginForm extends Component {
 					) }
 
 					<div className="login__form-action">
-						<FormsButton primary { ...isDisabled }>
-							{ this.props.translate( 'Log In' ) }
+						<FormsButton primary disabled={ isFormDisabled }>
+							{ this.isPasswordView() || this.isFullView()
+								? this.props.translate( 'Log In' )
+								: this.props.translate( 'Continue' ) }
 						</FormsButton>
 					</div>
 
@@ -320,20 +424,29 @@ export class LoginForm extends Component {
 }
 
 export default connect(
-	state => ( {
-		redirectTo: getCurrentQueryArguments( state ).redirect_to,
-		userEmail: getCurrentQueryArguments( state ).email_address,
-		requestError: getRequestError( state ),
-		isFormDisabled: isFormDisabled( state ),
-		socialAccountIsLinking: getSocialAccountIsLinking( state ),
-		socialAccountLinkEmail: getSocialAccountLinkEmail( state ),
-		socialAccountLinkService: getSocialAccountLinkService( state ),
-		isLoggedIn: Boolean( getCurrentUserId( state ) ),
-		oauth2Client: getCurrentOAuth2Client( state ),
-	} ),
+	state => {
+		const accountType = getAuthAccountTypeSelector( state );
+
+		return {
+			accountType,
+			hasAccountTypeLoaded: accountType !== null,
+			isFormDisabled: isFormDisabledSelector( state ),
+			isLoggedIn: Boolean( getCurrentUserId( state ) ),
+			oauth2Client: getCurrentOAuth2Client( state ),
+			redirectTo: getRedirectToOriginal( state ),
+			requestError: getRequestError( state ),
+			socialAccountIsLinking: getSocialAccountIsLinking( state ),
+			socialAccountLinkEmail: getSocialAccountLinkEmail( state ),
+			socialAccountLinkService: getSocialAccountLinkService( state ),
+			userEmail: getInitialQueryArguments( state ).email_address,
+		};
+	},
 	{
+		fetchMagicLoginRequestEmail,
 		formUpdate,
+		getAuthAccountType,
 		loginUser,
 		recordTracksEvent,
+		resetAuthAccountType,
 	}
 )( localize( LoginForm ) );

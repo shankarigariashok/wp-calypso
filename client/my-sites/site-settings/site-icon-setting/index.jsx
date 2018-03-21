@@ -245,6 +245,7 @@ class SiteIconSetting extends Component {
 			buttonProps = {
 				type: 'button',
 				onClick: this.showModal,
+				'data-tip-target': 'settings-site-icon-change',
 				onMouseEnter: this.preloadModal,
 			};
 		} else {
@@ -332,6 +333,7 @@ class SiteIconSetting extends Component {
 							labels={ {
 								confirm: translate( 'Continue' ),
 							} }
+							disableLargeImageSources={ true }
 							single
 						/>
 					</MediaLibrarySelectedData>

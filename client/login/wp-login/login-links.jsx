@@ -3,39 +3,40 @@
 /**
  * External dependencies
  */
-
+import Gridicon from 'gridicons';
+import page from 'page';
 import PropTypes from 'prop-types';
 import React from 'react';
 import { connect } from 'react-redux';
+import { get } from 'lodash';
 import { localize } from 'i18n-calypso';
-import page from 'page';
+import { parse as parseUrl } from 'url';
 
 /**
  * Internal dependencies
  */
-import { addQueryArgs } from 'lib/url';
-import { addLocaleToWpcomUrl } from 'lib/i18n-utils';
-import { isEnabled } from 'config';
-import safeProtocolUrl from 'lib/safe-protocol-url';
 import ExternalLink from 'components/external-link';
-import Gridicon from 'gridicons';
-import { getCurrentUserId } from 'state/current-user/selectors';
-import { recordPageView, recordTracksEvent } from 'state/analytics/actions';
-import { resetMagicLoginRequestForm } from 'state/login/magic-login/actions';
-import { login } from 'lib/paths';
+import LoggedOutFormBackLink from 'components/logged-out-form/back-link';
+import { addQueryArgs } from 'lib/url';
 import { getCurrentOAuth2Client } from 'state/ui/oauth2-clients/selectors';
+import { getCurrentQueryArguments } from 'state/selectors';
+import { getCurrentUserId } from 'state/current-user/selectors';
+import { isEnabled } from 'config';
+import { login } from 'lib/paths';
+import { recordTracksEventWithClientId as recordTracksEvent } from 'state/analytics/actions';
+import { resetMagicLoginRequestForm } from 'state/login/magic-login/actions';
 
 export class LoginLinks extends React.Component {
 	static propTypes = {
 		isLoggedIn: PropTypes.bool.isRequired,
 		locale: PropTypes.string.isRequired,
+		oauth2Client: PropTypes.object,
 		privateSite: PropTypes.bool,
-		recordPageView: PropTypes.func.isRequired,
+		query: PropTypes.object,
 		recordTracksEvent: PropTypes.func.isRequired,
 		resetMagicLoginRequestForm: PropTypes.func.isRequired,
 		translate: PropTypes.func.isRequired,
 		twoFactorAuthType: PropTypes.string,
-		oauth2Client: PropTypes.object,
 	};
 
 	recordBackToWpcomLinkClick = () => {
@@ -60,7 +61,7 @@ export class LoginLinks extends React.Component {
 		this.props.recordTracksEvent( 'calypso_login_magic_login_request_click' );
 		this.props.resetMagicLoginRequestForm();
 
-		page( login( { isNative: true, twoFactorAuthType: 'link' } ) );
+		page( login( { isNative: true, locale: this.props.locale, twoFactorAuthType: 'link' } ) );
 	};
 
 	recordResetPasswordLinkClick = () => {
@@ -68,33 +69,37 @@ export class LoginLinks extends React.Component {
 	};
 
 	renderBackLink() {
-		const { locale, oauth2Client, translate } = this.props;
+		// If we seem to be in a Jetpack connection flow, provide some special handling
+		// so users can go back to their site rather than WordPress.com
+		const redirectTo = get( this.props, [ 'query', 'redirect_to' ] );
+		if ( redirectTo ) {
+			const { pathname, query: redirectToQuery } = parseUrl( redirectTo, true );
+			if ( pathname === '/jetpack/connect/authorize' && redirectToQuery.client_id ) {
+				const returnToSiteUrl = addQueryArgs(
+					{ client_id: redirectToQuery.client_id },
+					'https://jetpack.wordpress.com/jetpack.returntosite/1/'
+				);
 
-		let url = addLocaleToWpcomUrl( 'https://wordpress.com', locale );
-		let message = translate( 'Back to WordPress.com' );
+				const { hostname } = parseUrl( redirectToQuery.site_url );
+				const linkText = hostname
+					? this.props.translate( 'Back to %(hostname)s', { args: { hostname } } )
+					: this.props.translate( 'Back' );
 
-		if ( oauth2Client ) {
-			url = safeProtocolUrl( oauth2Client.url );
-			if ( ! url || url === 'http:' ) {
-				return null;
+				return (
+					<ExternalLink className="wp-login__site-return-link" href={ returnToSiteUrl }>
+						<Gridicon icon="arrow-left" size={ 18 } />
+						{ linkText }
+					</ExternalLink>
+				);
 			}
-
-			message = translate( 'Back to %(clientTitle)s', {
-				args: {
-					clientTitle: oauth2Client.title,
-				},
-			} );
 		}
+
 		return (
-			<a
-				href={ url }
-				key="return-to-wpcom-link"
-				onClick={ this.recordBackToWpcomLinkClick }
-				rel="external"
-			>
-				<Gridicon icon="arrow-left" size={ 18 } />
-				{ message }
-			</a>
+			<LoggedOutFormBackLink
+				classes={ { 'logged-out-form__link-item': false } }
+				oauth2Client={ this.props.oauth2Client }
+				recordClick={ this.recordBackToWpcomLinkClick }
+			/>
 		);
 	}
 
@@ -122,9 +127,13 @@ export class LoginLinks extends React.Component {
 		}
 
 		return (
-			<a href="#" key="lost-phone-link" onClick={ this.handleLostPhoneLinkClick }>
+			<button
+				key="lost-phone-link"
+				data-e2e-link="lost-phone-link"
+				onClick={ this.handleLostPhoneLinkClick }
+			>
 				{ this.props.translate( "I can't access my phone" ) }
-			</a>
+			</button>
 		);
 	}
 
@@ -139,7 +148,7 @@ export class LoginLinks extends React.Component {
 
 		return (
 			<a
-				href="#"
+				href={ login( { isNative: true, locale: this.props.locale, twoFactorAuthType: 'link' } ) }
 				key="magic-login-link"
 				data-e2e-link="magic-login-link"
 				onClick={ this.handleMagicLoginLinkClick }
@@ -182,10 +191,10 @@ export class LoginLinks extends React.Component {
 const mapState = state => ( {
 	isLoggedIn: Boolean( getCurrentUserId( state ) ),
 	oauth2Client: getCurrentOAuth2Client( state ),
+	query: getCurrentQueryArguments( state ),
 } );
 
 const mapDispatch = {
-	recordPageView,
 	recordTracksEvent,
 	resetMagicLoginRequestForm,
 };

@@ -68,9 +68,6 @@ function getLocation( path ) {
 	if ( path.indexOf( '/recommendations/mine' ) === 0 ) {
 		return 'recommended_foryou';
 	}
-	if ( path.indexOf( '/recommendations' ) === 0 ) {
-		return 'recommended_topics';
-	}
 	if ( path.indexOf( '/following/edit' ) === 0 ) {
 		return 'following_edit';
 	}
@@ -166,20 +163,7 @@ export const recordTracksRailcarInteract = partial(
 );
 
 export function recordTrackForPost( eventName, post = {}, additionalProps = {}, options ) {
-	recordTrack(
-		eventName,
-		assign(
-			{
-				blog_id: ! post.is_external && post.site_ID > 0 ? post.site_ID : undefined,
-				post_id: ! post.is_external && post.ID > 0 ? post.ID : undefined,
-				feed_id: post.feed_ID > 0 ? post.feed_ID : undefined,
-				feed_item_id: post.feed_item_ID > 0 ? post.feed_item_ID : undefined,
-				is_jetpack: post.is_jetpack,
-			},
-			additionalProps
-		),
-		options
-	);
+	recordTrack( eventName, assign( getTracksPropertiesForPost( post ), additionalProps ), options );
 	if ( post.railcar && tracksRailcarEventWhitelist.has( eventName ) ) {
 		// check for overrides for the railcar
 		recordTracksRailcarInteract(
@@ -192,6 +176,16 @@ export function recordTrackForPost( eventName, post = {}, additionalProps = {}, 
 	}
 }
 
+export function getTracksPropertiesForPost( post = {} ) {
+	return {
+		blog_id: ! post.is_external && post.site_ID > 0 ? post.site_ID : undefined,
+		post_id: ! post.is_external && post.ID > 0 ? post.ID : undefined,
+		feed_id: post.feed_ID > 0 ? post.feed_ID : undefined,
+		feed_item_id: post.feed_item_ID > 0 ? post.feed_item_ID : undefined,
+		is_jetpack: post.is_jetpack,
+	};
+}
+
 export function recordTrackWithRailcar( eventName, railcar, eventProperties ) {
 	recordTrack( eventName, eventProperties );
 	recordTracksRailcarInteract(
@@ -202,6 +196,10 @@ export function recordTrackWithRailcar( eventName, railcar, eventProperties ) {
 }
 
 export function pageViewForPost( blogId, blogUrl, postId, isPrivate ) {
+	if ( ! blogId || ! blogUrl || ! postId ) {
+		return;
+	}
+
 	const params = {
 		ref: 'http://wordpress.com/',
 		reader: 1,

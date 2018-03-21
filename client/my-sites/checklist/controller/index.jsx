@@ -10,9 +10,10 @@ import React from 'react';
  * Internal Dependencies
  */
 
-import { renderWithReduxStore } from 'lib/react-helpers';
 import ChecklistShow from '../checklist-show';
 
-export function show( context ) {
-	renderWithReduxStore( <ChecklistShow />, 'primary', context.store );
+export function show( context, next ) {
+	const { params } = context;
+	context.primary = <ChecklistShow displayMode={ params.displayMode } />;
+	next();
 }

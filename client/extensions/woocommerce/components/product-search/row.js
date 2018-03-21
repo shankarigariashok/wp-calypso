@@ -5,7 +5,6 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { bindActionCreators } from 'redux';
-import classNames from 'classnames';
 import { connect } from 'react-redux';
 import { filter, find, get, intersection, noop, reduce, uniqBy, values } from 'lodash';
 import { localize } from 'i18n-calypso';
@@ -26,6 +25,7 @@ import { getSelectedSiteWithFallback } from 'woocommerce/state/sites/selectors';
 import { getVariationsForProduct } from 'woocommerce/state/sites/product-variations/selectors';
 import { areVariationsSelected, isProductSelected, isVariableProduct } from './utils';
 import ProductVariations from './variations';
+import ImageThumb from 'woocommerce/components/image-thumb';
 
 class ProductSearchRow extends Component {
 	static propTypes = {
@@ -123,7 +123,8 @@ class ProductSearchRow extends Component {
 			} );
 			const variationId = get( matchingVariations, '[0].id', false );
 			if ( variationId && ! this.isSelected( variationId ) ) {
-				this.props.onChange( variationId );
+				const { product } = this.props;
+				this.props.onChange( variationId, product.id );
 			}
 			if ( typeof callback === 'function' ) {
 				callback();
@@ -180,8 +181,15 @@ class ProductSearchRow extends Component {
 	};
 
 	renderInputName = product => {
-		const { currency, translate } = this.props;
-		const price = formatCurrency( product.price, currency );
+		const { currency, translate, showRegularPrice } = this.props;
+
+		let price;
+		if ( showRegularPrice ) {
+			price = formatCurrency( product.regular_price || '0', currency );
+		} else {
+			price = formatCurrency( product.price, currency );
+		}
+
 		let nameWithPrice = `${ product.name } - ${ price }`;
 		// Some things do need special handling…
 		if ( product.isVariation ) {
@@ -191,7 +199,7 @@ class ProductSearchRow extends Component {
 		if ( isVariableProduct( product ) ) {
 			return (
 				<span>
-					<span>{ nameWithPrice }</span>
+					<span>{ product.name }</span>
 					<Button compact onClick={ this.toggleCustomizeForm }>
 						{ translate( 'Select variations' ) }
 					</Button>
@@ -202,16 +210,12 @@ class ProductSearchRow extends Component {
 	};
 
 	renderInputImage( product ) {
-		let imageSrc = get( product, 'images[0].src', false );
+		let imageSrc = get( product, 'images[0].src', '' );
 		// Check for a variation image
 		if ( product.isVariation ) {
 			imageSrc = get( product.image, 'src', imageSrc );
 		}
-		const imageClasses = classNames( 'product-search__list-image', {
-			'is-thumb-placeholder': ! imageSrc,
-		} );
-
-		return <span className={ imageClasses }>{ imageSrc && <img src={ imageSrc } /> }</span>;
+		return <ImageThumb width={ 32 } height={ 32 } src={ imageSrc } alt="" />;
 	}
 
 	renderRow = product => {

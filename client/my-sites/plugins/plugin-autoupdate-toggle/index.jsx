@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
@@ -17,7 +15,7 @@ import PluginsLog from 'lib/plugins/log-store';
 import PluginAction from 'my-sites/plugins/plugin-action/plugin-action';
 import ExternalLink from 'components/external-link';
 import { recordGoogleEvent, recordTracksEvent } from 'state/analytics/actions';
-import utils from 'lib/site/utils';
+import { getSiteFileModDisableReason, isMainNetworkSite } from 'lib/site/utils';
 
 export class PluginAutoUpdateToggle extends Component {
 	toggleAutoUpdates = () => {
@@ -91,7 +89,7 @@ export class PluginAutoUpdateToggle extends Component {
 			);
 		}
 
-		if ( ! utils.isMainNetworkSite( site ) ) {
+		if ( ! isMainNetworkSite( site ) ) {
 			return translate(
 				'Only the main site on a multi-site installation can enable autoupdates for plugins.',
 				{
@@ -101,7 +99,7 @@ export class PluginAutoUpdateToggle extends Component {
 		}
 
 		if ( ! site.canAutoupdateFiles && site.options.file_mod_disabled ) {
-			const reasons = utils.getSiteFileModDisableReason( site, 'autoupdateFiles' );
+			const reasons = getSiteFileModDisableReason( site, 'autoupdateFiles' );
 			const html = [];
 
 			if ( reasons.length > 1 ) {
@@ -155,15 +153,10 @@ export class PluginAutoUpdateToggle extends Component {
 				'DISABLE_AUTOUPDATE_PLUGIN',
 			] ),
 			getDisabledInfo = this.getDisabledInfo(),
-			label = getDisabledInfo
-				? translate( 'Autoupdates disabled', {
-						context:
-							'this goes next to an icon that displays if the plugin has "autoupdates disabled" active',
-					} )
-				: translate( 'Autoupdates', {
-						context:
-							'this goes next to an icon that displays if the plugin has "autoupdates" active',
-					} );
+			label = translate( 'Autoupdates', {
+				context:
+					'this goes next to an icon that displays if the plugin has "autoupdates", both enabled and disabled',
+			} );
 
 		return (
 			<PluginAction

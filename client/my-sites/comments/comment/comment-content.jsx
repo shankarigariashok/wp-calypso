@@ -7,18 +7,17 @@ import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
 import Gridicon from 'gridicons';
-import { get, noop } from 'lodash';
+import { get } from 'lodash';
 
 /**
  * Internal dependencies
  */
 import AutoDirection from 'components/auto-direction';
+import CommentLink from 'my-sites/comments/comment/comment-link';
 import CommentPostLink from 'my-sites/comments/comment/comment-post-link';
 import Emojify from 'components/emojify';
 import QueryComment from 'components/data/query-comment';
-import { isEnabled } from 'config';
 import { stripHTML, decodeEntities } from 'lib/formatting';
-import { bumpStat, composeAnalytics, recordTracksEvent } from 'state/analytics/actions';
 import { getParentComment, getSiteComment } from 'state/selectors';
 import { isJetpackSite } from 'state/sites/selectors';
 import { getSelectedSiteId, getSelectedSiteSlug } from 'state/ui/selectors';
@@ -30,11 +29,8 @@ export class CommentContent extends Component {
 		isPostView: PropTypes.bool,
 	};
 
-	trackDeepReaderLinkClick = () =>
-		this.props.isJetpack ? noop : this.props.recordReaderCommentOpened();
-
 	renderInReplyTo = () => {
-		const { isBulkMode, parentCommentContent, parentCommentUrl, translate } = this.props;
+		const { commentId, isBulkMode, parentCommentContent, parentCommentUrl, translate } = this.props;
 
 		if ( ! parentCommentContent ) {
 			return null;
@@ -44,13 +40,13 @@ export class CommentContent extends Component {
 			<div className="comment__in-reply-to">
 				{ isBulkMode && <Gridicon icon="reply" size={ 18 } /> }
 				<span>{ translate( 'In reply to:' ) }</span>
-				<a
+				<CommentLink
+					commentId={ commentId }
 					href={ parentCommentUrl }
-					onClick={ this.trackDeepReaderLinkClick }
 					tabIndex={ isBulkMode ? -1 : 0 }
 				>
 					<Emojify>{ parentCommentContent }</Emojify>
-				</a>
+				</CommentLink>
 			</div>
 		);
 	};
@@ -59,7 +55,7 @@ export class CommentContent extends Component {
 		const {
 			commentContent,
 			commentId,
-			commentIsPending,
+			commentStatus,
 			isBulkMode,
 			isParentCommentLoaded,
 			isPostView,
@@ -86,10 +82,16 @@ export class CommentContent extends Component {
 
 				{ ! isBulkMode && (
 					<div className="comment__content-full">
-						{ ( commentIsPending || parentCommentContent || ! isPostView ) && (
+						{ ( parentCommentContent || ! isPostView || 'approved' !== commentStatus ) && (
 							<div className="comment__content-info">
-								{ commentIsPending && (
-									<div className="comment__status-label">{ translate( 'Pending' ) }</div>
+								{ 'unapproved' === commentStatus && (
+									<div className="comment__status-label is-pending">{ translate( 'Pending' ) }</div>
+								) }
+								{ 'spam' === commentStatus && (
+									<div className="comment__status-label is-spam">{ translate( 'Spam' ) }</div>
+								) }
+								{ 'trash' === commentStatus && (
+									<div className="comment__status-label is-trash">{ translate( 'Trash' ) }</div>
 								) }
 
 								{ ! isPostView && <CommentPostLink { ...{ commentId, isBulkMode } } /> }
@@ -125,18 +127,13 @@ const mapStateToProps = ( state, { commentId } ) => {
 	const parentCommentId = get( comment, 'parent.ID', 0 );
 	const parentCommentContent = decodeEntities( stripHTML( get( parentComment, 'content' ) ) );
 
-	let parentCommentUrl;
-	if ( isEnabled( 'comments/management/comment-view' ) ) {
-		parentCommentUrl = `/comment/${ siteSlug }/${ parentCommentId }`;
-	} else if ( isJetpack ) {
-		parentCommentUrl = get( parentComment, 'URL' );
-	} else {
-		parentCommentUrl = `/read/blogs/${ siteId }/posts/${ postId }#comment-${ parentCommentId }`;
-	}
+	const parentCommentUrl = isJetpack
+		? get( parentComment, 'URL' )
+		: `/comment/${ siteSlug }/${ parentCommentId }`;
 
 	return {
 		commentContent: get( comment, 'content' ),
-		commentIsPending: 'unapproved' === get( comment, 'status' ),
+		commentStatus: get( comment, 'status' ),
 		isJetpack,
 		isParentCommentLoaded: ! parentCommentId || !! parentCommentContent,
 		parentCommentContent,
@@ -147,14 +144,4 @@ const mapStateToProps = ( state, { commentId } ) => {
 	};
 };
 
-const mapDispatchToProps = dispatch => ( {
-	recordReaderCommentOpened: () =>
-		dispatch(
-			composeAnalytics(
-				recordTracksEvent( 'calypso_comment_management_comment_opened' ),
-				bumpStat( 'calypso_comment_management', 'comment_opened' )
-			)
-		),
-} );
-
-export default connect( mapStateToProps, mapDispatchToProps )( localize( CommentContent ) );
+export default connect( mapStateToProps )( localize( CommentContent ) );

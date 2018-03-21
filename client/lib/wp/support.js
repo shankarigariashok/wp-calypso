@@ -3,8 +3,7 @@
 /**
  * External dependencies
  */
-
-import qs from 'qs';
+import { parse, stringify } from 'qs';
 
 export default function wpcomSupport( wpcom ) {
 	let supportUser = '';
@@ -18,31 +17,34 @@ export default function wpcomSupport( wpcom ) {
 	 */
 	const addSupportData = function( params ) {
 		// Unwind the query string
-		let query = qs.parse( params.query );
+		const query = parse( params.query );
 
 		// Inject the credentials
 		query.support_user = supportUser;
 		query._support_token = supportToken;
 
 		return Object.assign( {}, params, {
-			query: qs.stringify( query ),
+			query: stringify( query ),
 		} );
+	};
+
+	/**
+	 * Add the supportUser and supportToken to the query.
+	 * @param {Object}  params The original request params object
+	 * @return {Object}        The new query object with support data injected
+	 */
+	const addSupportParams = function( params ) {
+		return {
+			...params,
+			support_user: supportUser,
+			_support_token: supportToken,
+		};
 	};
 
 	const request = wpcom.request.bind( wpcom );
 
 	return Object.assign( wpcom, {
-		fetchSupportUserToken: function( username, password ) {
-			return wpcom.req.post(
-				{
-					apiVersion: '1.1',
-					path: `/internal/support/${ username }/grant`,
-				},
-				{
-					password: password,
-				}
-			);
-		},
+		addSupportParams,
 		/**
 		 * @param {String} supportUser  Support username
 		 * @param {String} supportToken Support token

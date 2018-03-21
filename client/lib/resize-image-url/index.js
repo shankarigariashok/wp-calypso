@@ -26,7 +26,8 @@ const REGEXP_VALID_PROTOCOL = /^https?:$/;
  *
  * @type {Number}
  */
-const IMAGE_SCALE_FACTOR = get( global.window, 'devicePixelRatio', 1 ) > 1 ? 2 : 1;
+const IMAGE_SCALE_FACTOR =
+	get( typeof window !== 'undefined' && window, 'devicePixelRatio', 1 ) > 1 ? 2 : 1;
 
 /**
  * Query parameters to be treated as image dimensions
@@ -55,13 +56,18 @@ const scaleByFactor = value => value * IMAGE_SCALE_FACTOR;
 
 /**
  * Changes the sizing parameters on a URL. Works for WordPress.com, Photon, and
- * Gravatar images
+ * Gravatar images.
+ *
+ * NOTE: Original query string arguments will be stripped from WordPress.com
+ * and Photon images, and preserved for Gravatar images. If an external image
+ * URL containing query string arguments is passed to this function, it will
+ * return `null`.
  *
  * @param   {String}          imageUrl Original image url
  * @param   {(Number|Object)} resize   Resize pixel width, or object of query
  *                                     arguments (assuming Photon or Gravatar)
  * @param   {?Number}         height   Pixel height if specifying resize width
- * @returns {String}                   Resize image URL
+ * @returns {?String}                  Resized image URL, or `null` if unable to resize
  */
 export default function resizeImageUrl( imageUrl, resize, height ) {
 	if ( 'string' !== typeof imageUrl ) {

@@ -9,17 +9,13 @@ import { expect } from 'chai';
  * Internal dependencies
  */
 import reducer, { isNotificationsOpen, selectedSiteId, siteSelectionInitialized } from '../reducer';
-import {
-	SELECTED_SITE_SET,
-	SERIALIZE,
-	DESERIALIZE,
-	NOTIFICATIONS_PANEL_TOGGLE,
-} from 'state/action-types';
+import { SELECTED_SITE_SET, NOTIFICATIONS_PANEL_TOGGLE } from 'state/action-types';
 
 describe( 'reducer', () => {
 	test( 'should include expected keys in return value', () => {
 		expect( reducer( undefined, {} ) ).to.have.keys( [
 			'actionLog',
+			'comments',
 			'dropZone',
 			'editor',
 			'guidedTour',
@@ -29,41 +25,20 @@ describe( 'reducer', () => {
 			'isPreviewShowing',
 			'layoutFocus',
 			'language',
+			'masterbarVisibility',
 			'mediaModal',
 			'npsSurveyNotice',
 			'oauth2Clients',
-			'olark',
+			'payment',
 			'postTypeList',
 			'preview',
-			'queryArguments',
+			'route',
 			'reader',
 			'section',
 			'selectedSiteId',
 			'siteSelectionInitialized',
 			'themeSetup',
 		] );
-	} );
-
-	test( 'should refuse to persist any state', () => {
-		const state = reducer(
-			{
-				selectedSiteId: 2916284,
-			},
-			{ type: SERIALIZE }
-		);
-
-		expect( state ).to.eql( {} );
-	} );
-
-	test( 'should refuse to restore any persisted state', () => {
-		const state = reducer(
-			{
-				selectedSiteId: 2916284,
-			},
-			{ type: DESERIALIZE }
-		);
-
-		expect( state ).to.eql( {} );
 	} );
 
 	describe( '#selectedSiteId()', () => {

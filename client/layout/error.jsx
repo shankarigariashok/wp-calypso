@@ -7,10 +7,9 @@
 import debug from 'debug';
 import { localize } from 'i18n-calypso';
 import { assign } from 'lodash';
-import ReactDom from 'react-dom';
 import React from 'react';
 import url from 'url';
-import qs from 'querystring';
+import { stringify } from 'qs';
 
 /**
  * Internal dependencies
@@ -42,12 +41,12 @@ export function retry( chunkName ) {
 		analytics.mc.bumpStat( 'calypso_chunk_retry', chunkName );
 
 		// Trigger a full page load which should include script tags for the current chunk
-		window.location.search = qs.stringify( assign( parsed.query, { retry: '1' } ) );
+		window.location.search = stringify( assign( parsed.query, { retry: '1' } ) );
 	}
 }
 
-export function show( chunkName ) {
+export function show( context, chunkName ) {
 	log( 'Chunk %s could not be loaded', chunkName );
 	analytics.mc.bumpStat( 'calypso_chunk_error', chunkName );
-	ReactDom.render( <LoadingErrorMessage />, document.getElementById( 'primary' ) );
+	context.primary = <LoadingErrorMessage />;
 }

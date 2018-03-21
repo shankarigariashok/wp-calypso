@@ -8,7 +8,7 @@ import PropTypes from 'prop-types';
 import React from 'react';
 import { localize } from 'i18n-calypso';
 import url from 'url';
-import Qs from 'qs';
+import { stringify } from 'qs';
 import { cloneDeep, get, startsWith } from 'lodash';
 import { connect } from 'react-redux';
 import debugFactory from 'debug';
@@ -27,6 +27,7 @@ import { getCustomizerFocus } from './panels';
 import { getMenusUrl } from 'state/selectors';
 import { getSelectedSite } from 'state/ui/selectors';
 import { getCustomizerUrl, isJetpackSite } from 'state/sites/selectors';
+import wpcom from 'lib/wp';
 
 const debug = debugFactory( 'calypso:my-sites:customize' );
 
@@ -185,7 +186,11 @@ class Customize extends React.Component {
 			query.customize_amp = 1;
 		}
 
-		return Qs.stringify( query );
+		//needed to load the customizer correctly when su'd
+		if ( wpcom.addSupportParams ) {
+			return stringify( wpcom.addSupportParams( query ) );
+		}
+		return stringify( query );
 	};
 
 	listenToCustomizer = () => {

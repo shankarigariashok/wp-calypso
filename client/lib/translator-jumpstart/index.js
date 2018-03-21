@@ -39,7 +39,7 @@ const user = new User(),
  * Local variables
  */
 
-var injectUrl,
+let injectUrl,
 	initialized,
 	previousEnabledSetting,
 	_shouldWrapTranslations = false;
@@ -52,6 +52,11 @@ var injectUrl,
 const communityTranslatorJumpstart = {
 	isEnabled() {
 		const currentUser = user.get();
+
+		// disabling the CT for locale variants until the GlotPress API can handle them
+		if ( !! currentUser.localeVariant ) {
+			return false;
+		}
 
 		if ( ! currentUser || 'en' === currentUser.localeSlug || ! currentUser.localeSlug ) {
 			return false;
@@ -72,6 +77,7 @@ const communityTranslatorJumpstart = {
 
 		return true;
 	},
+
 	isActivated() {
 		return _shouldWrapTranslations;
 	},
@@ -90,6 +96,11 @@ const communityTranslatorJumpstart = {
 			return displayedTranslationFromPage;
 		}
 
+		if ( 'boolean' === typeof optionsFromPage.textOnly && optionsFromPage.textOnly ) {
+			debug( 'respecting textOnly for string "' + originalFromPage + '"' );
+			return displayedTranslationFromPage;
+		}
+
 		const props = {
 			className: 'translatable',
 			'data-singular': originalFromPage,
@@ -105,8 +116,11 @@ const communityTranslatorJumpstart = {
 			props[ 'data-plural' ] = optionsFromPage.plural;
 		}
 
-		// React.DOM.data returns a frozen object, therefore we make a copy so that we can modify it below
-		const dataElement = Object.assign( {}, React.DOM.data( props, displayedTranslationFromPage ) );
+		// <data> returns a frozen object, therefore we make a copy so that we can modify it below
+		const dataElement = Object.assign(
+			{},
+			<data { ...props }>{ displayedTranslationFromPage }</data>
+		);
 
 		// now we can override the toString function which would otherwise return [object Object]
 		dataElement.toString = () => displayedTranslationFromPage;
@@ -118,8 +132,8 @@ const communityTranslatorJumpstart = {
 	},
 
 	init() {
-		const languageJson = i18n.getLocale() || { '': {} },
-			localeCode = languageJson[ '' ].localeSlug;
+		const languageJson = i18n.getLocale() || { '': {} };
+		const { localeSlug: localeCode } = languageJson[ '' ];
 
 		if ( localeCode && languageJson ) {
 			this.updateTranslationData( localeCode, languageJson );
@@ -176,7 +190,7 @@ const communityTranslatorJumpstart = {
 		}
 
 		this.setInjectionURL( 'community-translator.min.js' );
-		if ( config( 'env' ) === 'production' ) {
+		if ( process.env.NODE_ENV === 'production' ) {
 			translationDataFromPage.glotPress.project = 'wpcom';
 		} else {
 			translationDataFromPage.glotPress.project = 'test';

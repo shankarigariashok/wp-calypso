@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { localize } from 'i18n-calypso';
@@ -27,29 +25,32 @@ import {
 	PLAN_JETPACK_BUSINESS_MONTHLY,
 	PLAN_JETPACK_PERSONAL_MONTHLY,
 } from 'lib/plans/constants';
+import { addQueryArgs } from 'lib/url';
 import QueryPlans from 'components/data/query-plans';
 import QuerySitePlans from 'components/data/query-site-plans';
 import FAQ from 'components/faq';
 import FAQItem from 'components/faq/faq-item';
 import { isEnabled } from 'config';
-import purchasesPaths from 'me/purchases/paths';
+import { purchasesRoot } from 'me/purchases/paths';
 import { plansLink } from 'lib/plans';
 import SegmentedControl from 'components/segmented-control';
 import SegmentedControlItem from 'components/segmented-control/item';
+import PaymentMethods from 'blocks/payment-methods';
 
 class PlansFeaturesMain extends Component {
 	getPlanFeatures() {
 		const {
-			site,
-			intervalType,
-			onUpgradeClick,
-			hideFreePlan,
-			isInSignup,
-			isLandingPage,
 			basePlansPath,
-			selectedFeature,
 			displayJetpackPlans,
 			domainName,
+			hideFreePlan,
+			intervalType,
+			isInSignup,
+			isLandingPage,
+			onUpgradeClick,
+			selectedFeature,
+			selectedPlan,
+			site,
 		} = this.props;
 
 		const isPersonalPlanEnabled = isEnabled( 'plans/personal-plan' );
@@ -66,15 +67,16 @@ class PlansFeaturesMain extends Component {
 			return (
 				<div className="plans-features-main__group" data-e2e-plans="jetpack">
 					<PlanFeatures
-						plans={ jetpackPlans }
-						selectedFeature={ selectedFeature }
-						onUpgradeClick={ onUpgradeClick }
+						basePlansPath={ basePlansPath }
+						displayJetpackPlans={ displayJetpackPlans }
+						domainName={ domainName }
 						isInSignup={ isInSignup }
 						isLandingPage={ isLandingPage }
-						basePlansPath={ basePlansPath }
+						onUpgradeClick={ onUpgradeClick }
+						plans={ jetpackPlans }
+						selectedFeature={ selectedFeature }
+						selectedPlan={ selectedPlan }
 						site={ site }
-						domainName={ domainName }
-						displayJetpackPlans={ displayJetpackPlans }
 					/>
 				</div>
 			);
@@ -93,15 +95,16 @@ class PlansFeaturesMain extends Component {
 			return (
 				<div className="plans-features-main__group" data-e2e-plans="jetpack">
 					<PlanFeatures
-						plans={ jetpackPlans }
-						selectedFeature={ selectedFeature }
-						onUpgradeClick={ onUpgradeClick }
+						basePlansPath={ basePlansPath }
+						displayJetpackPlans={ displayJetpackPlans }
+						domainName={ domainName }
 						isInSignup={ isInSignup }
 						isLandingPage={ isLandingPage }
-						basePlansPath={ basePlansPath }
+						onUpgradeClick={ onUpgradeClick }
+						plans={ jetpackPlans }
+						selectedFeature={ selectedFeature }
+						selectedPlan={ selectedPlan }
 						site={ site }
-						domainName={ domainName }
-						displayJetpackPlans={ displayJetpackPlans }
 					/>
 				</div>
 			);
@@ -120,15 +123,16 @@ class PlansFeaturesMain extends Component {
 		return (
 			<div className="plans-features-main__group" data-e2e-plans="wpcom">
 				<PlanFeatures
-					plans={ plans }
-					onUpgradeClick={ onUpgradeClick }
+					basePlansPath={ basePlansPath }
+					displayJetpackPlans={ displayJetpackPlans }
+					domainName={ domainName }
 					isInSignup={ isInSignup }
 					isLandingPage={ isLandingPage }
-					basePlansPath={ basePlansPath }
+					onUpgradeClick={ onUpgradeClick }
+					plans={ plans }
+					selectedPlan={ selectedPlan }
 					selectedFeature={ selectedFeature }
 					site={ site }
-					domainName={ domainName }
-					displayJetpackPlans={ displayJetpackPlans }
 				/>
 			</div>
 		);
@@ -317,7 +321,7 @@ class PlansFeaturesMain extends Component {
 						'Yes. We want you to love everything you do at WordPress.com, so we provide a 30-day' +
 							' refund on all of our plans. {{a}}Manage purchases{{/a}}.',
 						{
-							components: { a: <a href={ purchasesPaths.purchasesRoot() } /> },
+							components: { a: <a href={ purchasesRoot } /> },
 						}
 					) }
 				/>
@@ -340,11 +344,23 @@ class PlansFeaturesMain extends Component {
 		);
 	}
 
+	constructPath( plansUrl, intervalType ) {
+		const { selectedFeature, selectedPlan, site } = this.props;
+		return addQueryArgs(
+			{
+				feature: selectedFeature,
+				plan: selectedPlan,
+			},
+			plansLink( plansUrl, site, intervalType )
+		);
+	}
+
 	getIntervalTypeToggle() {
-		const { translate, intervalType, site, basePlansPath } = this.props;
+		const { basePlansPath, intervalType, translate } = this.props;
 		const segmentClasses = classNames( 'plan-features__interval-type', 'price-toggle' );
 
 		let plansUrl = '/plans';
+
 		if ( basePlansPath ) {
 			plansUrl = basePlansPath;
 		}
@@ -353,14 +369,14 @@ class PlansFeaturesMain extends Component {
 			<SegmentedControl compact className={ segmentClasses } primary={ true }>
 				<SegmentedControlItem
 					selected={ intervalType === 'monthly' }
-					path={ plansLink( plansUrl, site, 'monthly' ) }
+					path={ this.constructPath( plansUrl, 'monthly' ) }
 				>
 					{ translate( 'Monthly billing' ) }
 				</SegmentedControlItem>
 
 				<SegmentedControlItem
 					selected={ intervalType === 'yearly' }
-					path={ plansLink( plansUrl, site, 'yearly' ) }
+					path={ this.constructPath( plansUrl, 'yearly' ) }
 				>
 					{ translate( 'Yearly billing' ) }
 				</SegmentedControlItem>
@@ -380,33 +396,37 @@ class PlansFeaturesMain extends Component {
 
 		return (
 			<div className="plans-features-main">
+				<div className="plans-features-main__notice" />
 				{ displayJetpackPlans ? this.getIntervalTypeToggle() : null }
 				<QueryPlans />
 				<QuerySitePlans siteId={ get( site, 'ID' ) } />
 				{ this.getPlanFeatures() }
+				<PaymentMethods />
 				{ faqs }
+				<div className="plans-features-main__bottom" />
 			</div>
 		);
 	}
 }
 
 PlansFeaturesMain.propTypes = {
-	site: PropTypes.object,
+	basePlansPath: PropTypes.string,
+	displayJetpackPlans: PropTypes.bool.isRequired,
+	hideFreePlan: PropTypes.bool,
+	intervalType: PropTypes.string,
 	isInSignup: PropTypes.bool,
 	isLandingPage: PropTypes.bool,
-	basePlansPath: PropTypes.string,
-	intervalType: PropTypes.string,
 	onUpgradeClick: PropTypes.func,
-	hideFreePlan: PropTypes.bool,
-	showFAQ: PropTypes.bool,
 	selectedFeature: PropTypes.string,
-	displayJetpackPlans: PropTypes.bool.isRequired,
+	selectedPlan: PropTypes.string,
+	showFAQ: PropTypes.bool,
+	site: PropTypes.object,
 };
 
 PlansFeaturesMain.defaultProps = {
 	basePlansPath: null,
-	intervalType: 'yearly',
 	hideFreePlan: false,
+	intervalType: 'yearly',
 	site: {},
 	showFAQ: true,
 };

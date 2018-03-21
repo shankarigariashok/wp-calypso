@@ -5,13 +5,12 @@
  */
 
 import { translate } from 'i18n-calypso';
-import { find, flatten, isEmpty, isNil, map, omit, some, xor } from 'lodash';
+import { find, flatten, isEmpty, isNil, map, omit, some, startsWith, xor } from 'lodash';
 
 /**
  * Internal dependencies
  */
 import { getSelectedSiteId } from 'state/ui/selectors';
-import { getShippingZonesEdits } from 'woocommerce/state/ui/shipping/zones/selectors';
 import {
 	createShippingZone,
 	updateShippingZone,
@@ -22,6 +21,7 @@ import {
 	updateShippingZoneMethod,
 	deleteShippingZoneMethod,
 } from 'woocommerce/state/sites/shipping-zone-methods/actions';
+import { updateWcsShippingZoneMethod } from 'woocommerce/woocommerce-services/state/service-settings/actions';
 import { updateShippingZoneLocations } from 'woocommerce/state/sites/shipping-zone-locations/actions';
 import {
 	actionListStepNext,
@@ -38,22 +38,23 @@ import {
 	getShippingZoneLocationsWithEdits,
 	areCurrentlyEditingShippingZoneLocationsValid,
 } from 'woocommerce/state/ui/shipping/zones/locations/selectors';
-import { getCurrentlyEditingShippingZone } from 'woocommerce/state/ui/shipping/zones/selectors';
+import {
+	getShippingZonesEdits,
+	getCurrentlyEditingShippingZone,
+	generateZoneName,
+	generateCurrentlyEditingZoneName,
+} from 'woocommerce/state/ui/shipping/zones/selectors';
 import { getCurrentlyEditingShippingZoneMethods } from 'woocommerce/state/ui/shipping/zones/methods/selectors';
 import { getRawShippingZoneLocations } from 'woocommerce/state/sites/shipping-zone-locations/selectors';
 import { getShippingZoneMethod } from 'woocommerce/state/sites/shipping-zone-methods/selectors';
 import { getZoneLocationsPriority } from 'woocommerce/state/sites/shipping-zone-locations/helpers';
 import { getAPIShippingZones } from 'woocommerce/state/sites/shipping-zones/selectors';
-import analytics from 'lib/analytics';
 import { getStoreLocation } from 'woocommerce/state/sites/settings/general/selectors';
 import { getActionList } from 'woocommerce/state/action-list/selectors';
 import { getCountryName } from 'woocommerce/state/sites/locations/selectors';
 import { isDefaultShippingZoneCreated } from 'woocommerce/state/sites/setup-choices/selectors';
 import { setCreatedDefaultShippingZone } from 'woocommerce/state/sites/setup-choices/actions';
-import {
-	generateZoneName,
-	generateCurrentlyEditingZoneName,
-} from 'woocommerce/state/ui/shipping/zones/selectors';
+import { recordTrack } from 'woocommerce/lib/analytics';
 
 const createShippingZoneSuccess = actionList => (
 	dispatch,
@@ -199,7 +200,7 @@ const getZoneMethodDeleteSteps = ( siteId, zoneId, method, state ) => {
 		{
 			description: translate( 'Deleting Shipping Method' ),
 			onStep: ( dispatch, actionList ) => {
-				analytics.tracks.recordEvent( 'calypso_woocommerce_shipping_method_deleted', {
+				recordTrack( 'calypso_woocommerce_shipping_method_deleted', {
 					shipping_method: methodType,
 				} );
 				dispatch(
@@ -217,28 +218,30 @@ const getZoneMethodDeleteSteps = ( siteId, zoneId, method, state ) => {
 };
 
 const getZoneMethodUpdateSteps = ( siteId, zoneId, method, state ) => {
-	const { id, ...methodProps } = method;
-	const methodType =
-		methodProps.methodType || getShippingZoneMethod( state, id, siteId ).methodType;
-	delete methodProps.methodType;
-	if ( isEmpty( methodProps ) ) {
-		return [];
-	}
+	const { id, methodType, enabled, ...extraMethodProps } = method;
+	const realMethodType = methodType || getShippingZoneMethod( state, id, siteId ).methodType;
 
 	const isNew = 'number' !== typeof id;
 	const wasEnabled = ! isNew && getShippingZoneMethod( state, id, siteId ).enabled;
-	const enabledChanged = ! isNil( methodProps.enabled ) && wasEnabled !== methodProps.enabled;
+	const enabledChanged = ! isNil( enabled ) && wasEnabled !== enabled;
+	const isWcsMethod = startsWith( realMethodType, 'wc_services' );
+	// The WCS method needs to be updated in 2 steps: "enable/disable" toggle uses the normal endpoint, rest of the props use a custom one
+	const methodPropsToUpdate = isWcsMethod ? {} : { ...extraMethodProps };
+	if ( enabledChanged ) {
+		methodPropsToUpdate.enabled = enabled;
+	}
+	const steps = [];
 
-	return [
-		{
+	if ( ! isEmpty( methodPropsToUpdate ) ) {
+		steps.push( {
 			description: translate( 'Updating Shipping Method' ),
 			onStep: ( dispatch, actionList ) => {
 				if ( isNew || enabledChanged ) {
 					const event =
-						false !== methodProps.enabled
+						false !== enabled
 							? 'calypso_woocommerce_shipping_method_enabled'
 							: 'calypso_woocommerce_shipping_method_disabled';
-					analytics.tracks.recordEvent( event, { shipping_method: methodType } );
+					recordTrack( event, { shipping_method: realMethodType } );
 				}
 
 				dispatch(
@@ -246,14 +249,34 @@ const getZoneMethodUpdateSteps = ( siteId, zoneId, method, state ) => {
 						siteId,
 						getZoneId( zoneId, actionList ),
 						getMethodId( id, actionList ),
-						methodProps,
+						methodPropsToUpdate,
 						actionListStepSuccess( actionList ),
 						actionListStepFailure( actionList )
 					)
 				);
 			},
-		},
-	];
+		} );
+	}
+
+	if ( isWcsMethod && ! isEmpty( extraMethodProps ) ) {
+		steps.push( {
+			description: translate( 'Updating Shipping Method (extra settings)' ),
+			onStep: ( dispatch, actionList ) => {
+				dispatch(
+					updateWcsShippingZoneMethod(
+						siteId,
+						getMethodId( id, actionList ),
+						realMethodType,
+						extraMethodProps,
+						actionListStepSuccess( actionList ),
+						actionListStepFailure( actionList )
+					)
+				);
+			},
+		} );
+	}
+
+	return steps;
 };
 
 const getZoneMethodCreateSteps = ( siteId, zoneId, method, defaultOrder, state ) => {
@@ -279,7 +302,7 @@ const getZoneMethodCreateSteps = ( siteId, zoneId, method, defaultOrder, state )
 		{
 			description: translate( 'Creating Shipping Method' ),
 			onStep: ( dispatch, actionList ) => {
-				analytics.tracks.recordEvent( 'calypso_woocommerce_shipping_method_created', {
+				recordTrack( 'calypso_woocommerce_shipping_method_created', {
 					shipping_method: methodType,
 				} );
 				dispatch(
@@ -307,7 +330,7 @@ const getZoneMethodCreateSteps = ( siteId, zoneId, method, defaultOrder, state )
 		steps.push.apply( steps, {
 			description: translate( 'Updating Shipping Method' ), // Better not tell the user we're just tracking at this point
 			onStep: ( dispatch, actionList ) => {
-				analytics.tracks.recordEvent( 'calypso_woocommerce_shipping_method_enabled', {
+				recordTrack( 'calypso_woocommerce_shipping_method_enabled', {
 					shipping_method: methodType,
 				} );
 				dispatch( actionListStepSuccess( actionList ) );

@@ -21,7 +21,11 @@ import PackagesListItem from './packages-list-item';
 import QueryPackages from 'woocommerce/woocommerce-services/components/query-packages';
 import * as PackagesActions from '../../state/packages/actions';
 import { getSelectedSiteId } from 'state/ui/selectors';
-import { getPackagesForm, getAllSelectedPackages } from '../../state/packages/selectors';
+import {
+	getPackagesForm,
+	getAllSelectedPackages,
+	isFetchError,
+} from '../../state/packages/selectors';
 
 class Packages extends Component {
 	renderListHeader = packages => {
@@ -47,14 +51,20 @@ class Packages extends Component {
 
 		let button = null;
 		if ( pckg.is_user_defined ) {
-			const onEdit = () => this.props.editPackage( siteId, pckg );
+			const onEdit = () => {
+				this.props.onChange();
+				this.props.editPackage( siteId, pckg );
+			};
 			button = (
 				<Button compact onClick={ onEdit }>
 					{ translate( 'Edit' ) }
 				</Button>
 			);
 		} else {
-			const onRemove = () => this.props.removePredefinedPackage( siteId, pckg.serviceId, pckg.id );
+			const onRemove = () => {
+				this.props.onChange();
+				this.props.removePredefinedPackage( siteId, pckg.serviceId, pckg.id );
+			};
 			button = (
 				<Button compact onClick={ onRemove }>
 					{ translate( 'Remove' ) }
@@ -76,10 +86,17 @@ class Packages extends Component {
 	};
 
 	render() {
-		const { isFetching, siteId, allSelectedPackages, translate } = this.props;
+		const { isFetching, fetchError, siteId, allSelectedPackages, translate } = this.props;
+		if ( fetchError ) {
+			return null;
+		}
+
 		const packages = isFetching ? [ {}, {}, {} ] : allSelectedPackages;
 
-		const addPackage = () => this.props.addPackage( siteId );
+		const addPackage = () => {
+			this.props.onChange();
+			this.props.addPackage( siteId );
+		};
 
 		return (
 			<div>
@@ -109,6 +126,7 @@ Packages.propTypes = {
 	removePackage: PropTypes.func.isRequired,
 	editPackage: PropTypes.func.isRequired,
 	dismissModal: PropTypes.func.isRequired,
+	onChange: PropTypes.func.isRequired,
 	savePackage: PropTypes.func.isRequired,
 	updatePackagesField: PropTypes.func.isRequired,
 	toggleOuterDimensions: PropTypes.func.isRequired,
@@ -126,10 +144,11 @@ Packages.propTypes = {
 export default connect(
 	state => {
 		const siteId = getSelectedSiteId( state );
-		const form = getPackagesForm( state, siteId );
+		const form = getPackagesForm( state, siteId ) || {};
 		return {
 			siteId,
-			isFetching: ! form || ! form.packages || form.isFetching,
+			isFetching: ! form.packages || form.isFetching,
+			fetchError: isFetchError( state, siteId ),
 			form,
 			allSelectedPackages: getAllSelectedPackages( state, siteId ) || [],
 		};

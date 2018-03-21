@@ -1,5 +1,4 @@
 /** @format */
-
 /**
  * External dependencies
  */
@@ -17,9 +16,10 @@ import DocumentHead from 'components/data/document-head';
 import HeaderCake from 'components/header-cake';
 import Main from 'components/main';
 import PageViewTracker from 'lib/analytics/page-view-tracker';
-import purchasesPaths from 'me/purchases/paths';
+import { billingHistory } from 'me/purchases/paths';
 import QueryBillingTransactions from 'components/data/query-billing-transactions';
 import tableRows from './table-rows';
+import { groupDomainProducts } from './utils';
 import { getPastBillingTransaction, getPastBillingTransactions } from 'state/selectors';
 import { recordGoogleEvent } from 'state/analytics/actions';
 
@@ -49,7 +49,7 @@ class BillingReceipt extends React.Component {
 		const { totalTransactions, transaction } = this.props;
 
 		if ( ! transaction && totalTransactions !== null ) {
-			page.redirect( purchasesPaths.billingHistory() );
+			page.redirect( billingHistory );
 		}
 	}
 
@@ -74,10 +74,15 @@ class BillingReceipt extends React.Component {
 
 		if ( transaction.pay_part === 'paypal_express' ) {
 			text = translate( 'PayPal' );
-		} else if ( 'NOT STORED' === transaction.cc_type.toUpperCase() ) {
-			text = translate( 'Credit Card' );
+		} else if ( 'XXXX' !== transaction.cc_num ) {
+			text = translate( '%(cardType)s ending in %(cardNum)s', {
+				args: {
+					cardType: transaction.cc_type.toUpperCase(),
+					cardNum: transaction.cc_num,
+				},
+			} );
 		} else {
-			text = transaction.cc_type.toUpperCase() + translate( ' ending in ' ) + transaction.cc_num;
+			return null;
 		}
 
 		return (
@@ -91,11 +96,7 @@ class BillingReceipt extends React.Component {
 	renderTitle() {
 		const { translate } = this.props;
 
-		return (
-			<HeaderCake backHref={ purchasesPaths.billingHistory() }>
-				{ translate( 'Billing History' ) }
-			</HeaderCake>
-		);
+		return <HeaderCake backHref={ billingHistory }>{ translate( 'Billing History' ) }</HeaderCake>;
 	}
 
 	renderPlaceholder() {
@@ -142,12 +143,14 @@ class BillingReceipt extends React.Component {
 
 	renderLineItems() {
 		const { transaction, translate } = this.props;
-		const items = transaction.items.map( item => {
+		const groupedTransactionItems = groupDomainProducts( transaction.items, translate );
+
+		const items = groupedTransactionItems.map( item => {
 			return (
 				<tr key={ item.id }>
 					<td className="billing-history__receipt-item-name">
 						<span>{ item.variation }</span>
-						<small>({ item.type })</small>
+						<small>({ item.type_localized })</small>
 						<br />
 						<em>{ item.domain }</em>
 					</td>

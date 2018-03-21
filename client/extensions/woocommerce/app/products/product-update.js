@@ -17,12 +17,10 @@ import { localize } from 'i18n-calypso';
 import Main from 'components/main';
 import accept from 'lib/accept';
 import { ProtectFormGuard } from 'lib/protect-form';
-import SidebarNavigation from 'my-sites/sidebar-navigation';
 import { getLink } from 'woocommerce/lib/nav-utils';
 import { successNotice, errorNotice } from 'state/notices/actions';
 import { getActionList } from 'woocommerce/state/action-list/selectors';
 import {
-	createProduct,
 	fetchProduct,
 	deleteProduct as deleteProductAction,
 } from 'woocommerce/state/sites/products/actions';
@@ -49,9 +47,11 @@ import {
 	clearProductCategoryEdits,
 } from 'woocommerce/state/ui/product-categories/actions';
 import { getProductCategoriesWithLocalEdits } from 'woocommerce/state/ui/product-categories/selectors';
+import { getSaveErrorMessage } from './save-error-message';
 import page from 'page';
 import ProductForm from './product-form';
 import ProductHeader from './product-header';
+import { withAnalytics, recordTracksEvent } from 'state/analytics/actions';
 
 class ProductUpdate extends React.Component {
 	static propTypes = {
@@ -67,6 +67,10 @@ class ProductUpdate extends React.Component {
 		editProductCategory: PropTypes.func.isRequired,
 		editProductAttribute: PropTypes.func.isRequired,
 		editProductVariation: PropTypes.func.isRequired,
+	};
+
+	state = {
+		isUploading: [],
 	};
 
 	componentDidMount() {
@@ -108,6 +112,18 @@ class ProductUpdate extends React.Component {
 		}
 	}
 
+	onUploadStart = () => {
+		this.setState( prevState => ( {
+			isUploading: [ ...prevState.isUploading, [ true ] ],
+		} ) );
+	};
+
+	onUploadFinish = () => {
+		this.setState( prevState => ( {
+			isUploading: prevState.isUploading.slice( 1 ),
+		} ) );
+	};
+
 	// TODO: In v1, this deletes a product, as we don't have trash management.
 	// Once we have trashing management, we can introduce 'trash' instead.
 	onTrash = () => {
@@ -141,26 +157,30 @@ class ProductUpdate extends React.Component {
 	};
 
 	onSave = () => {
-		const { product, translate } = this.props;
+		const { product, translate, site, fetchProductCategories: fetch } = this.props;
+		const successAction = () => {
+			fetch( site.ID );
+			return successNotice(
+				translate( '%(product)s successfully updated.', {
+					args: { product: product.name },
+				} ),
+				{
+					duration: 8000,
+					button: translate( 'View' ),
+					onClick: () => {
+						window.open( product.permalink );
+					},
+				}
+			);
+		};
 
-		const successAction = successNotice(
-			translate( '%(product)s successfully updated.', {
-				args: { product: product.name },
-			} ),
-			{
+		const failureAction = error => {
+			const errorSlug = ( error && error.error ) || undefined;
+
+			return errorNotice( getSaveErrorMessage( errorSlug, product.name, translate ), {
 				duration: 8000,
-				button: translate( 'View' ),
-				onClick: () => {
-					window.open( product.permalink );
-				},
-			}
-		);
-
-		const failureAction = errorNotice(
-			translate( 'There was a problem saving %(product)s. Please try again.', {
-				args: { product: product.name },
-			} )
-		);
+			} );
+		};
 
 		this.props.createProductActionList( successAction, failureAction );
 	};
@@ -182,11 +202,10 @@ class ProductUpdate extends React.Component {
 
 		const isValid = 'undefined' !== site && this.isProductValid();
 		const isBusy = Boolean( actionList ); // If there's an action list present, we're trying to save.
-		const saveEnabled = isValid && ! isBusy && hasEdits;
+		const saveEnabled = isValid && ! isBusy && hasEdits && 0 === this.state.isUploading.length;
 
 		return (
-			<Main className={ className }>
-				<SidebarNavigation />
+			<Main className={ className } wideLayout>
 				<ProductHeader
 					site={ site }
 					product={ product }
@@ -205,6 +224,8 @@ class ProductUpdate extends React.Component {
 					editProductCategory={ this.props.editProductCategory }
 					editProductAttribute={ this.props.editProductAttribute }
 					editProductVariation={ this.props.editProductVariation }
+					onUploadStart={ this.onUploadStart }
+					onUploadFinish={ this.onUploadFinish }
 				/>
 			</Main>
 		);
@@ -236,8 +257,11 @@ function mapStateToProps( state, ownProps ) {
 function mapDispatchToProps( dispatch ) {
 	return bindActionCreators(
 		{
-			createProduct,
-			createProductActionList,
+			createProductActionList: ( ...args ) =>
+				withAnalytics(
+					recordTracksEvent( 'calypso_woocommerce_ui_product_update' ),
+					createProductActionList( ...args )
+				),
 			deleteProduct: deleteProductAction,
 			editProduct,
 			editProductCategory,

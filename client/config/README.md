@@ -2,7 +2,7 @@ client/config
 =============
 
 This module reads config data from `window.configData` (passed from the Node.js
-server via the Pug template file) and initializes a `config` object that is
+server in the HTML response) and initializes a `config` object that is
 used to read these values.
 
 You can read more about how to use `config` in the
@@ -20,7 +20,7 @@ in-progress features without launching them to production.
 Is a feature enabled?
 
 ``` js
-var config = require( 'config' );
+import config from 'config';
 
 if ( config.isEnabled( 'myFeature') ) {
 	// do something only when myFeature is enabled

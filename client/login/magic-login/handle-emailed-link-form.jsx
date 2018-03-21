@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import React from 'react';
 import PropTypes from 'prop-types';
 import classNames from 'classnames';
@@ -32,9 +30,14 @@ import {
 	getMagicLoginRequestedAuthSuccessfully,
 	isFetchingMagicLoginAuth,
 } from 'state/selectors';
-import { getTwoFactorNotificationSent, isTwoFactorEnabled } from 'state/login/selectors';
+import {
+	getRedirectToOriginal,
+	getRedirectToSanitized,
+	getTwoFactorNotificationSent,
+	isTwoFactorEnabled,
+} from 'state/login/selectors';
 import { getCurrentUser } from 'state/current-user/selectors';
-import { recordTracksEvent } from 'state/analytics/actions';
+import { recordTracksEventWithClientId as recordTracksEvent } from 'state/analytics/actions';
 
 const user = userFactory();
 
@@ -44,7 +47,6 @@ class HandleEmailedLinkForm extends React.Component {
 		clientId: PropTypes.string,
 		emailAddress: PropTypes.string.isRequired,
 		token: PropTypes.string.isRequired,
-		tokenTime: PropTypes.string.isRequired,
 
 		// Connected props
 		authError: PropTypes.oneOfType( [ PropTypes.string, PropTypes.number ] ),
@@ -52,6 +54,8 @@ class HandleEmailedLinkForm extends React.Component {
 		isAuthenticated: PropTypes.bool,
 		isExpired: PropTypes.bool,
 		isFetching: PropTypes.bool,
+		redirectToOriginal: PropTypes.string,
+		redirectToSanitized: PropTypes.string,
 		twoFactorEnabled: PropTypes.bool,
 		twoFactorNotificationSent: PropTypes.string,
 
@@ -68,8 +72,7 @@ class HandleEmailedLinkForm extends React.Component {
 	constructor( props ) {
 		super( props );
 
-		if ( isEmpty( props.emailAddress ) || isEmpty( props.token ) || isEmpty( props.tokenTime ) ) {
-			// Required props are really required :)
+		if ( isEmpty( props.emailAddress ) || isEmpty( props.token ) ) {
 			this.props.showMagicLoginLinkExpiredPage();
 		}
 	}
@@ -81,27 +84,23 @@ class HandleEmailedLinkForm extends React.Component {
 			hasSubmitted: true,
 		} );
 
-		this.props.fetchMagicLoginAuthenticate(
-			this.props.emailAddress,
-			this.props.token,
-			this.props.tokenTime
-		);
+		this.props.fetchMagicLoginAuthenticate( this.props.token, this.props.redirectToOriginal );
 	};
 
 	// Lifted from `blocks/login`
 	// @TODO move to `state/login/actions` & use both places
 	handleValidToken = () => {
-		if ( ! this.props.twoFactorEnabled ) {
+		const { redirectToSanitized, twoFactorEnabled, twoFactorNotificationSent } = this.props;
+
+		if ( ! twoFactorEnabled ) {
 			this.rebootAfterLogin();
 		} else {
 			page(
 				login( {
 					isNative: true,
 					// If no notification is sent, the user is using the authenticator for 2FA by default
-					twoFactorAuthType: this.props.twoFactorNotificationSent.replace(
-						'none',
-						'authenticator'
-					),
+					twoFactorAuthType: twoFactorNotificationSent.replace( 'none', 'authenticator' ),
+					redirectTo: redirectToSanitized,
 				} )
 			);
 		}
@@ -110,22 +109,20 @@ class HandleEmailedLinkForm extends React.Component {
 	// Lifted from `blocks/login`
 	// @TODO move to `state/login/actions` & use both places
 	rebootAfterLogin = () => {
-		const { redirectTo } = this.props;
+		const { redirectToSanitized, twoFactorEnabled } = this.props;
 
 		this.props.recordTracksEvent( 'calypso_login_success', {
-			two_factor_enabled: this.props.twoFactorEnabled,
+			two_factor_enabled: twoFactorEnabled,
 			magic_login: 1,
 		} );
 
 		// Redirects to / if no redirect url is available
-		const url = redirectTo ? redirectTo : window.location.origin;
+		const url = redirectToSanitized ? redirectToSanitized : window.location.origin;
 
 		// user data is persisted in localstorage at `lib/user/user` line 157
 		// therefore we need to reset it before we redirect, otherwise we'll get
 		// mixed data from old and new user
-		user.clear();
-
-		window.location.href = url;
+		user.clear( () => ( window.location.href = url ) );
 	};
 
 	componentWillUpdate( nextProps, nextState ) {
@@ -202,6 +199,8 @@ class HandleEmailedLinkForm extends React.Component {
 
 const mapState = state => {
 	return {
+		redirectToOriginal: getRedirectToOriginal( state ),
+		redirectToSanitized: getRedirectToSanitized( state ),
 		authError: getMagicLoginRequestAuthError( state ),
 		currentUser: getCurrentUser( state ),
 		isAuthenticated: getMagicLoginRequestedAuthSuccessfully( state ),

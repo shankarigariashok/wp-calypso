@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { find, get, isEmpty, map, mapValues, sum } from 'lodash';
+import { find, get, isEmpty, isEqual, isFinite, mapValues, round, some } from 'lodash';
 import { translate } from 'i18n-calypso';
 /**
  * Internal dependencies
@@ -9,9 +9,11 @@ import { translate } from 'i18n-calypso';
 import createSelector from 'lib/create-selector';
 import { getSelectedSiteId } from 'state/ui/selectors';
 import { hasNonEmptyLeaves } from 'woocommerce/woocommerce-services/lib/utils/tree';
-import { isValidPhone } from 'woocommerce/woocommerce-services/lib/utils/phone-format';
-import { areSettingsLoaded } from 'woocommerce/woocommerce-services/state/label-settings/selectors';
-import { isLoaded as arePackagesLoaded } from 'woocommerce/woocommerce-services/state/packages/selectors';
+import { areSettingsLoaded, areSettingsErrored } from 'woocommerce/woocommerce-services/state/label-settings/selectors';
+import {
+	isLoaded as arePackagesLoaded,
+	isFetchError as arePackagesErrored,
+} from 'woocommerce/woocommerce-services/state/packages/selectors';
 
 export const getShippingLabel = ( state, orderId, siteId = getSelectedSiteId( state ) ) => {
 	return get( state, [ 'extensions', 'woocommerce', 'woocommerceServices', siteId, 'shippingLabel', orderId ], null );
@@ -71,33 +73,44 @@ export const getForm = ( state, orderId, siteId = getSelectedSiteId( state ) ) =
 	return shippingLabel && shippingLabel.form;
 };
 
-export const getRatesTotal = createSelector(
-	( state, orderId, siteId = getSelectedSiteId( state ) ) => {
-		const form = getForm( state, orderId, siteId );
-		if ( ! form ) {
-			return 0;
-		}
-
-		const { values: selectedRates, available: availableRates } = form.rates;
-
-		const ratesCost = map( selectedRates, ( rateId, boxId ) => {
-			const packageRates = get( availableRates, [ boxId, 'rates' ], false );
-
-			if ( packageRates ) {
-				const foundRate = find( packageRates, [ 'service_id', rateId ] );
-
-				return foundRate ? foundRate.rate : 0;
-			}
-			return 0;
-		} );
-
-		return Number( sum( ratesCost ) ).toFixed( 2 );
-	},
-	( state, orderId, siteId = getSelectedSiteId( state ) ) => {
-		const form = getForm( state, orderId, siteId );
-		return [ form && form.rates ];
+/**
+ * Returns a breakdown of the total price for selected labels in form of { prices, discount, total }
+ * @param {Object} state global state tree
+ * @param {Number} orderId order Id
+ * @param {Number} siteId site Id
+ *
+ * @returns {Object} price breakdown
+ */
+export const getTotalPriceBreakdown = ( state, orderId, siteId = getSelectedSiteId( state ) ) => {
+	const form = getForm( state, orderId, siteId );
+	if ( ! form ) {
+		return null;
 	}
-);
+
+	const { values: selectedRates, available: availableRates } = form.rates;
+	const prices = [];
+	let discount = 0;
+	let total = 0;
+	for ( const packageId in selectedRates ) {
+		const packageRates = get( availableRates, [ packageId, 'rates' ], false );
+		const foundRate = find( packageRates, [ 'service_id', selectedRates[ packageId ] ] );
+		if ( foundRate ) {
+			prices.push( {
+				title: foundRate.title,
+				retailRate: foundRate.retail_rate,
+			} );
+
+			discount += round( foundRate.retail_rate - foundRate.rate, 2 );
+			total += foundRate.rate;
+		}
+	}
+
+	return prices.length ? {
+		prices,
+		discount: discount,
+		total: total,
+	} : null;
+};
 
 const getAddressErrors = ( { values, isNormalized, normalized, selectNormalized, ignoreValidation }, countriesData ) => {
 	if ( isNormalized && ! normalized ) {
@@ -107,8 +120,8 @@ const getAddressErrors = ( { values, isNormalized, normalized, selectNormalized,
 			address: translate( 'This address is not recognized. Please try another.' ),
 		};
 	}
-	const { phone, postcode, state, country } = ( isNormalized && selectNormalized ) ? normalized : values;
-	const requiredFields = [ 'name', 'phone', 'address', 'city', 'postcode', 'country' ];
+	const { postcode, state, country } = ( isNormalized && selectNormalized ) ? normalized : values;
+	const requiredFields = [ 'name', 'address', 'city', 'postcode', 'country' ];
 	const errors = {};
 	requiredFields.forEach( ( field ) => {
 		if ( ! values[ field ] ) {
@@ -117,10 +130,6 @@ const getAddressErrors = ( { values, isNormalized, normalized, selectNormalized,
 	} );
 
 	if ( countriesData[ country ] ) {
-		if ( ! isValidPhone( phone, country ) ) {
-			errors.phone = translate( 'Invalid phone number for %(country)s', { args: { country: countriesData[ country ].name } } );
-		}
-
 		switch ( country ) {
 			case 'US':
 				if ( ! /^\d{5}(?:-\d{4})?$/.test( postcode ) ) {
@@ -152,8 +161,19 @@ const getPackagesErrors = ( values ) => mapValues( values, ( pckg ) => {
 		errors.box_id = translate( 'Please select a package' );
 	}
 
-	if ( ! pckg.weight || 'number' !== typeof pckg.weight || 0 > pckg.weight ) {
+	const isInvalidDimension = ( dimension ) => ( ! isFinite( dimension ) || 0 >= dimension );
+
+	if ( isInvalidDimension( pckg.weight ) ) {
 		errors.weight = translate( 'Invalid weight' );
+	}
+
+	const hasInvalidDimensions = some( [
+		pckg.length,
+		pckg.width,
+		pckg.height,
+	], isInvalidDimension );
+	if ( hasInvalidDimensions ) {
+		errors.dimensions = translate( 'Package dimensions must be greater than zero' );
 	}
 
 	return errors;
@@ -209,14 +229,52 @@ export const getFormErrors = createSelector(
 	]
 );
 
+/**
+ * Checks the form for errors and returns a step with an error in it or null
+ * @param {Object} state global state tree
+ * @param {Object} orderId order Id
+ * @param {Object} siteId site Id
+ *
+ * @returns {String} erroneous step name or null
+ */
+export const getFirstErroneousStep = ( state, orderId, siteId = getSelectedSiteId( state ) ) => {
+	const form = getForm( state, orderId, siteId );
+	if ( ! form ) {
+		return null;
+	}
+
+	const errors = getFormErrors( state, orderId, siteId );
+
+	if ( ! form.origin.isNormalized ||
+		! isEqual( form.origin.values, form.origin.normalized ) ||
+		hasNonEmptyLeaves( errors.origin ) ) {
+		return 'origin';
+	}
+
+	if ( ! form.destination.isNormalized ||
+		! isEqual( form.destination.values, form.destination.normalized ) ||
+		hasNonEmptyLeaves( errors.destination ) ) {
+		return 'destination';
+	}
+
+	if ( hasNonEmptyLeaves( errors.packages ) ) {
+		return 'packages';
+	}
+
+	if ( hasNonEmptyLeaves( errors.rates ) ) {
+		return 'rates';
+	}
+
+	return null;
+};
+
 export const canPurchase = createSelector(
 	( state, orderId, siteId = getSelectedSiteId( state ) ) => {
-		const errors = getFormErrors( state, orderId, siteId );
 		const form = getForm( state, orderId, siteId );
 
 		return (
 			! isEmpty( form ) &&
-			! hasNonEmptyLeaves( errors ) &&
+			! getFirstErroneousStep( state, orderId, siteId ) &&
 			! form.origin.normalizationInProgress &&
 			! form.destination.normalizationInProgress &&
 			! form.rates.retrievalInProgress &&
@@ -224,11 +282,24 @@ export const canPurchase = createSelector(
 		);
 	},
 	( state, orderId, siteId = getSelectedSiteId( state ) ) => [
-		getFormErrors( state, orderId, siteId ),
 		getForm( state, orderId, siteId ),
+		getFirstErroneousStep( state, orderId, siteId ),
 	]
 );
 
 export const areLabelsFullyLoaded = ( state, orderId, siteId = getSelectedSiteId( state ) ) => {
 	return isLoaded( state, orderId, siteId ) && areSettingsLoaded( state, siteId ) && arePackagesLoaded( state, siteId );
+};
+
+export const isLabelDataFetchError = ( state, orderId, siteId = getSelectedSiteId( state ) ) => {
+	return isError( state, orderId, siteId ) || areSettingsErrored( state, siteId ) || arePackagesErrored( state, siteId );
+};
+
+export const getCountriesData = ( state, orderId, siteId = getSelectedSiteId( state ) ) => {
+	if ( ! isLoaded( state, orderId, siteId ) ) {
+		return null;
+	}
+
+	const shippingLabel = getShippingLabel( state, orderId, siteId );
+	return shippingLabel.storeOptions.countriesData;
 };

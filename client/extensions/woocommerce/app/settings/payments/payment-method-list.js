@@ -28,6 +28,7 @@ class SettingsPaymentsMethodList extends Component {
 		isLoading: PropTypes.bool,
 		fetchPaymentMethods: PropTypes.func.isRequired,
 		methodType: PropTypes.string.isRequired,
+		onChange: PropTypes.func.isRequired,
 		paymentMethods: PropTypes.array.isRequired,
 		site: PropTypes.object,
 	};
@@ -52,13 +53,15 @@ class SettingsPaymentsMethodList extends Component {
 	};
 
 	renderMethodItem = method => {
-		const { site } = this.props;
-		// Disable BACS and Cheque payment for now until #16630 and #16629 are fixed.
-		if ( 'bacs' === method.id ) {
-			return null;
-		}
-
-		return <PaymentMethodItem method={ method } key={ method.title } site={ site } />;
+		const { onChange, site } = this.props;
+		return (
+			<PaymentMethodItem
+				method={ method }
+				key={ method.title }
+				onChange={ onChange }
+				site={ site }
+			/>
+		);
 	};
 
 	showPlaceholder = () => {

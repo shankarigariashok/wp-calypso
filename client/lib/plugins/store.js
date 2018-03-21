@@ -3,26 +3,24 @@
 /**
  * External dependencies
  */
-
 import debugFactory from 'debug';
-
-const debug = debugFactory( 'calypso:sites-plugins:sites-plugins-store' );
-import { assign, isArray, sortBy, uniq, compact, values, find } from 'lodash';
+import { assign, clone, isArray, sortBy, values, find } from 'lodash';
 
 /**
  * Internal dependencies
  */
 import Dispatcher from 'dispatcher';
 import emitter from 'lib/mixins/emitter';
-/* eslint-disable no-restricted-imports */
-import sitesListFactory from 'lib/sites-list';
-const sitesList = sitesListFactory();
 /* eslint-enable no-restricted-imports */
 import PluginsActions from 'lib/plugins/actions';
 import versionCompare from 'lib/version-compare';
-import PluginUtils from 'lib/plugins/utils';
-import JetpackSite from 'lib/site/jetpack';
-import Site from 'lib/site';
+import { normalizePluginData } from 'lib/plugins/utils';
+import { reduxDispatch, reduxGetState } from 'lib/redux-bridge';
+import { getNetworkSites } from 'state/selectors';
+import { getSite } from 'state/sites/selectors';
+import { sitePluginUpdated } from 'state/sites/actions';
+
+const debug = debugFactory( 'calypso:sites-plugins:sites-plugins-store' );
 
 /*
  * Constants
@@ -61,7 +59,7 @@ var _fetching = {},
 	};
 
 function refreshNetworkSites( site ) {
-	var networkSites = sitesList.getNetworkSites( site );
+	const networkSites = getNetworkSites( reduxGetState(), site.ID );
 	if ( networkSites ) {
 		networkSites.forEach( PluginsActions.fetchSitePlugins );
 	}
@@ -99,7 +97,7 @@ function update( site, slug, plugin ) {
 	if ( ! _pluginsBySite[ site.ID ][ slug ] ) {
 		_pluginsBySite[ site.ID ][ slug ] = { slug: slug };
 	}
-	plugin = PluginUtils.normalizePluginData( plugin );
+	plugin = normalizePluginData( plugin );
 	_pluginsBySite[ site.ID ][ slug ] = assign( {}, _pluginsBySite[ site.ID ][ slug ], plugin );
 
 	debug( 'update to ', _pluginsBySite[ site.ID ][ slug ] );
@@ -224,20 +222,13 @@ const PluginsStore = {
 			return null;
 		}
 
-		pluginSites = uniq(
-			compact(
-				plugin.sites.map( function( site ) {
-					// we create a copy of the site to avoid any possible modification down the line affecting the main list
-					let pluginSite = site.jetpack
-						? new JetpackSite( sitesList.getSite( site.ID ) )
-						: new Site( sitesList.getSite( site.ID ) );
-					pluginSite.plugin = site.plugin;
-					if ( site.visible ) {
-						return pluginSite;
-					}
-				} )
-			)
-		);
+		pluginSites = plugin.sites.filter( site => site.visible ).map( site => {
+			// clone the site object before adding a new property. Don't modify the return value of getSite
+			const pluginSite = clone( getSite( reduxGetState(), site.ID ) );
+			pluginSite.plugin = site.plugin;
+			return pluginSite;
+		} );
+
 		return pluginSites.sort( function( first, second ) {
 			return first.title.toLowerCase() > second.title.toLowerCase() ? 1 : -1;
 		} );
@@ -254,13 +245,7 @@ const PluginsStore = {
 			if ( ! site.visible ) {
 				return false;
 			}
-			//TODO: compatibility with old site object (for now, remove when not needed)
-			if (
-				site.jetpack &&
-				( typeof site.isSecondaryNetworkSite === 'function'
-					? site.isSecondaryNetworkSite()
-					: site.isSecondaryNetworkSite )
-			) {
+			if ( site.jetpack && site.isSecondaryNetworkSite ) {
 				return false;
 			}
 
@@ -320,7 +305,7 @@ PluginsStore.dispatchToken = Dispatcher.register( function( { action } ) {
 					action.plugin.slug,
 					Object.assign( { update: { recentlyUpdated: true } }, action.data )
 				);
-				sitesList.onUpdatedPlugin( action.site );
+				reduxDispatch( sitePluginUpdated( action.site.ID ) );
 				setTimeout(
 					PluginsActions.removePluginUpdateInfo.bind( PluginsActions, action.site, action.plugin ),
 					_UPDATED_PLUGIN_INFO_TIME_TO_LIVE

@@ -109,12 +109,30 @@ class TagStream extends React.Component {
 			} );
 		}
 
+		if ( tag && tag.error ) {
+			return (
+				<React.Fragment>
+					<QueryReaderFollowedTags />
+					<QueryReaderTag tag={ this.props.decodedTagSlug } />
+					{ this.props.showBack && <HeaderBack /> }
+					<TagStreamHeader
+						title={ title }
+						imageSearchString={ imageSearchString }
+						showFollow={ false }
+						showBack={ this.props.showBack }
+					/>
+					<EmptyContent />
+				</React.Fragment>
+			);
+		}
+
 		return (
 			<Stream
 				{ ...this.props }
 				listName={ this.state.title }
 				emptyContent={ emptyContent }
 				showFollowInHeader={ true }
+				forcePlaceholders={ ! tag } // if tag hasn't loaded yet, then make everything a placeholder
 			>
 				<QueryReaderFollowedTags />
 				<QueryReaderTag tag={ this.props.decodedTagSlug } />

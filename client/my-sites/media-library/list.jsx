@@ -15,16 +15,15 @@ import React from 'react';
  * Internal dependencies
  */
 import MediaActions from 'lib/media/actions';
-import MediaUtils from 'lib/media/utils';
+import { getMimePrefix } from 'lib/media/utils';
 import ListItem from './list-item';
 import ListNoResults from './list-no-results';
 import ListNoContent from './list-no-content';
-import userFactory from 'lib/user';
-const user = userFactory();
 
 import SortedGrid from 'components/sorted-grid';
 import ListPlanUpgradeNudge from './list-plan-upgrade-nudge';
 import { getPreference } from 'state/preferences/selectors';
+import { isRtl as isRtlSelector } from 'state/selectors';
 
 const GOOGLE_MAX_RESULTS = 1000;
 
@@ -97,7 +96,9 @@ export class MediaLibraryList extends React.Component {
 		if ( ! isFillingEntireRow && ! isLastInRow ) {
 			marginValue = ( 1 % this.props.mediaScale ) / ( itemsPerRow - 1 ) * 100 + '%';
 
-			if ( user.isRTL() ) {
+			const { isRtl } = this.props;
+
+			if ( isRtl ) {
 				style.marginLeft = marginValue;
 			} else {
 				style.marginRight = marginValue;
@@ -179,7 +180,7 @@ export class MediaLibraryList extends React.Component {
 			! this.props.single &&
 			selectedIndex !== -1 &&
 			selectedItems.length === 1 &&
-			'image' === MediaUtils.getMimePrefix( item );
+			'image' === getMimePrefix( item );
 
 		return (
 			<ListItem
@@ -233,8 +234,15 @@ export class MediaLibraryList extends React.Component {
 		return null;
 	};
 
+	sourceIsUngrouped( source ) {
+		const ungroupedSources = [ 'pexels' ];
+		return -1 !== ungroupedSources.indexOf( source );
+	}
+
 	render() {
 		var onFetchNextPage;
+		let getItemGroup = this.getItemGroup;
+		let getGroupLabel = this.getGroupLabel;
 
 		if ( this.props.filterRequiresUpgrade ) {
 			return <ListPlanUpgradeNudge filter={ this.props.filter } site={ this.props.site } />;
@@ -255,11 +263,18 @@ export class MediaLibraryList extends React.Component {
 			this.props.mediaOnFetchNextPage();
 		}.bind( this );
 
+		// some sources aren't grouped beyond anything but the source, so set the
+		// getItemGroup function to return the source, and no label.
+		if ( this.sourceIsUngrouped( this.props.source ) ) {
+			getItemGroup = () => this.props.source;
+			getGroupLabel = () => '';
+		}
+
 		return (
 			<SortedGrid
 				ref={ this.setListContext }
-				getItemGroup={ this.getItemGroup }
-				getGroupLabel={ this.getGroupLabel }
+				getItemGroup={ getItemGroup }
+				getGroupLabel={ getGroupLabel }
 				context={ this.props.scrollable ? this.state.listContext : false }
 				items={ this.props.media || [] }
 				itemsPerRow={ this.getItemsPerRow() }
@@ -280,6 +295,7 @@ export class MediaLibraryList extends React.Component {
 export default connect(
 	state => ( {
 		mediaScale: getPreference( state, 'mediaScale' ),
+		isRtl: isRtlSelector( state ),
 	} ),
 	null,
 	null,

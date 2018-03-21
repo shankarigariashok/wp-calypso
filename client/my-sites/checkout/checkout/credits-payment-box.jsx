@@ -11,44 +11,43 @@ import { some } from 'lodash';
 /**
  * Internal dependencies
  */
+import WordPressLogo from 'components/wordpress-logo';
 import PayButton from './pay-button';
 import PaymentBox from './payment-box';
 import TermsOfService from './terms-of-service';
-import { abtest } from 'lib/abtest';
 import CartCoupon from 'my-sites/checkout/cart/cart-coupon';
 import PaymentChatButton from './payment-chat-button';
-import config from 'config';
 import { PLAN_BUSINESS } from 'lib/plans/constants';
 import CartToggle from './cart-toggle';
 
 class CreditsPaymentBox extends React.Component {
 	content = () => {
-		const { cart, transactionStep } = this.props;
+		const { cart, transactionStep, presaleChatAvailable } = this.props;
 		const hasBusinessPlanInCart = some( cart.products, { product_slug: PLAN_BUSINESS } );
-		const showPaymentChatButton =
-			config.isEnabled( 'upgrades/presale-chat' ) &&
-			abtest( 'presaleChatButton' ) === 'showChatButton' &&
-			hasBusinessPlanInCart;
+		const showPaymentChatButton = presaleChatAvailable && hasBusinessPlanInCart;
 
 		return (
 			<form onSubmit={ this.props.onSubmit }>
 				<div className="payment-box-section">
-					<h6>{ this.props.translate( 'WordPress.com Credits' ) }</h6>
+					<WordPressLogo size={ 52 } />
+					<div className="checkout__payment-box-section-content">
+						<h6>{ this.props.translate( 'WordPress.com Credits' ) }</h6>
 
-					<span>
-						{ this.props.translate(
-							'You have {{strong}}%(credits)s %(currency)s in Credits{{/strong}} available.',
-							{
-								args: {
-									credits: cart.credits,
-									currency: cart.currency,
-								},
-								components: {
-									strong: <strong />,
-								},
-							}
-						) }
-					</span>
+						<span>
+							{ this.props.translate(
+								'You have {{strong}}%(credits)s %(currency)s in Credits{{/strong}} available.',
+								{
+									args: {
+										credits: cart.credits,
+										currency: cart.currency,
+									},
+									components: {
+										strong: <strong />,
+									},
+								}
+							) }
+						</span>
+					</div>
 				</div>
 
 				<TermsOfService />

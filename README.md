@@ -2,7 +2,7 @@
 
 Calypso is the new WordPress.com front-end – a beautiful redesign of the WordPress dashboard using a single-page web application, powered by the WordPress.com REST API. Calypso is built for reading, writing, and managing all of your WordPress sites in one place.
 
-![beautiful screenshot](https://developer.wordpress.com/wp-content/themes/a8c/wpcomdev3/calypso/images/speed2x.png)
+![beautiful screenshot](https://cldup.com/Q74QJCh0Yl.png)
 
 It’s built with JavaScript – a very light [node](https://nodejs.org) plus [express](http://expressjs.com) server, [React.js](https://facebook.github.io/react/), [Redux](http://redux.js.org/), [wpcom.js](http://wpcomjs.com), and many other wonderful libraries on the front-end.
 
@@ -15,7 +15,7 @@ You can try out the user-side of Calypso on [WordPress.com](https://wordpress.co
 1.	Make sure you have `git`, `node`, and `npm` installed.
 2.	Clone this repository locally.
 3.	Add `127.0.0.1 calypso.localhost` to your local `hosts` file.
-4.	Execute `npm start` or `npm run dashboard` (for a more visually-oriented interface) from the root directory of the repository.
+4.	Execute `npm start` from the root directory of the repository.
 5.	Open [`calypso.localhost:3000`](http://calypso.localhost:3000/) in your browser.
 
 Need more detailed installation instructions? [We have them](docs/install.md).

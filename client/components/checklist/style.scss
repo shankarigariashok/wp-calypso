@@ -25,25 +25,26 @@
 		flex-direction: row;
 		font-size: 14px;
 		white-space: nowrap;
+		margin-bottom: 5px;
 	}
 
 	&-progress-text {
 		display: flex;
 		flex: 1 1;
 		margin: 0;
-		color: $gray;
+		color: $gray-text-min;
 	}
 
 	&-progress-number {
 		display: flex;
-		color: $gray;
+		color: $gray-text-min;
 		padding-left: 1em;
 	}
 
 	&-summary {
 		font-size: 12px;
 		line-height: 24px;
-		color: $gray;
+		color: $gray-text-min;
 		cursor: pointer;
 	}
 
@@ -67,6 +68,10 @@
 			.gridicon {
 				transform: rotate(180deg);
 			}
+		}
+
+		.accessible-focus &:focus {
+			box-shadow: inset 0 0 0 2px $blue-light;
 		}
 	}
 
@@ -103,7 +108,7 @@
 		top: 0;
 		bottom: 0;
 		left: 34px;
-		border-left: 1px solid lighten($gray, 20%);
+		border-left: 1px solid $gray-lighten-20;
 	}
 
 	&-icon {
@@ -113,10 +118,33 @@
 		left: 24px;
 		width: 16px;
 		height: 16px;
-		border: 2px solid lighten($gray, 20%);
+		border: 2px solid $gray-lighten-20;
 		border-radius: 16px;
 		background: $white;
 		cursor: pointer;
+
+		.gridicons-checkmark {
+			display: none;
+			fill: $white;
+			position: absolute;
+			top: -1px;
+			left: 1px;
+		}
+
+		&:hover,
+		&:focus {
+			background: $alert-green;
+			border-color: $alert-green;
+
+			.gridicons-checkmark {
+				display: block;
+			}
+		}
+
+		&:active {
+			background: $blue-medium;
+			border-color: $blue-medium;
+		}
 	}
 
 	&-primary {
@@ -137,7 +165,8 @@
 		}
 	}
 
-	&-title {
+	&-title-link.button {
+		padding: 0;
 		color: $blue-wordpress;
 		font-weight: 400;
 		font-size: 16px;
@@ -149,7 +178,7 @@
 
 	&-duration {
 		font-size: 12px;
-		color: $gray;
+		color: $gray-text-min;
 
 		.checklist__task-primary & {
 			display: inline-block;
@@ -184,24 +213,27 @@
 			top: 13px;
 			background: $alert-green;
 			border-color: $alert-green;
+
+			&:hover {
+				cursor: default;
+			}
 		}
 
-		.checklist__task-title {
-			color: $gray;
+		.checklist__task-title,
+		.checklist__task-title-link {
+			color: $gray-text-min;
 			font-size: 14px;
+			cursor: default;
+		}
+
+		.gridicons-checkmark {
+			display: block;
 		}
 
 		.checklist__task-description,
 		.checklist__task-duration,
 		.checklist__task-secondary {
 			display: none;
-		}
-
-		.gridicons-checkmark {
-			position: absolute;
-			top: -1px;
-			left: 1px;
-			fill: $white;
 		}
 	}
 
@@ -215,7 +247,7 @@
 			border: 0;
 			padding: 0;
 			text-decoration: underline;
-			color: $gray;
+			color: $gray-text-min;
 			font-size: 12px;
 			font-weight: 400;
 			width: 100%;

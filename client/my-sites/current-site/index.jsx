@@ -5,7 +5,6 @@
  */
 
 import React, { Component } from 'react';
-import classNames from 'classnames';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
 import PropTypes from 'prop-types';
@@ -20,7 +19,6 @@ import Button from 'components/button';
 import Card from 'components/card';
 import Site from 'blocks/site';
 import Gridicon from 'gridicons';
-import config from 'config';
 import SiteNotice from './notice';
 import CartStore from 'lib/cart/store';
 import { setLayoutFocus } from 'state/ui/layout-focus/actions';
@@ -30,10 +28,11 @@ import { infoNotice, removeNotice } from 'state/notices/actions';
 import { getNoticeLastTimeShown } from 'state/notices/selectors';
 import { getSectionName } from 'state/ui/selectors';
 import { recordTracksEvent } from 'state/analytics/actions';
+import isRtl from 'state/selectors/is-rtl';
+import { hasAllSitesList } from 'state/sites/selectors';
 
 class CurrentSite extends Component {
 	static propTypes = {
-		isPreviewShowing: PropTypes.bool,
 		siteCount: PropTypes.number.isRequired,
 		setLayoutFocus: PropTypes.func.isRequired,
 		selectedSite: PropTypes.object,
@@ -91,46 +90,13 @@ class CurrentSite extends Component {
 		analytics.ga.recordEvent( 'Sidebar', 'Clicked Switch Site' );
 	};
 
-	previewSite = event => this.props.onClick && this.props.onClick( event );
-
-	renderSiteViewLink() {
-		if ( config.isEnabled( 'standalone-site-preview' ) ) {
-			return;
-		}
-
-		const { isPreviewShowing, selectedSite, translate } = this.props;
-
-		const viewText = selectedSite.is_previewable
-			? translate( 'Site Preview' )
-			: translate( 'View site' );
-
-		const viewIcon = selectedSite.is_previewable ? 'computer' : 'external';
-
-		return (
-			<a
-				href={ selectedSite.URL }
-				onClick={ this.previewSite }
-				className={ classNames( 'current-site__view-site', {
-					selected: isPreviewShowing,
-				} ) }
-				target="_blank"
-				rel="noopener noreferrer"
-			>
-				<span className="current-site__view-site-text">{ viewText }</span>
-				<Gridicon icon={ viewIcon } />
-			</a>
-		);
-	}
-
 	render() {
-		const { selectedSite, translate, anySiteSelected } = this.props;
+		const { selectedSite, translate, anySiteSelected, rtlOn } = this.props;
 
-		if ( ! anySiteSelected.length ) {
+		if ( ! anySiteSelected.length || ( ! selectedSite && ! this.props.hasAllSitesList ) ) {
 			/* eslint-disable wpcalypso/jsx-classname-namespace */
 			return (
 				<Card className="current-site is-loading">
-					{ this.props.siteCount > 1 && <span className="current-site__switch-sites">&nbsp;</span> }
-
 					<div className="site">
 						<a className="site__content">
 							<div className="site-icon" />
@@ -148,9 +114,11 @@ class CurrentSite extends Component {
 			<Card className="current-site">
 				{ this.props.siteCount > 1 && (
 					<span className="current-site__switch-sites">
-						<Button compact borderless onClick={ this.switchSites }>
-							<Gridicon icon="arrow-left" size={ 18 } />
-							{ translate( 'Switch Site' ) }
+						<Button borderless onClick={ this.switchSites }>
+							<Gridicon icon={ rtlOn ? 'chevron-right' : 'chevron-left' } />
+							<span className="current-site__switch-sites-label">
+								{ translate( 'Switch Site' ) }
+							</span>
 						</Button>
 					</span>
 				) }
@@ -158,15 +126,13 @@ class CurrentSite extends Component {
 				{ selectedSite ? (
 					<div>
 						<Site site={ selectedSite } />
-						{ this.renderSiteViewLink() }
 					</div>
 				) : (
 					<AllSites />
 				) }
 
-				<AsyncLoad require="my-sites/current-site/domain-warnings" placeholder={ null } />
-
 				<SiteNotice site={ selectedSite } allSitesPath={ this.props.allSitesPath } />
+				<AsyncLoad require="my-sites/current-site/domain-warnings" placeholder={ null } />
 			</Card>
 		);
 	}
@@ -174,11 +140,13 @@ class CurrentSite extends Component {
 
 export default connect(
 	state => ( {
+		rtlOn: isRtl( state ),
 		selectedSite: getSelectedSite( state ),
 		anySiteSelected: getSelectedOrAllSites( state ),
 		siteCount: getVisibleSites( state ).length,
 		staleCartItemNoticeLastTimeShown: getNoticeLastTimeShown( state, 'stale-cart-item-notice' ),
 		sectionName: getSectionName( state ),
+		hasAllSitesList: hasAllSitesList( state ),
 	} ),
 	{ setLayoutFocus, infoNotice, removeNotice, recordTracksEvent }
 )( localize( CurrentSite ) );

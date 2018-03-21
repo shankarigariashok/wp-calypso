@@ -4,7 +4,7 @@
  * External dependencies
  */
 
-import { get, includes } from 'lodash';
+import { get } from 'lodash';
 
 /**
  * Internal dependencies
@@ -13,13 +13,14 @@ import { ANALYTICS_EVENT_RECORD, EDITOR_PASTE_EVENT } from 'state/action-types';
 import { SOURCE_GOOGLE_DOCS } from 'components/tinymce/plugins/wpcom-track-paste/sources';
 import config from 'config';
 import { abtest } from 'lib/abtest';
-import { getAll as getAllMedia } from 'lib/media/store';
-import { PLAN_PREMIUM, PLAN_BUSINESS } from 'lib/plans/constants';
+import MediaStore from 'lib/media/store';
 import { getSectionName, getSelectedSite, getSelectedSiteId } from 'state/ui/selectors';
 import { getLastAction } from 'state/ui/action-log/selectors';
 import { getCurrentUser } from 'state/current-user/selectors';
 import { canCurrentUser } from 'state/selectors';
-import { getSitePlan, hasDefaultSiteTitle, isCurrentPlanPaid } from 'state/sites/selectors';
+import { hasDefaultSiteTitle, isCurrentPlanPaid } from 'state/sites/selectors';
+
+const { getAll: getAllMedia } = MediaStore;
 
 export const WEEK_IN_MILLISECONDS = 7 * 1000 * 3600 * 24;
 
@@ -151,7 +152,7 @@ export const isSelectedSiteCustomizable = state =>
  *
  * @param {Object} state Global state tree
  * @return {Boolean} True if site has any media files, false otherwise.
-*/
+ */
 export const doesSelectedSiteHaveMediaFiles = state => {
 	const siteId = getSelectedSiteId( state );
 	if ( ! siteId ) {
@@ -192,21 +193,6 @@ export const hasSelectedSiteDefaultSiteTitle = state => {
 export const isSelectedSitePlanPaid = state => {
 	const siteId = getSelectedSiteId( state );
 	return siteId ? isCurrentPlanPaid( state, siteId ) : false;
-};
-
-/**
- * Returns true if the selected site is on the Premium or Business plan
- *
- * @param {Object} state Global state tree
- * @return {Boolean} True if selected site is on the Premium or Business plan, false otherwise.
- */
-export const hasSelectedSitePremiumOrBusinessPlan = state => {
-	const siteId = getSelectedSiteId( state );
-	const sitePlan = getSitePlan( state, siteId );
-	if ( ! sitePlan ) {
-		return false;
-	}
-	return includes( [ PLAN_PREMIUM, PLAN_BUSINESS ], sitePlan.product_slug );
 };
 
 /**

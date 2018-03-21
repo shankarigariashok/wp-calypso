@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import { assign, filter, findIndex, findLastIndex, forEach, last, map, defer } from 'lodash';
 import debugFactory from 'debug';
 
@@ -13,10 +11,11 @@ const debug = debugFactory( 'calypso:feed-store:post-list-store' );
  * Internal Dependencies
  */
 import Emitter from 'lib/mixins/emitter';
-import FeedPostStore from 'lib/feed-post-store';
 import { action as ActionTypes } from './constants';
 import { setLastStoreId } from 'reader/controller-helper';
 import * as FeedStreamActions from './actions';
+import { reduxGetState } from 'lib/redux-bridge';
+import { getPostByKey } from 'state/reader/posts/selectors';
 
 export default class PagedStream {
 	constructor( spec ) {
@@ -86,7 +85,7 @@ export default class PagedStream {
 			case ActionTypes.SELECT_FIRST_ITEM:
 				this.selectFirstItem();
 				break;
-			case ActionTypes.DISMISS_FEED_STREAM_POST:
+			case ActionTypes.DISMISS_POST:
 				this.dismissPost( action.postKey );
 				break;
 		}
@@ -102,7 +101,7 @@ export default class PagedStream {
 
 	getAll() {
 		return map( this.postKeys, function( key ) {
-			return FeedPostStore.get( key );
+			return key.isGap ? key : getPostByKey( reduxGetState(), key );
 		} );
 	}
 
@@ -116,6 +115,10 @@ export default class PagedStream {
 
 	getUpdateCount() {
 		return 0;
+	}
+
+	getPendingPostKeys() {
+		return this.pendingPostKeys;
 	}
 
 	getSelectedPostKey() {
@@ -138,7 +141,11 @@ export default class PagedStream {
 	}
 
 	isValidPostOrGap( postKey ) {
-		const post = FeedPostStore.get( postKey );
+		if ( postKey.isGap ) {
+			return true;
+		}
+
+		const post = getPostByKey( reduxGetState(), postKey );
 		return (
 			post && post._state !== 'error' && post._state !== 'pending' && post._state !== 'minimal'
 		);

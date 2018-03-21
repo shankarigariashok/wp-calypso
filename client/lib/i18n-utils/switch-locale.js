@@ -21,43 +21,64 @@ function languageFileUrl( localeSlug ) {
 	return `${ protocol }widgets.wp.com/languages/calypso/${ localeSlug }.json`;
 }
 
-export default function switchLocale( localeSlug ) {
-	if ( localeSlug === i18n.getLocaleSlug() ) {
-		return;
-	}
+function setLocaleInDOM( localeSlug, isRTL ) {
+	document.documentElement.lang = localeSlug;
+	document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
 
-	if ( isDefaultLocale( localeSlug ) ) {
-		i18n.configure( { defaultLocaleSlug: localeSlug } );
-		return;
-	}
+	const directionFlag = isRTL ? '-rtl' : '';
+	const debugFlag = process.env.NODE_ENV === 'development' ? '-debug' : '';
+	const cssUrl = window.app.staticUrls[ `style${ debugFlag }${ directionFlag }.css` ];
 
-	const language = getLanguage( localeSlug );
+	switchCSS( 'main-css', cssUrl );
+}
+
+let lastRequestedLocale = null;
+export default function switchLocale( localeSlug, localeVariant ) {
+	// check if the language exists in config.languages
+	const language = getLanguage( localeSlug, localeVariant );
+
 	if ( ! language ) {
 		return;
 	}
 
 	// Note: i18n is a singleton that will be shared between all server requests!
-	request.get( languageFileUrl( localeSlug ) ).end( function( error, response ) {
-		if ( error ) {
-			debug(
-				'Encountered an error loading locale file for ' + localeSlug + '. Falling back to English.'
-			);
-			return;
-		}
+	// Disable switching locale on the server
+	if ( typeof document === 'undefined' ) {
+		return;
+	}
 
-		i18n.setLocale( response.body );
+	const { langSlug: targetLocaleSlug, parentLangSlug } = language;
 
-		if ( typeof document !== 'undefined' ) {
-			document.documentElement.lang = localeSlug;
-			document.documentElement.dir = language.rtl ? 'rtl' : 'ltr';
+	// variant lang objects contain references to their parent lang, which is what we want to tell the browser we're running
+	const domLocaleSlug = parentLangSlug || targetLocaleSlug;
 
-			const directionFlag = language.rtl ? '-rtl' : '';
-			const debugFlag = process.env.NODE_ENV === 'development' ? '-debug' : '';
-			const cssUrl = window.app.staticUrls[ `style${ debugFlag }${ directionFlag }.css` ];
+	lastRequestedLocale = targetLocaleSlug;
 
-			switchCSS( 'main-css', cssUrl );
-		}
-	} );
+	if ( isDefaultLocale( targetLocaleSlug ) ) {
+		i18n.configure( { defaultLocaleSlug: targetLocaleSlug } );
+		setLocaleInDOM( domLocaleSlug, !! language.rtl );
+	} else {
+		request.get( languageFileUrl( targetLocaleSlug ) ).end( function( error, response ) {
+			if ( error ) {
+				debug(
+					'Encountered an error loading locale file for ' +
+						localeSlug +
+						'. Falling back to English.'
+				);
+				return;
+			}
+
+			// Handle race condition when we're requested to switch to a different
+			// locale while we're in the middle of request, we should abondon result
+			if ( targetLocaleSlug !== lastRequestedLocale ) {
+				return;
+			}
+
+			i18n.setLocale( response.body );
+
+			setLocaleInDOM( domLocaleSlug, !! language.rtl );
+		} );
+	}
 }
 
 const bundles = {};

@@ -20,15 +20,16 @@ import { connect } from 'react-redux';
 /**
  * Internal dependencies
  */
-import CalendarStep from './calendar-step';
-import ConfirmationStep from './confirmation-step';
-import InfoStep from './info-step';
 import Main from 'components/main';
-import Skeleton from './skeleton';
-import QueryConciergeShifts from 'components/data/query-concierge-shifts';
-import { getConciergeShifts } from 'state/selectors';
-
-const STEP_COMPONENTS = [ InfoStep, CalendarStep, ConfirmationStep ];
+import QueryConciergeAvailableTimes from 'components/data/query-concierge-available-times';
+import QueryUserSettings from 'components/data/query-user-settings';
+import QuerySites from 'components/data/query-sites';
+import QuerySitePlans from 'components/data/query-site-plans';
+import { PLAN_BUSINESS } from 'lib/plans/constants';
+import { getConciergeAvailableTimes, getUserSettings } from 'state/selectors';
+import { WPCOM_CONCIERGE_SCHEDULE_ID } from './constants';
+import { getSite } from 'state/sites/selectors';
+import Upsell from './shared/upsell';
 
 class ConciergeMain extends Component {
 	constructor( props ) {
@@ -47,33 +48,49 @@ class ConciergeMain extends Component {
 		this.setState( { currentStep: this.state.currentStep + 1 } );
 	};
 
-	render() {
-		const CurrentStep = STEP_COMPONENTS[ this.state.currentStep ];
-		const { shifts } = this.props;
+	getDisplayComponent = () => {
+		const { appointmentId, availableTimes, site, steps, userSettings } = this.props;
 
-		// TODO:
-		// 1. pass in the real scheduleId for WP.com concierge schedule.
-		// 2. render the shifts for real.
+		const CurrentStep = steps[ this.state.currentStep ];
+		const Skeleton = this.props.skeleton;
+
+		if ( ! availableTimes || ! site || ! site.plan || ! userSettings ) {
+			return <Skeleton />;
+		}
+
+		if ( site.plan.product_slug !== PLAN_BUSINESS ) {
+			return <Upsell site={ site } />;
+		}
+
+		// We have shift data and this is a business site — show the signup steps
+		return (
+			<CurrentStep
+				appointmentId={ appointmentId }
+				availableTimes={ availableTimes }
+				site={ site }
+				onComplete={ this.goToNextStep }
+				onBack={ this.goToPreviousStep }
+			/>
+		);
+	};
+
+	render() {
+		const { site } = this.props;
+
 		return (
 			<Main>
-				<QueryConciergeShifts scheduleId={ 123 } />
-				{ shifts ? (
-					<CurrentStep
-						shifts={ shifts }
-						onComplete={ this.goToNextStep }
-						onBack={ this.goToPreviousStep }
-					/>
-				) : (
-					<Skeleton />
-				) }
+				<QueryUserSettings />
+				<QueryConciergeAvailableTimes scheduleId={ WPCOM_CONCIERGE_SCHEDULE_ID } />
+				<QuerySites />
+				{ site && <QuerySitePlans siteId={ site.ID } /> }
+				{ this.getDisplayComponent() }
 			</Main>
 		);
 	}
 }
 
-export default connect(
-	state => ( {
-		shifts: getConciergeShifts( state ),
-	} ),
-	{ getConciergeShifts }
-)( ConciergeMain );
+export default connect( ( state, props ) => ( {
+	availableTimes: getConciergeAvailableTimes( state ),
+	site: getSite( state, props.siteSlug ),
+	userSettings: getUserSettings( state ),
+} ) )( ConciergeMain );

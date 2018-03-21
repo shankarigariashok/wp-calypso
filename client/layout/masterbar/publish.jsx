@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import PropTypes from 'prop-types';
 import React from 'react';
 import classNames from 'classnames';
@@ -12,20 +10,23 @@ import { connect } from 'react-redux';
 /**
  * Internal dependencies
  */
+import { recordTracksEvent } from 'state/analytics/actions';
 import MasterbarItem from './item';
 import SitesPopover from 'components/sites-popover';
-import paths from 'lib/paths';
-import viewport from 'lib/viewport';
+import { newPost } from 'lib/paths';
+import { isMobile } from 'lib/viewport';
 import { preload } from 'sections-preload';
 import { getSelectedSite } from 'state/ui/selectors';
-import AsyncLoad from 'components/async-load';
+import MasterbarDrafts from './drafts';
+import { isRtl as isRtlSelector } from 'state/selectors';
+import TranslatableString from 'components/translatable/proptype';
 
 class MasterbarItemNew extends React.Component {
 	static propTypes = {
 		user: PropTypes.object,
 		isActive: PropTypes.bool,
 		className: PropTypes.string,
-		tooltip: PropTypes.string,
+		tooltip: TranslatableString,
 		// connected props
 		selectedSite: PropTypes.object,
 	};
@@ -34,14 +35,18 @@ class MasterbarItemNew extends React.Component {
 		isShowingPopover: false,
 	};
 
-	setPostButtonContext = component => {
-		this.setState( {
-			postButtonContext: component,
-		} );
+	setPostButtonRef = component => {
+		this.postButtonRef = component;
 	};
 
-	toggleSitesPopover = ( isShowingPopover = ! this.state.isShowingPopover ) => {
-		this.setState( { isShowingPopover } );
+	toggleSitesPopover = () => {
+		this.setState( state => ( {
+			isShowingPopover: ! state.isShowingPopover,
+		} ) );
+	};
+
+	closeSitesPopover = () => {
+		this.setState( { isShowingPopover: false } );
 	};
 
 	onClick = event => {
@@ -55,51 +60,77 @@ class MasterbarItemNew extends React.Component {
 		}
 	};
 
-	getPopoverPosition = () => {
-		if ( viewport.isMobile() ) {
+	preloadPostEditor = () => preload( 'post-editor' );
+
+	getPopoverPosition() {
+		const { isRtl } = this.props;
+
+		if ( isMobile() ) {
 			return 'bottom';
 		}
 
-		if ( this.props.user.isRTL() ) {
+		if ( isRtl ) {
 			return 'bottom right';
 		}
 
 		return 'bottom left';
-	};
+	}
+
+	renderPopover() {
+		if ( ! this.state.isShowingPopover ) {
+			return null;
+		}
+
+		return (
+			<SitesPopover
+				id="popover__sites-popover-masterbar"
+				visible
+				groups
+				context={ this.postButtonRef }
+				onClose={ this.closeSitesPopover }
+				onSiteSelect={ this.props.siteSelected }
+				position={ this.getPopoverPosition() }
+			/>
+		);
+	}
 
 	render() {
 		const classes = classNames( this.props.className );
 		const currentSite = this.props.selectedSite || this.props.user.get().primarySiteSlug;
-		const newPostPath = paths.newPost( currentSite );
+		const newPostPath = newPost( currentSite );
 
 		return (
 			<div className="masterbar__publish">
 				<MasterbarItem
-					ref={ this.setPostButtonContext }
+					ref={ this.setPostButtonRef }
 					url={ newPostPath }
 					icon="create"
 					onClick={ this.onClick }
 					isActive={ this.props.isActive }
 					tooltip={ this.props.tooltip }
 					className={ classes }
-					preloadSection={ () => preload( 'post-editor' ) }
+					preloadSection={ this.preloadPostEditor }
 				>
 					{ this.props.children }
-					<SitesPopover
-						id="popover__sites-popover-masterbar"
-						visible={ this.state.isShowingPopover }
-						context={ this.state.postButtonContext }
-						onClose={ this.toggleSitesPopover.bind( this, false ) }
-						groups={ true }
-						position={ this.getPopoverPosition() }
-					/>
+					{ this.renderPopover() }
 				</MasterbarItem>
-				<AsyncLoad require="layout/masterbar/drafts" placeholder={ null } />
+				<MasterbarDrafts />
 			</div>
 		);
 	}
 }
 
-export default connect( state => {
-	return { selectedSite: getSelectedSite( state ) };
-} )( MasterbarItemNew );
+const mapStateToProps = state => {
+	return {
+		selectedSite: getSelectedSite( state ),
+		isRtl: isRtlSelector( state ),
+	};
+};
+
+const mapDispatchToProps = dispatch => ( {
+	siteSelected: () => {
+		dispatch( recordTracksEvent( 'calypso_masterbar_write_button_clicked' ) );
+	},
+} );
+
+export default connect( mapStateToProps, mapDispatchToProps )( MasterbarItemNew );

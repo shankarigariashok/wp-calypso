@@ -4,16 +4,25 @@
  */
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
+import { bindActionCreators } from 'redux';
+import { connect } from 'react-redux';
 import emailValidator from 'email-validator';
-import { get, noop } from 'lodash';
+import { find, get, isEmpty, noop } from 'lodash';
 import { localize } from 'i18n-calypso';
 
 /**
  * Internal dependencies
  */
 import AddressView from 'woocommerce/components/address-view';
+import { areLocationsLoaded, getAllCountries } from 'woocommerce/state/sites/locations/selectors';
+import {
+	areSettingsGeneralLoaded,
+	getStoreLocation,
+} from 'woocommerce/state/sites/settings/general/selectors';
 import Button from 'components/button';
 import Dialog from 'components/dialog';
+import { fetchLocations } from 'woocommerce/state/sites/locations/actions';
+import { fetchSettingsGeneral } from 'woocommerce/state/sites/settings/general/actions';
 import FormCheckbox from 'components/forms/form-checkbox';
 import FormFieldset from 'components/forms/form-fieldset';
 import FormInputValidation from 'components/forms/form-input-validation';
@@ -22,44 +31,55 @@ import FormLegend from 'components/forms/form-legend';
 import FormPhoneMediaInput from 'components/forms/form-phone-media-input';
 import FormTextInput from 'components/forms/form-text-input';
 import getAddressViewFormat from 'woocommerce/lib/get-address-view-format';
+import { forPayments as countriesList } from 'lib/countries-list';
 
-// @todo Update this to use our store countries list
-import countriesListBuilder from 'lib/countries-list';
-const countriesList = countriesListBuilder.forPayments();
+const defaultAddress = {
+	street: '',
+	street2: '',
+	city: '',
+	postcode: '',
+	email: '',
+	first_name: '',
+	last_name: '',
+	phone: '',
+};
 
 class CustomerAddressDialog extends Component {
 	static propTypes = {
 		address: PropTypes.shape( {
-			address_1: PropTypes.string.isRequired,
+			address_1: PropTypes.string,
 			address_2: PropTypes.string,
-			city: PropTypes.string.isRequired,
+			city: PropTypes.string,
 			state: PropTypes.string,
-			country: PropTypes.string.isRequired,
+			country: PropTypes.string,
 			postcode: PropTypes.string,
 			email: PropTypes.string,
-			first_name: PropTypes.string.isRequired,
-			last_name: PropTypes.string.isRequired,
+			first_name: PropTypes.string,
+			last_name: PropTypes.string,
 			phone: PropTypes.string,
 		} ),
+		areLocationsLoaded: PropTypes.bool,
 		closeDialog: PropTypes.func,
+		countries: PropTypes.arrayOf(
+			PropTypes.shape( {
+				code: PropTypes.string.isRequired,
+				name: PropTypes.string.isRequired,
+				states: PropTypes.arrayOf(
+					PropTypes.shape( {
+						code: PropTypes.string.isRequired,
+						name: PropTypes.string.isRequired,
+					} )
+				),
+			} )
+		),
 		isBilling: PropTypes.bool,
 		isVisible: PropTypes.bool,
+		siteId: PropTypes.number,
 		updateAddress: PropTypes.func.isRequired,
 	};
 
 	static defaultProps = {
-		address: {
-			street: '',
-			street2: '',
-			city: '',
-			state: 'AL',
-			country: 'US',
-			postcode: '',
-			email: '',
-			first_name: '',
-			last_name: '',
-			phone: '',
-		},
+		address: defaultAddress,
 		closeDialog: noop,
 		isBilling: false,
 		isVisible: false,
@@ -68,8 +88,27 @@ class CustomerAddressDialog extends Component {
 
 	state = {};
 
+	maybeFetchLocations() {
+		const { siteId } = this.props;
+
+		if ( siteId && ! this.props.areLocationsLoaded ) {
+			this.props.fetchLocations( siteId );
+		}
+	}
+
 	componentDidMount() {
 		this.initializeState();
+		this.maybeFetchLocations();
+	}
+
+	componentWillMount() {
+		this.fetchData( this.props );
+	}
+
+	componentWillReceiveProps( newProps ) {
+		if ( newProps.siteId !== this.props.siteId ) {
+			this.fetchData( newProps );
+		}
 	}
 
 	componentDidUpdate( prevProps ) {
@@ -77,15 +116,31 @@ class CustomerAddressDialog extends Component {
 		if ( this.props.isVisible && ! prevProps.isVisible ) {
 			this.initializeState();
 		}
+		this.maybeFetchLocations();
 	}
 
 	initializeState = () => {
-		const { address = {} } = this.props;
+		const { defaultCountry, defaultState } = this.props;
+		const address = {
+			...defaultAddress,
+			country: defaultCountry,
+			state: defaultState,
+			...this.props.address,
+		};
 		this.setState( {
 			address,
-			phoneCountry: address.country || 'US',
+			phoneCountry: address.country || defaultCountry,
 			emailValidMessage: false,
 		} );
+	};
+
+	fetchData = ( { siteId, areSettingsLoaded } ) => {
+		if ( ! siteId ) {
+			return;
+		}
+		if ( ! areSettingsLoaded ) {
+			this.props.fetchSettingsGeneral( siteId );
+		}
 	};
 
 	updateAddress = () => {
@@ -115,12 +170,20 @@ class CustomerAddressDialog extends Component {
 		}
 		this.setState( prevState => {
 			const { address } = prevState;
-			const newState = { ...address, [ name ]: value };
-			// If country changed, we should also reset the state
+			const newState = { address: { ...address, [ name ]: value } };
+
+			// Users of AddressView isEditable must always update the state prop
+			// passed to AddressView in the event of country changes
 			if ( 'country' === name ) {
-				newState.state = '';
+				const countryData = find( this.props.countries, { code: value } );
+				if ( ! isEmpty( countryData.states ) ) {
+					newState.address.state = countryData.states[ 0 ].code;
+				} else {
+					newState.address.state = '';
+				}
 			}
-			return { address: newState };
+
+			return newState;
 		} );
 	};
 
@@ -152,7 +215,7 @@ class CustomerAddressDialog extends Component {
 			return null;
 		}
 		return (
-			<div>
+			<div className="order-customer__billing-fields">
 				<FormFieldset>
 					<FormPhoneMediaInput
 						label={ translate( 'Phone Number' ) }
@@ -187,9 +250,9 @@ class CustomerAddressDialog extends Component {
 	};
 
 	render() {
-		const { isBilling, isVisible, translate } = this.props;
+		const { countries, isBilling, isVisible, translate } = this.props;
 		const { address, emailValidMessage } = this.state;
-		if ( ! address ) {
+		if ( ! address || isEmpty( countries ) ) {
 			return null;
 		}
 
@@ -232,10 +295,10 @@ class CustomerAddressDialog extends Component {
 						</div>
 					</div>
 					<AddressView
-						isEditable
-						showAllLocations
-						onChange={ this.onChange }
 						address={ getAddressViewFormat( address ) }
+						countries={ countries }
+						isEditable
+						onChange={ this.onChange }
 					/>
 					{ this.renderBillingFields() }
 				</FormFieldset>
@@ -244,4 +307,20 @@ class CustomerAddressDialog extends Component {
 	}
 }
 
-export default localize( CustomerAddressDialog );
+export default connect(
+	state => {
+		const address = getStoreLocation( state );
+		const locationsLoaded = areLocationsLoaded( state );
+		const areSettingsLoaded = areSettingsGeneralLoaded( state );
+		const countries = getAllCountries( state );
+
+		return {
+			areLocationsLoaded: locationsLoaded,
+			areSettingsLoaded,
+			countries,
+			defaultCountry: address.country,
+			defaultState: address.state,
+		};
+	},
+	dispatch => bindActionCreators( { fetchLocations, fetchSettingsGeneral }, dispatch )
+)( localize( CustomerAddressDialog ) );

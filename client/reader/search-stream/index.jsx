@@ -30,8 +30,9 @@ import SuggestionProvider from './suggestion-provider';
 import Suggestion from './suggestion';
 import { resemblesUrl, withoutHttp, addSchemeIfMissing } from 'lib/url';
 import { getReaderAliasedFollowFeedUrl } from 'state/selectors';
-import { SEARCH_RESULTS_URL_INPUT } from 'reader/follow-button/follow-sources';
+import { SEARCH_RESULTS_URL_INPUT } from 'reader/follow-sources';
 import FollowButton from 'reader/follow-button';
+import MobileBackToSidebar from 'components/mobile-back-to-sidebar';
 
 const WIDE_DISPLAY_CUTOFF = 660;
 
@@ -168,6 +169,9 @@ class SearchStream extends React.Component {
 					style={ { width: this.props.width } }
 					ref={ this.handleFixedAreaMounted }
 				>
+					<MobileBackToSidebar>
+						<h1>{ translate( 'Streams' ) }</h1>
+					</MobileBackToSidebar>
 					<CompactCard className="search-stream__input-card">
 						<SearchInput
 							onSearch={ this.updateQuery }

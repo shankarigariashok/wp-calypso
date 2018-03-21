@@ -443,19 +443,23 @@ class ScrollHelper {
 	}
 
 	loadNextPage() {
+		if ( this.queuedFetchNextPage ) {
+			return;
+		}
 		let triggeredByScroll = this.triggeredByScroll;
 
 		debug( 'fetching next page', this.containerBottom, this.bottomPlaceholderHeight );
 
 		// Consider all page fetches once user starts scrolling as triggered by scroll
-		// Same condition check is in lib/mixins/infinite-scroll loadNextPage
+		// Same condition check is in components/infinite-scroll checkScrollPosition
 		if ( this.scrollPosition > this.contextHeight ) {
 			triggeredByScroll = true;
 		}
 
 		// scroll check may be triggered while dispatching an action,
 		// we cannot create new action while dispatching old one
-		setTimeout( () => {
+		this.queuedFetchNextPage = Promise.resolve().then( () => {
+			this.queuedFetchNextPage = null;
 			// checking these values again because we shifted the fetch to the next stack
 			if ( this.props.fetchingNextPage || this.props.lastPage ) {
 				return false;
@@ -463,7 +467,7 @@ class ScrollHelper {
 			this.props.fetchNextPage( {
 				triggeredByScroll: triggeredByScroll,
 			} );
-		}, 0 );
+		} );
 	}
 }
 

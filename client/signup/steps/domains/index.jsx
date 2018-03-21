@@ -1,24 +1,23 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import React from 'react';
 import page from 'page';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
-import { defer, endsWith } from 'lodash';
+import { defer, endsWith, get } from 'lodash';
 import { localize, getLocaleSlug } from 'i18n-calypso';
 
 /**
  * Internal dependencies
  */
 import MapDomainStep from 'components/domains/map-domain-step';
+import TransferDomainStep from 'components/domains/transfer-domain-step';
 import productsListFactory from 'lib/products-list';
 import RegisterDomainStep from 'components/domains/register-domain-step';
 import SignupActions from 'lib/signup/actions';
-import signupUtils from 'signup/utils';
+import { getStepUrl } from 'signup/utils';
 import StepWrapper from 'signup/step-wrapper';
 import { cartItems } from 'lib/cart-values';
 import { DOMAINS_WITH_PLANS_ONLY } from 'state/current-user/constants';
@@ -27,11 +26,15 @@ import { getUsernameSuggestion } from 'lib/signup/step-actions';
 import {
 	recordAddDomainButtonClick,
 	recordAddDomainButtonClickInMapDomain,
+	recordAddDomainButtonClickInTransferDomain,
 } from 'state/domains/actions';
 import { composeAnalytics, recordGoogleEvent, recordTracksEvent } from 'state/analytics/actions';
 import { getCurrentUser, currentUserHasFlag } from 'state/current-user/selectors';
 import Notice from 'components/notice';
 import { getDesignType } from 'state/signup/steps/design-type/selectors';
+import { getDomainSearchPrefill } from 'state/signup/steps/domains/selectors';
+import { setDomainSearchPrefill } from 'state/signup/steps/domains/actions';
+import { abtest } from 'lib/abtest';
 
 const productsList = productsListFactory();
 
@@ -46,6 +49,7 @@ class DomainsStep extends React.Component {
 		positionInFlow: PropTypes.number.isRequired,
 		queryObject: PropTypes.object,
 		signupProgress: PropTypes.array.isRequired,
+		domainSearchPrefill: PropTypes.string,
 		step: PropTypes.object,
 		stepName: PropTypes.string.isRequired,
 		stepSectionName: PropTypes.string,
@@ -58,16 +62,15 @@ class DomainsStep extends React.Component {
 	state = { products: productsList.get() };
 
 	showDomainSearch = () => {
-		page( signupUtils.getStepUrl( this.props.flowName, this.props.stepName, this.props.locale ) );
+		page( getStepUrl( this.props.flowName, this.props.stepName, this.props.locale ) );
 	};
 
 	getMapDomainUrl = () => {
-		return signupUtils.getStepUrl(
-			this.props.flowName,
-			this.props.stepName,
-			'mapping',
-			this.props.locale
-		);
+		return getStepUrl( this.props.flowName, this.props.stepName, 'mapping', this.props.locale );
+	};
+
+	getTransferDomainUrl = () => {
+		return getStepUrl( this.props.flowName, this.props.stepName, 'transfer', this.props.locale );
 	};
 
 	componentDidMount() {
@@ -179,7 +182,35 @@ class DomainsStep extends React.Component {
 					stepSectionName: this.props.stepSectionName,
 				},
 				this.getThemeArgs()
-			)
+			),
+			[],
+			{ domainItem }
+		);
+
+		this.props.goToNextStep();
+	};
+
+	handleAddTransfer = domain => {
+		const domainItem = cartItems.domainTransfer( { domain, extra: { signup: true } } );
+		const isPurchasingItem = true;
+
+		this.props.recordAddDomainButtonClickInTransferDomain( domain, 'signup' );
+
+		SignupActions.submitSignupStep(
+			Object.assign(
+				{
+					processingMessage: this.props.translate( 'Adding your domain transfer' ),
+					stepName: this.props.stepName,
+					[ 'transfer' ]: {},
+					domainItem,
+					isPurchasingItem,
+					siteUrl: domain,
+					stepSectionName: this.props.stepSectionName,
+				},
+				this.getThemeArgs()
+			),
+			[],
+			{ domainItem }
 		);
 
 		this.props.goToNextStep();
@@ -201,6 +232,11 @@ class DomainsStep extends React.Component {
 		const initialState = this.props.step ? this.props.step.domainForm : this.state.domainForm;
 		const includeDotBlogSubdomain = this.props.flowName === 'subdomain';
 
+		const suggestion =
+			'withSiteTitle' === abtest( 'domainSearchPrefill' ) && !! this.props.domainSearchPrefill
+				? this.props.domainSearchPrefill
+				: get( this.props, 'queryObject.new', '' );
+
 		return (
 			<RegisterDomainStep
 				path={ this.props.path }
@@ -209,6 +245,7 @@ class DomainsStep extends React.Component {
 				products={ this.state.products }
 				basePath={ this.props.path }
 				mapDomainUrl={ this.getMapDomainUrl() }
+				transferDomainUrl={ this.getTransferDomainUrl() }
 				onAddMapping={ this.handleAddMapping.bind( this, 'domainForm' ) }
 				onSave={ this.handleSave.bind( this, 'domainForm' ) }
 				offerUnavailableOption={ ! this.props.isDomainOnly }
@@ -219,11 +256,15 @@ class DomainsStep extends React.Component {
 				isSignupStep
 				showExampleSuggestions
 				surveyVertical={ this.props.surveyVertical }
-				suggestion={ this.props.queryObject ? this.props.queryObject.new : '' }
+				suggestion={ suggestion }
 				designType={ this.props.signupDependencies && this.props.signupDependencies.designType }
+				onDomainSearchChange={ this.handleDomainSearchChange }
 			/>
 		);
 	};
+
+	handleDomainSearchChange = newSearchValue =>
+		this.props.setDomainSearchPrefill( newSearchValue, true );
 
 	mappingForm = () => {
 		const initialState = this.props.step ? this.props.step.mappingForm : undefined,
@@ -231,7 +272,7 @@ class DomainsStep extends React.Component {
 				this.props.step && this.props.step.domainForm && this.props.step.domainForm.lastQuery;
 
 		return (
-			<div className="domains-step__section-wrapper">
+			<div className="domains__step-section-wrapper">
 				<MapDomainStep
 					initialState={ initialState }
 					path={ this.props.path }
@@ -247,20 +288,51 @@ class DomainsStep extends React.Component {
 		);
 	};
 
+	onTransferSave = state => {
+		this.handleSave( 'transferForm', state );
+	};
+
+	transferForm = () => {
+		const initialQuery =
+			this.props.step && this.props.step.domainForm && this.props.step.domainForm.lastQuery;
+
+		return (
+			<div className="domains__step-section-wrapper">
+				<TransferDomainStep
+					analyticsSection="signup"
+					basePath={ this.props.path }
+					domainsWithPlansOnly={ this.props.domainsWithPlansOnly }
+					initialQuery={ initialQuery }
+					isSignupStep
+					onRegisterDomain={ this.handleAddDomain }
+					onTransferDomain={ this.handleAddTransfer }
+					onSave={ this.onTransferSave }
+					products={ productsList.get() }
+				/>
+			</div>
+		);
+	};
+
 	render() {
 		let content;
 		const { translate } = this.props;
 		const backUrl = this.props.stepSectionName
-			? signupUtils.getStepUrl(
-					this.props.flowName,
-					this.props.stepName,
-					undefined,
-					getLocaleSlug()
-				)
+			? getStepUrl( this.props.flowName, this.props.stepName, undefined, getLocaleSlug() )
 			: undefined;
+		let fallbackSubHeaderText = translate(
+			"Enter your site's name, or some key words that describe it - " +
+				"we'll use this to create your new site's address."
+		);
 
 		if ( 'mapping' === this.props.stepSectionName ) {
 			content = this.mappingForm();
+		}
+
+		if ( 'transfer' === this.props.stepSectionName ) {
+			content = this.transferForm();
+			fallbackSubHeaderText = translate(
+				'Use a domain you already own with your new WordPress.com site.'
+			);
 		}
 
 		if ( ! this.props.stepSectionName ) {
@@ -269,7 +341,7 @@ class DomainsStep extends React.Component {
 
 		if ( this.props.step && 'invalid' === this.props.step.status ) {
 			content = (
-				<div className="domains-step__section-wrapper">
+				<div className="domains__step-section-wrapper">
 					<Notice status="is-error" showDismiss={ false }>
 						{ this.props.step.errors.message }
 					</Notice>
@@ -287,10 +359,7 @@ class DomainsStep extends React.Component {
 				signupProgress={ this.props.signupProgress }
 				subHeaderText={ translate( "First up, let's find a domain." ) }
 				fallbackHeaderText={ translate( "Let's give your site an address." ) }
-				fallbackSubHeaderText={ translate(
-					"Enter your site's name, or some key words that describe it - " +
-						"we'll use this to create your new site's address."
-				) }
+				fallbackSubHeaderText={ fallbackSubHeaderText }
 				stepContent={ content }
 			/>
 		);
@@ -337,10 +406,13 @@ export default connect(
 			: true,
 		surveyVertical: getSurveyVertical( state ),
 		designType: getDesignType( state ),
+		domainSearchPrefill: getDomainSearchPrefill( state ),
 	} ),
 	{
 		recordAddDomainButtonClick,
 		recordAddDomainButtonClickInMapDomain,
+		recordAddDomainButtonClickInTransferDomain,
+		setDomainSearchPrefill,
 		submitDomainStepSelection,
 	}
 )( localize( DomainsStep ) );

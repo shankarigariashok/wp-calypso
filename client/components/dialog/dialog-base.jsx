@@ -44,6 +44,7 @@ class DialogBase extends Component {
 				onRequestClose={ this._close }
 				closeTimeoutMS={ this.props.leaveTimeout }
 				contentLabel={ this.props.label }
+				appElement={ document.getElementById( 'wpcom' ) }
 				overlayClassName={ backdropClassName } // We use flex here which react-modal doesn't
 				className={ dialogClassName }
 				role="dialog"
@@ -89,6 +90,7 @@ class DialogBase extends Component {
 				key={ button.action }
 				className={ classes }
 				data-e2e-button={ button.action }
+				data-tip-target={ `dialog-base-action-${ button.action }` }
 				onClick={ clickHandler }
 				disabled={ !! button.disabled }
 			>

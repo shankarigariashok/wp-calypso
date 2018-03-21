@@ -13,19 +13,29 @@ import { find, get, isEmpty } from 'lodash';
  */
 import ShippingRates from './list';
 import StepContainer from '../step-container';
+import formatCurrency from 'lib/format-currency';
 import { hasNonEmptyLeaves } from 'woocommerce/woocommerce-services/lib/utils/tree';
 import { toggleStep, updateRate } from 'woocommerce/woocommerce-services/state/shipping-label/actions';
 import {
 	getShippingLabel,
 	isLoaded,
 	getFormErrors,
-	getRatesTotal,
+	getTotalPriceBreakdown,
 } from 'woocommerce/woocommerce-services/state/shipping-label/selectors';
 import { getAllPackageDefinitions } from 'woocommerce/woocommerce-services/state/packages/selectors';
+import { getPaymentCurrencySettings } from 'woocommerce/state/sites/settings/general/selectors';
+import { getOrderShippingTotal } from 'woocommerce/lib/order-values/totals';
+import { getOrderShippingMethod } from 'woocommerce/lib/order-values';
+import { getOrder } from 'woocommerce/state/sites/orders/selectors';
+import Notice from 'components/notice';
 
-const ratesSummary = ( selectedRates, availableRates, total, currencySymbol, packagesSaved, translate ) => {
+const ratesSummary = ( selectedRates, availableRates, total, packagesSaved, translate ) => {
 	if ( ! packagesSaved ) {
 		return translate( 'Unsaved changes made to packages' );
+	}
+
+	if ( ! total ) {
+		return '';
 	}
 
 	const packageIds = Object.keys( selectedRates );
@@ -38,11 +48,10 @@ const ratesSummary = ( selectedRates, availableRates, total, currencySymbol, pac
 		const rateInfo = find( packageRates, [ 'service_id', selectedRate ] );
 
 		if ( rateInfo ) {
-			return translate( '%(serviceName)s: %(currencySymbol)s%(rate).2f', {
+			return translate( '%(serviceName)s: %(rate)s', {
 				args: {
 					serviceName: rateInfo.title,
-					rate: rateInfo.rate,
-					currencySymbol,
+					rate: formatCurrency( rateInfo.rate, 'USD' ),
 				},
 			} );
 		}
@@ -51,10 +60,9 @@ const ratesSummary = ( selectedRates, availableRates, total, currencySymbol, pac
 	}
 
 	// Otherwise, just show the total
-	return translate( 'Total rate: %(currencySymbol)s%(total)s', {
+	return translate( 'Total rate: %(total)s', {
 		args: {
-			total,
-			currencySymbol,
+			total: formatCurrency( total, 'USD' ),
 		},
 	} );
 };
@@ -79,6 +87,46 @@ const getRatesStatus = ( { retrievalInProgress, errors, available, form } ) => {
 	return { isSuccess: true };
 };
 
+const showCheckoutShippingInfo = ( props ) => {
+	const {
+		shippingMethod,
+		shippingCost,
+		currency,
+		translate,
+	} = props;
+
+	if ( shippingMethod ) {
+		let shippingInfo;
+
+		if ( 0 < shippingCost ) {
+			shippingInfo = translate(
+				'Your customer selected {{shippingMethod/}} and paid {{shippingCost/}}',
+				{
+					components: {
+						shippingMethod: <span className="rates-step__shipping-info-method">{ shippingMethod }</span>,
+						shippingCost: <span className="rates-step__shipping-info-cost">{ formatCurrency( shippingCost, currency ) }</span>,
+					},
+				}
+			);
+		} else {
+			shippingInfo = translate(
+				'Your customer selected {{shippingMethod/}}',
+				{
+					components: {
+						shippingMethod: <span className="rates-step__shipping-info-method">{ shippingMethod }</span>,
+					},
+				}
+			);
+		}
+
+		return (
+			<div className="rates-step__shipping-info">
+				<Notice showDismiss={ false }>{ shippingInfo }</Notice>
+			</div>
+		);
+	}
+};
+
 const RatesStep = ( props ) => {
 	const {
 		siteId,
@@ -87,16 +135,15 @@ const RatesStep = ( props ) => {
 		allPackages,
 		values,
 		available,
-		currencySymbol,
 		errors,
 		expanded,
 		ratesTotal,
 		translate,
 	} = props;
-	const summary = ratesSummary( values, available, ratesTotal, currencySymbol, form.packages.saved, translate );
-
+	const summary = ratesSummary( values, available, ratesTotal, form.packages.saved, translate );
 	const toggleStepHandler = () => props.toggleStep( orderId, siteId, 'rates' );
 	const updateRateHandler = ( packageId, value ) => props.updateRate( orderId, siteId, packageId, value );
+
 	return (
 		<StepContainer
 			title={ translate( 'Rates' ) }
@@ -104,6 +151,7 @@ const RatesStep = ( props ) => {
 			expanded={ expanded }
 			toggleStep={ toggleStepHandler }
 			{ ...getRatesStatus( props ) } >
+			{ ! isEmpty( available ) && showCheckoutShippingInfo( props ) }
 			<ShippingRates
 				id="rates"
 				showRateNotice={ false }
@@ -112,7 +160,6 @@ const RatesStep = ( props ) => {
 				selectedRates={ values }
 				availableRates={ available }
 				updateRate={ updateRateHandler }
-				currencySymbol={ currencySymbol }
 				errors={ errors } />
 		</StepContainer>
 	);
@@ -124,7 +171,6 @@ RatesStep.propTypes = {
 	form: PropTypes.object.isRequired,
 	values: PropTypes.object.isRequired,
 	available: PropTypes.object.isRequired,
-	currencySymbol: PropTypes.string.isRequired,
 	errors: PropTypes.object.isRequired,
 	toggleStep: PropTypes.func.isRequired,
 	updateRate: PropTypes.func.isRequired,
@@ -133,14 +179,18 @@ RatesStep.propTypes = {
 const mapStateToProps = ( state, { orderId, siteId } ) => {
 	const loaded = isLoaded( state, orderId, siteId );
 	const shippingLabel = getShippingLabel( state, orderId, siteId );
-	const storeOptions = loaded ? shippingLabel.storeOptions : {};
+	const priceBreakdown = getTotalPriceBreakdown( state, orderId, siteId );
+	const order = getOrder( state, orderId, siteId );
+
 	return {
 		...shippingLabel.form.rates,
 		form: shippingLabel.form,
-		currencySymbol: storeOptions.currency_symbol,
 		errors: loaded && getFormErrors( state, orderId, siteId ).rates,
-		ratesTotal: getRatesTotal( state, orderId, siteId ),
+		ratesTotal: priceBreakdown ? priceBreakdown.total : 0,
 		allPackages: getAllPackageDefinitions( state, siteId ),
+		currency: getPaymentCurrencySettings( state, siteId ),
+		shippingCost: getOrderShippingTotal( order ),
+		shippingMethod: getOrderShippingMethod( order ),
 	};
 };
 

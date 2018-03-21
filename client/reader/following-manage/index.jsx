@@ -8,7 +8,7 @@ import { trim, debounce, random, take, reject, includes } from 'lodash';
 import { localize } from 'i18n-calypso';
 import page from 'page';
 import PropTypes from 'prop-types';
-import qs from 'qs';
+import { stringify } from 'qs';
 
 /**
  * Internal Dependencies
@@ -24,6 +24,7 @@ import {
 	getReaderRecommendedSitesPagingOffset,
 	getBlockedSites,
 	getReaderAliasedFollowFeedUrl,
+	getReaderFollowsCount,
 } from 'state/selectors';
 import QueryReaderFeedsSearch from 'components/data/query-reader-feeds-search';
 import QueryReaderRecommendedSites from 'components/data/query-reader-recommended-sites';
@@ -32,14 +33,12 @@ import FollowingManageSubscriptions from './subscriptions';
 import FollowingManageSearchFeedsResults from './feed-search-results';
 import FollowingManageEmptyContent from './empty';
 import MobileBackToSidebar from 'components/mobile-back-to-sidebar';
-import { addQueryArgs } from 'lib/url';
 import FollowButton from 'reader/follow-button';
 import {
 	READER_FOLLOWING_MANAGE_URL_INPUT,
 	READER_FOLLOWING_MANAGE_RECOMMENDATION,
-} from 'reader/follow-button/follow-sources';
-import { resemblesUrl, withoutHttp, addSchemeIfMissing } from 'lib/url';
-import { getReaderFollowsCount } from 'state/selectors';
+} from 'reader/follow-sources';
+import { resemblesUrl, withoutHttp, addSchemeIfMissing, addQueryArgs } from 'lib/url';
 import { recordTrack, recordAction } from 'reader/stats';
 import { SORT_BY_RELEVANCE } from 'state/reader/feed-searches/actions';
 
@@ -80,7 +79,7 @@ class FollowingManage extends Component {
 		) {
 			let searchUrl = '/following/manage';
 			if ( newValue ) {
-				searchUrl += '?' + qs.stringify( { q: newValue } );
+				searchUrl += '?' + stringify( { q: newValue } );
 				recordTrack( 'calypso_reader_following_manage_search_performed', {
 					query: newValue,
 				} );
@@ -238,13 +237,12 @@ class FollowingManage extends Component {
 						</div>
 					) }
 				</div>
-				{ hasFollows &&
-					! sitesQuery && (
-						<RecommendedSites
-							sites={ take( filteredRecommendedSites, 2 ) }
-							followSource={ READER_FOLLOWING_MANAGE_RECOMMENDATION }
-						/>
-					) }
+				{ ! sitesQuery && (
+					<RecommendedSites
+						sites={ take( filteredRecommendedSites, 2 ) }
+						followSource={ READER_FOLLOWING_MANAGE_RECOMMENDATION }
+					/>
+				) }
 				{ !! sitesQuery &&
 					! isFollowByUrlWithNoSearchResults && (
 						<FollowingManageSearchFeedsResults

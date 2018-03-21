@@ -13,17 +13,19 @@ import debugFactory from 'debug';
 import config from 'config';
 import {
 	ANALYTICS_SUPER_PROPS_UPDATE,
+	JETPACK_DISCONNECT_RECEIVE,
 	NOTIFICATIONS_PANEL_TOGGLE,
 	SELECTED_SITE_SET,
+	SITE_DELETE_RECEIVE,
 	SITE_RECEIVE,
 	SITES_RECEIVE,
-	SITES_UPDATE,
 	SITES_ONCE_CHANGED,
 	SELECTED_SITE_SUBSCRIBE,
 	SELECTED_SITE_UNSUBSCRIBE,
 } from 'state/action-types';
 import analytics from 'lib/analytics';
 import cartStore from 'lib/cart/store';
+import userFactory from 'lib/user';
 import {
 	isNotificationsOpen,
 	hasSitePendingAutomatedTransfer,
@@ -32,13 +34,11 @@ import {
 import { getSelectedSite, getSelectedSiteId } from 'state/ui/selectors';
 import { getCurrentUser } from 'state/current-user/selectors';
 import keyboardShortcuts from 'lib/keyboard-shortcuts';
+import getGlobalKeyboardShortcuts from 'lib/keyboard-shortcuts/global';
 import { fetchAutomatedTransferStatus } from 'state/automated-transfer/actions';
 
-// KILL IT WITH FIRE
-import sitesFactory from 'lib/sites-list';
-const sites = sitesFactory();
-
 const debug = debugFactory( 'calypso:state:middleware' );
+const user = userFactory();
 
 /**
  * Module variables
@@ -47,13 +47,13 @@ const globalKeyBoardShortcutsEnabled = config.isEnabled( 'keyboard-shortcuts' );
 let globalKeyboardShortcuts;
 
 if ( globalKeyBoardShortcutsEnabled ) {
-	globalKeyboardShortcuts = require( 'lib/keyboard-shortcuts/global' )();
+	globalKeyboardShortcuts = getGlobalKeyboardShortcuts();
 }
 
 const desktopEnabled = config.isEnabled( 'desktop' );
 let desktop;
 if ( desktopEnabled ) {
-	desktop = require( 'lib/desktop' );
+	desktop = require( 'lib/desktop' ).default;
 }
 
 /*
@@ -101,20 +101,6 @@ const removeSelectedSitesChangeListener = ( dispatch, action ) => {
  * providing an alternative to `sites.once()`.
  */
 let sitesListeners = [];
-
-/**
- * Sets the selected site id for SitesList
- *
- * @param {function} dispatch - redux dispatch function
- * @param {number} siteId     - the selected site id
- */
-const updateSelectedSiteIdForSitesList = ( dispatch, { siteId } ) => {
-	if ( siteId ) {
-		sites.select( siteId );
-	} else {
-		sites.selectAll();
-	}
-};
 
 /**
  * Sets the selectedSite and siteCount for lib/analytics. This is used to
@@ -224,13 +210,11 @@ const handler = ( dispatch, action, getState ) => {
 
 		case SELECTED_SITE_SET:
 			//let this fall through
-			updateSelectedSiteIdForSitesList( dispatch, action );
 			updateSelectedSiteForCart( dispatch, action );
 			updateSelectedSiteIdForSubscribers( dispatch, action );
 
 		case SITE_RECEIVE:
 		case SITES_RECEIVE:
-		case SITES_UPDATE:
 			// Wait a tick for the reducer to update the state tree
 			setTimeout( () => {
 				if ( action.type === SITES_RECEIVE ) {
@@ -255,6 +239,11 @@ const handler = ( dispatch, action, getState ) => {
 			return;
 		case SELECTED_SITE_UNSUBSCRIBE:
 			removeSelectedSitesChangeListener( dispatch, action );
+			return;
+
+		case SITE_DELETE_RECEIVE:
+		case JETPACK_DISCONNECT_RECEIVE:
+			user.decrementSiteCount();
 			return;
 	}
 };

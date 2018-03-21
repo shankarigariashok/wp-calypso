@@ -3,12 +3,11 @@
 /**
  * External dependencies
  */
-
 import React from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
-import { get } from 'lodash';
+import page from 'page';
 
 /**
  * Internal dependencies
@@ -16,26 +15,54 @@ import { get } from 'lodash';
 import DocumentHead from 'components/data/document-head';
 import GoogleAppsDialog from 'components/upgrades/google-apps/google-apps-dialog';
 import Main from 'components/main';
-import { getSite } from 'state/sites/selectors';
+import QuerySites from 'components/data/query-sites';
+import { getSiteSlug, getSiteTitle } from 'state/sites/selectors';
+import { addItem, removeItem } from 'lib/upgrades/actions';
+import { cartItems } from 'lib/cart-values';
+import { isDotComPlan } from 'lib/products-values';
+import { getABTestVariation } from 'lib/abtest';
 
 export class GsuiteNudge extends React.Component {
 	static propTypes = {
 		domain: PropTypes.string.isRequired,
 		receiptId: PropTypes.number.isRequired,
-		productsList: PropTypes.object.isRequired,
 		selectedSiteId: PropTypes.number.isRequired,
 	};
 
 	handleClickSkip = () => {
-		this.props.onClickSkip( this.props.siteSlug );
+		const { siteSlug, receiptId } = this.props;
+
+		// DO NOT assign the test here.
+		if ( 'show' === getABTestVariation( 'checklistThankYouForPaidUser' ) ) {
+			page( `/checklist/${ siteSlug }/paid` );
+		} else {
+			page( `/checkout/thank-you/${ siteSlug }/${ receiptId }` );
+		}
 	};
 
 	handleAddGoogleApps = googleAppsCartItem => {
-		this.props.onAddGoogleApps( googleAppsCartItem, this.props.siteSlug );
+		const { siteSlug, receiptId } = this.props;
+
+		googleAppsCartItem.extra = {
+			...googleAppsCartItem.extra,
+			receipt_for_domain: receiptId,
+		};
+
+		this.removePlanFromCart();
+
+		addItem( googleAppsCartItem );
+		page( `/checkout/${ siteSlug }` );
 	};
 
+	removePlanFromCart() {
+		const items = cartItems.getAll( this.props.cart );
+		items.filter( isDotComPlan ).forEach( function( item ) {
+			removeItem( item, false );
+		} );
+	}
+
 	render() {
-		const { siteTitle, translate } = this.props;
+		const { selectedSiteId, siteTitle, translate } = this.props;
 
 		return (
 			<Main className="gsuite-nudge">
@@ -44,9 +71,9 @@ export class GsuiteNudge extends React.Component {
 						args: { siteTitle },
 					} ) }
 				/>
+				<QuerySites siteId={ selectedSiteId } />
 				<GoogleAppsDialog
 					domain={ this.props.domain }
-					productsList={ this.props.productsList }
 					onClickSkip={ this.handleClickSkip }
 					onAddGoogleApps={ this.handleAddGoogleApps }
 				/>
@@ -56,9 +83,8 @@ export class GsuiteNudge extends React.Component {
 }
 
 export default connect( ( state, props ) => {
-	const selectedSite = getSite( state, props.selectedSiteId );
 	return {
-		siteSlug: get( selectedSite, 'slug', '' ),
-		siteTitle: get( selectedSite, 'name', '' ),
+		siteSlug: getSiteSlug( state, props.selectedSiteId ),
+		siteTitle: getSiteTitle( state, props.selectedSiteId ),
 	};
 } )( localize( GsuiteNudge ) );

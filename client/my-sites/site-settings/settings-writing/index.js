@@ -10,7 +10,8 @@ import page from 'page';
 import config from 'config';
 import controller from './controller';
 import settingsController from 'my-sites/site-settings/settings-controller';
-import { navigation, siteSelection } from 'my-sites/controller';
+import { navigation, siteSelection, sites } from 'my-sites/controller';
+import { makeLayout, render as clientRender } from 'controller';
 
 export default function() {
 	page(
@@ -18,16 +19,22 @@ export default function() {
 		siteSelection,
 		navigation,
 		settingsController.siteSettings,
-		controller.writing
+		controller.writing,
+		makeLayout,
+		clientRender
 	);
 
 	if ( config.isEnabled( 'manage/site-settings/categories' ) ) {
+		page( '/settings/taxonomies/:taxonomy', siteSelection, sites, makeLayout, clientRender );
+
 		page(
 			'/settings/taxonomies/:taxonomy/:site_id',
 			siteSelection,
 			navigation,
 			settingsController.setScroll,
-			controller.taxonomies
+			controller.taxonomies,
+			makeLayout,
+			clientRender
 		);
 	}
 }

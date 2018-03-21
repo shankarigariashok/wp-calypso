@@ -5,6 +5,7 @@
  */
 import IO from 'socket.io-client';
 import { isString } from 'lodash';
+import debugFactory from 'debug';
 
 /**
  * Internal dependencies
@@ -15,6 +16,7 @@ import {
 	receiveDisconnect,
 	receiveError,
 	receiveInit,
+	receiveLocalizedSupport,
 	receiveMessage,
 	receiveReconnecting,
 	receiveStatus,
@@ -23,7 +25,7 @@ import {
 	requestTranscript,
 } from 'state/happychat/connection/actions';
 
-const debug = require( 'debug' )( 'calypso:happychat:connection' );
+const debug = debugFactory( 'calypso:happychat:connection' );
 
 const buildConnection = socket =>
 	isString( socket )
@@ -71,6 +73,7 @@ class Connection {
 						.on( 'reconnecting', () => dispatch( receiveReconnecting() ) )
 						.on( 'status', status => dispatch( receiveStatus( status ) ) )
 						.on( 'accept', accept => dispatch( receiveAccept( accept ) ) )
+						.on( 'localized-support', accept => dispatch( receiveLocalizedSupport( accept ) ) )
 						.on( 'message', message => dispatch( receiveMessage( message ) ) );
 				} )
 				.catch( e => reject( e ) );

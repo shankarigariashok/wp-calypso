@@ -14,9 +14,8 @@ import { localize } from 'i18n-calypso';
  * Internal dependencies
  */
 import { omitUrlParams } from 'lib/url';
-import WebPreview from 'components/web-preview';
-import WebPreviewContent from 'components/web-preview/content';
 import { isEnabled } from 'config';
+import WebPreview from 'components/web-preview';
 
 class EditorPreview extends React.Component {
 	static propTypes = {
@@ -130,12 +129,12 @@ class EditorPreview extends React.Component {
 		return (
 			<div className={ className }>
 				{ isFullScreen ? (
-					<WebPreviewContent
+					<WebPreview
+						isContentOnly
 						showPreview={ this.props.showPreview }
 						showEdit={ true }
 						showExternal={ true }
 						showUrl={ true }
-						defaultViewportDevice={ this.props.defaultViewportDevice }
 						onClose={ this.props.onClose }
 						onEdit={ this.props.onEdit }
 						previewUrl={ this.state.iframeUrl }
@@ -149,7 +148,6 @@ class EditorPreview extends React.Component {
 				) : (
 					<WebPreview
 						showPreview={ this.props.showPreview }
-						defaultViewportDevice={ this.props.defaultViewportDevice }
 						onClose={ this.props.onClose }
 						previewUrl={ this.state.iframeUrl }
 						externalUrl={ this.cleanExternalUrl( this.props.externalUrl ) }

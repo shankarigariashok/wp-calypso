@@ -4,9 +4,8 @@
  * External dependencies
  */
 
-import ReactDom from 'react-dom';
 import React from 'react';
-import qs from 'qs';
+import { stringify } from 'qs';
 import { debounce } from 'lodash';
 import page from 'page';
 import url from 'url';
@@ -15,19 +14,18 @@ import url from 'url';
  * Internal dependencies
  */
 import config from 'config';
+// This is a custom AsyncLoad component for devdocs that includes a
+// `props.component`-aware placeholder. It still needs to be imported as
+// `AsyncLoad` though–see https://github.com/Automattic/babel-plugin-transform-wpcalypso-async/blob/master/index.js#L12
+import AsyncLoad from './devdocs-async-load';
 import DocsComponent from './main';
 import { login } from 'lib/paths';
 import SingleDocComponent from './doc';
-import DesignAssetsComponent from './design';
-import Blocks from './design/blocks';
-import DocsSelectors from './docs-selectors';
-import Typography from './design/typography';
 import DevWelcome from './welcome';
 import Sidebar from './sidebar';
 import FormStateExamplesComponent from './form-state-examples';
 import EmptyContent from 'components/empty-content';
 import WizardComponent from './wizard-component';
-import { renderWithReduxStore } from 'lib/react-helpers';
 
 const devdocs = {
 	/*
@@ -35,12 +33,9 @@ const devdocs = {
 	 * so #secondary needs to be cleaned up
 	 */
 	sidebar: function( context, next ) {
-		ReactDom.render(
-			React.createElement( Sidebar, {
-				path: context.path,
-			} ),
-			document.getElementById( 'secondary' )
-		);
+		context.secondary = React.createElement( Sidebar, {
+			path: context.path,
+		} );
 
 		next();
 	},
@@ -48,7 +43,7 @@ const devdocs = {
 	/*
 	 * Controller for page listing multiple developer docs
 	 */
-	devdocs: function( context ) {
+	devdocs: function( context, next ) {
 		function onSearchChange( searchTerm ) {
 			const query = context.query;
 
@@ -58,8 +53,7 @@ const devdocs = {
 				delete query.term;
 			}
 
-			const queryString = qs
-				.stringify( query )
+			const queryString = stringify( query )
 				.replace( /%20/g, '+' )
 				.trim();
 
@@ -72,119 +66,94 @@ const devdocs = {
 			page.replace( newUrl, context.state, false, false );
 		}
 
-		renderWithReduxStore(
-			React.createElement( DocsComponent, {
-				term: context.query.term,
-				// we debounce with wait time of 0, so that the search doesn’t happen
-				// in the same tick as the keyUp event and possibly cause typing lag
-				onSearchChange: debounce( onSearchChange, 0 ),
-			} ),
-			'primary',
-			context.store
-		);
+		context.primary = React.createElement( DocsComponent, {
+			term: context.query.term,
+			// we debounce with wait time of 0, so that the search doesn’t happen
+			// in the same tick as the keyUp event and possibly cause typing lag
+			onSearchChange: debounce( onSearchChange, 0 ),
+		} );
+		next();
 	},
 
 	/*
 	 * Controller for single developer document
 	 */
-	singleDoc: function( context ) {
-		renderWithReduxStore(
-			React.createElement( SingleDocComponent, {
-				path: context.params.path,
-				term: context.query.term,
-				sectionId: Object.keys( context.hash )[ 0 ],
-			} ),
-			'primary',
-			context.store
-		);
+	singleDoc: function( context, next ) {
+		context.primary = React.createElement( SingleDocComponent, {
+			path: context.params.path,
+			term: context.query.term,
+			sectionId: Object.keys( context.hash )[ 0 ],
+		} );
+		next();
 	},
 
 	// UI components
-	design: function( context ) {
-		renderWithReduxStore(
-			React.createElement( DesignAssetsComponent, {
-				component: context.params.component,
-			} ),
-			'primary',
-			context.store
-		);
+	design: function( context, next ) {
+		context.primary = <AsyncLoad component={ context.params.component } require="./design" />;
+		next();
 	},
 
-	wizard: function( context ) {
-		renderWithReduxStore(
-			<WizardComponent stepName={ context.params.stepName } />,
-			'primary',
-			context.store
-		);
+	wizard: function( context, next ) {
+		context.primary = <WizardComponent stepName={ context.params.stepName } />;
+		next();
 	},
 
 	// App Blocks
-	blocks: function( context ) {
-		renderWithReduxStore(
-			React.createElement( Blocks, {
-				component: context.params.component,
-			} ),
-			'primary',
-			context.store
+	blocks: function( context, next ) {
+		context.primary = (
+			<AsyncLoad component={ context.params.component } require="./design/blocks" />
 		);
+		next();
 	},
 
-	selectors: function( context ) {
-		renderWithReduxStore(
-			React.createElement( DocsSelectors, {
-				selector: context.params.selector,
-				search: context.query.search,
-			} ),
-			'primary',
-			context.store
+	selectors: function( context, next ) {
+		context.primary = (
+			<AsyncLoad
+				require="./docs-selectors"
+				search={ context.query.search }
+				selector={ context.params.selector }
+			/>
 		);
+		next();
 	},
 
-	typography: function( context ) {
-		renderWithReduxStore(
-			React.createElement( Typography, {
-				component: context.params.component,
-			} ),
-			'primary',
-			context.store
+	typography: function( context, next ) {
+		context.primary = (
+			<AsyncLoad component={ context.params.component } require="./design/typography" />
 		);
+		next();
 	},
 
-	formStateExamples: function( context ) {
-		ReactDom.render(
-			React.createElement( FormStateExamplesComponent, {
-				component: context.params.component,
-			} ),
-			document.getElementById( 'primary' )
-		);
+	formStateExamples: function( context, next ) {
+		context.primary = React.createElement( FormStateExamplesComponent, {
+			component: context.params.component,
+		} );
+		next();
 	},
 
-	pleaseLogIn: function() {
+	pleaseLogIn: function( context, next ) {
 		const currentUrl = url.parse( location.href );
 		const redirectTo = currentUrl.protocol + '//' + currentUrl.host + '/devdocs/welcome';
 
-		ReactDom.unmountComponentAtNode( document.getElementById( 'secondary' ) );
-
-		ReactDom.render(
-			React.createElement( EmptyContent, {
-				title: 'Log In to start hacking',
-				line: 'Required to access the WordPress.com API',
-				action: 'Log In to WordPress.com',
-				actionURL: login( {
-					isNative: config.isEnabled( 'login/native-login-links' ),
-					redirectTo,
-				} ),
-				secondaryAction: 'Register',
-				secondaryActionURL: '/start/developer',
-				illustration: '/calypso/images/illustrations/illustration-nosites.svg',
+		context.primary = React.createElement( EmptyContent, {
+			title: 'Log In to start hacking',
+			line: 'Required to access the WordPress.com API',
+			action: 'Log In to WordPress.com',
+			actionURL: login( {
+				isNative: config.isEnabled( 'login/native-login-links' ),
+				redirectTo,
 			} ),
-			document.getElementById( 'primary' )
-		);
+			secondaryAction: 'Register',
+			secondaryActionURL: '/start/developer',
+			illustration: '/calypso/images/illustrations/illustration-nosites.svg',
+		} );
+		next();
 	},
 
 	// Welcome screen
-	welcome: function() {
-		ReactDom.render( React.createElement( DevWelcome, {} ), document.getElementById( 'primary' ) );
+	welcome: function( context, next ) {
+		context.primary = React.createElement( DevWelcome, {} );
+		next();
 	},
 };
 

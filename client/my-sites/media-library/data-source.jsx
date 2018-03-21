@@ -23,6 +23,11 @@ export class MediaLibraryDataSource extends Component {
 	static propTypes = {
 		source: PropTypes.string.isRequired,
 		onSourceChange: PropTypes.func.isRequired,
+		disabledSources: PropTypes.array,
+	};
+
+	static defaultProps = {
+		disabledSources: [],
 	};
 
 	constructor( props ) {
@@ -54,12 +59,14 @@ export class MediaLibraryDataSource extends Component {
 	}
 
 	renderMenuItems( sources ) {
-		return sources.map( item => (
-			<PopoverMenuItem action={ item.value } key={ item.value } onClick={ this.changeSource }>
-				{ item.icon }
-				{ item.label }
-			</PopoverMenuItem>
-		) );
+		return sources
+			.filter( item => -1 === this.props.disabledSources.indexOf( item.value ) )
+			.map( item => (
+				<PopoverMenuItem action={ item.value } key={ item.value } onClick={ this.changeSource }>
+					{ item.icon }
+					{ item.label }
+				</PopoverMenuItem>
+			) );
 	}
 
 	render() {
@@ -68,14 +75,21 @@ export class MediaLibraryDataSource extends Component {
 			{
 				value: '',
 				label: translate( 'WordPress library' ),
-				icon: <Gridicon icon="my-sites" size={ 24 } />,
+				icon: <Gridicon icon="image" size={ 24 } />,
 			},
 			{
 				value: 'google_photos',
-				label: translate( 'Photos from Your Google library' ),
-				icon: <img src="/calypso/images/sharing/google-photos-logo.svg" width="24" height="24" />,
+				label: translate( 'Photos from your Google library' ),
+				icon: <Gridicon icon="shutter" size={ 24 } />,
 			},
 		];
+		if ( config.isEnabled( 'external-media/free-photo-library' ) ) {
+			sources.push( {
+				value: 'pexels',
+				label: translate( 'Free photo library' ),
+				icon: <Gridicon icon="image-multiple" size={ 24 } />,
+			} );
+		}
 		const currentSelected = find( sources, item => item.value === source );
 		const classes = classnames( {
 			button: true,
@@ -98,6 +112,7 @@ export class MediaLibraryDataSource extends Component {
 				>
 					{ currentSelected && currentSelected.icon }
 					{ this.renderScreenReader( currentSelected ) }
+					<Gridicon icon="chevron-down" size={ 18 } />
 
 					<PopoverMenu
 						context={ this.refs && this.refs.popoverMenuButton }

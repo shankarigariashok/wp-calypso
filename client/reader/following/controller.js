@@ -8,17 +8,16 @@ import i18n from 'i18n-calypso';
 /**
  * Internal dependencies
  */
-import route from 'lib/route';
+import { sectionify } from 'lib/route';
 import userSettings from 'lib/user-settings';
 import { trackPageLoad, setPageTitle } from 'reader/controller-helper';
-import { renderWithReduxStore } from 'lib/react-helpers';
 import AsyncLoad from 'components/async-load';
 
 const analyticsPageTitle = 'Reader';
 
 const exported = {
-	followingManage( context ) {
-		const basePath = route.sectionify( context.path );
+	followingManage( context, next ) {
+		const basePath = sectionify( context.path );
 		const fullAnalyticsPageTitle = analyticsPageTitle + ' > Manage Followed Sites';
 		const mcKey = 'following_manage';
 		const { q: sitesQuery, s: subsQuery, sort: subsSortOrder, showMoreResults } = context.query;
@@ -27,7 +26,7 @@ const exported = {
 
 		trackPageLoad( basePath, fullAnalyticsPageTitle, mcKey );
 
-		renderWithReduxStore(
+		context.primary = (
 			<AsyncLoad
 				require="reader/following-manage"
 				key="following-manage"
@@ -38,10 +37,9 @@ const exported = {
 				subsSortOrder={ subsSortOrder }
 				context={ context }
 				userSettings={ userSettings }
-			/>,
-			document.getElementById( 'primary' ),
-			context.store
+			/>
 		);
+		next();
 	},
 };
 

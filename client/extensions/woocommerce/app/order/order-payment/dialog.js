@@ -20,7 +20,6 @@ import Button from 'components/button';
 import Dialog from 'components/dialog';
 import { fetchPaymentMethods } from 'woocommerce/state/sites/payment-methods/actions';
 import formatCurrency from 'lib/format-currency';
-import FormFieldset from 'components/forms/form-fieldset';
 import FormLabel from 'components/forms/form-label';
 import FormTextarea from 'components/forms/form-textarea';
 import { getCurrencyFormatDecimal } from 'woocommerce/lib/currency';
@@ -33,7 +32,6 @@ import { getOrderRefundTotal } from 'woocommerce/lib/order-values/totals';
 import { getSelectedSiteWithFallback } from 'woocommerce/state/sites/selectors';
 import Notice from 'components/notice';
 import OrderRefundTable from './table';
-import PriceInput from 'woocommerce/components/price-input';
 import { sendRefund } from 'woocommerce/state/sites/orders/refunds/actions';
 
 class RefundDialog extends Component {
@@ -59,7 +57,6 @@ class RefundDialog extends Component {
 		super( props );
 
 		this.state = {
-			errorMessage: false,
 			refundTotal: this.getInitialRefund(),
 			refundNote: '',
 		};
@@ -83,7 +80,6 @@ class RefundDialog extends Component {
 		// Has been opened and closed before, let's reset the values.
 		if ( newProps.isVisible && ! this.props.isVisible ) {
 			this.setState( {
-				errorMessage: false,
 				refundTotal: this.getInitialRefund(),
 				refundNote: '',
 			} );
@@ -138,6 +134,18 @@ class RefundDialog extends Component {
 		this.setState( { refundTotal: this.recalculateRefund( data ) } );
 	};
 
+	isRefundInvalid = thisRefund => {
+		const { order, translate } = this.props;
+		// Refund total is negative, so this effectively subtracts the refund from total.
+		const maxRefund = parseFloat( order.total ) + getOrderRefundTotal( order );
+		if ( thisRefund > maxRefund ) {
+			return translate( 'Refund must be less than or equal to the order balance.' );
+		} else if ( thisRefund <= 0 ) {
+			return translate( 'Refund must be greater than zero.' );
+		}
+		return false;
+	};
+
 	updateNote = event => {
 		this.setState( {
 			refundNote: event.target.value,
@@ -145,26 +153,9 @@ class RefundDialog extends Component {
 	};
 
 	sendRefund = () => {
-		const { order, paymentMethod, siteId, translate } = this.props;
+		const { order, paymentMethod, siteId } = this.props;
 		// Refund total is negative, so this effectively subtracts the refund from total.
-		const maxRefund = parseFloat( order.total ) + getOrderRefundTotal( order );
 		const thisRefund = getCurrencyFormatDecimal( this.state.refundTotal, order.currency );
-		if ( thisRefund > maxRefund ) {
-			this.setState( {
-				errorMessage: translate(
-					'Refund must be less than or equal to the order balance, %(total)s',
-					{
-						args: {
-							total: formatCurrency( maxRefund, order.currency ),
-						},
-					}
-				),
-			} );
-			return;
-		} else if ( thisRefund <= 0 ) {
-			this.setState( { errorMessage: translate( 'Refund must be greater than zero.' ) } );
-			return;
-		}
 		this.toggleDialog();
 		const refundObj = {
 			amount: thisRefund.toPrecision(),
@@ -209,21 +200,31 @@ class RefundDialog extends Component {
 
 	render() {
 		const { isPaymentLoading, order, isVisible, translate } = this.props;
-		const { errorMessage, refundNote } = this.state;
+		const { refundNote } = this.state;
 		const dialogClass = 'woocommerce'; // eslint/css specificity hack
 
-		let refundTotal = formatCurrency( 0, order.currency );
+		let refundTotal = getCurrencyFormatDecimal( 0, order.currency );
 		if ( this.state.refundTotal ) {
-			refundTotal = formatCurrency( this.state.refundTotal, order.currency );
+			refundTotal = getCurrencyFormatDecimal( this.state.refundTotal, order.currency );
 		}
-		refundTotal = refundTotal.replace( /[^0-9.,]/g, '' );
+
+		const errorMessage = this.isRefundInvalid( refundTotal );
+		const refundDisabled = isPaymentLoading || !! errorMessage;
 
 		const dialogButtons = [
 			<Button onClick={ this.toggleDialog }>{ translate( 'Cancel' ) }</Button>,
-			<Button primary onClick={ this.sendRefund } disabled={ isPaymentLoading }>
+			<Button primary onClick={ this.sendRefund } disabled={ refundDisabled }>
 				{ translate( 'Refund', { context: 'Action label for button' } ) }
 			</Button>,
 		];
+
+		if ( errorMessage ) {
+			dialogButtons.unshift(
+				<Notice status="is-error" showDismiss={ false } isCompact>
+					{ errorMessage }
+				</Notice>
+			);
+		}
 
 		return (
 			<Dialog
@@ -241,29 +242,18 @@ class RefundDialog extends Component {
 						<FormTextarea onChange={ this.updateNote } name="refund_note" value={ refundNote } />
 					</FormLabel>
 
-					<FormFieldset className="order-payment__details">
-						<FormLabel className="order-payment__amount">
+					<div className="order-payment__details">
+						<div className="order-payment__amount">
 							<span className="order-payment__amount-label">
 								{ translate( 'Total refund amount' ) }
 							</span>
-							<div className="order-payment__amount-value">
-								<PriceInput
-									name="refund_total"
-									readOnly
-									currency={ order.currency }
-									value={ refundTotal }
-								/>
-							</div>
-						</FormLabel>
+							<span className="order-payment__amount-value">
+								{ formatCurrency( refundTotal, order.currency ) }
+							</span>
+						</div>
 
 						{ this.renderCreditCard() }
-					</FormFieldset>
-
-					{ errorMessage && (
-						<Notice status="is-error" showDismiss={ false }>
-							{ errorMessage }
-						</Notice>
-					) }
+					</div>
 				</form>
 			</Dialog>
 		);

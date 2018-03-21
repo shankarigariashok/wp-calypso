@@ -15,7 +15,7 @@ import { throttle } from 'lodash';
  * Internal dependencies
  */
 import Button from 'components/button';
-import viewport from 'lib/viewport';
+import { getWindowInnerWidth } from 'lib/viewport';
 
 /**
  * Module variables
@@ -31,15 +31,17 @@ class HeaderCakeBack extends Component {
 		href: PropTypes.string,
 		text: PropTypes.string,
 		spacer: PropTypes.bool,
+		alwaysShowActionText: PropTypes.bool,
 	};
 
 	static defaultProps = {
 		spacer: false,
 		disabled: false,
+		alwaysShowActionText: false,
 	};
 
 	state = {
-		windowWidth: viewport.getWindowInnerWidth(),
+		windowWidth: getWindowInnerWidth(),
 	};
 
 	componentDidMount() {
@@ -53,15 +55,16 @@ class HeaderCakeBack extends Component {
 
 	handleWindowResize = () => {
 		this.setState( {
-			windowWidth: viewport.getWindowInnerWidth(),
+			windowWidth: getWindowInnerWidth(),
 		} );
 	};
 
 	hideText( text ) {
 		if (
-			( this.state.windowWidth <= HIDE_BACK_CRITERIA.windowWidth &&
+			! this.props.alwaysShowActionText &&
+			( ( this.state.windowWidth <= HIDE_BACK_CRITERIA.windowWidth &&
 				text.length >= HIDE_BACK_CRITERIA.characterLength ) ||
-			this.state.windowWidth <= 300
+				this.state.windowWidth <= 300 )
 		) {
 			return true;
 		}

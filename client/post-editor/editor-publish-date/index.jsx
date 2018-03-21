@@ -18,7 +18,7 @@ import { intersection } from 'lodash';
  */
 import Button from 'components/button';
 import PostScheduler from './post-scheduler';
-import utils from 'lib/posts/utils';
+import * as utils from 'lib/posts/utils';
 import { getSelectedSite } from 'state/ui/selectors';
 
 export class EditorPublishDate extends React.Component {
@@ -153,6 +153,7 @@ export class EditorPublishDate extends React.Component {
 						</div>
 					) }
 				</div>
+				<Gridicon className="editor-publish-date__header-chevron" icon="chevron-down" size={ 18 } />
 			</div>
 		);
 	}

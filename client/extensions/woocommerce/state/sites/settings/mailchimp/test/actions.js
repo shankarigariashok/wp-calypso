@@ -40,7 +40,7 @@ describe( 'actions', () => {
 			nock( 'https://public-api.wordpress.com:443' )
 				.persist()
 				.get( '/rest/v1.1/jetpack-blogs/123/rest-api/' )
-				.query( { path: '/wc/v3/mailchimp&_method=get', json: true } )
+				.query( { path: '/wc/v3/mailchimp&_via_calypso&_method=get', json: true } )
 				.reply( 200, {
 					data: {
 						mailchimp_api_key: '6e46d0621d-us16',
@@ -108,7 +108,7 @@ describe( 'actions', () => {
 			nock( 'https://public-api.wordpress.com:443' )
 				.persist()
 				.post( '/rest/v1.1/jetpack-blogs/123/rest-api/' )
-				.query( { path: '/wc/v3/mailchimp/api_key&_method=put', json: true } )
+				.query( { path: '/wc/v3/mailchimp/api_key&_via_calypso&_method=put', json: true } )
 				.reply( 200, {
 					data: {
 						mailchimp_api_key: '12345testing',
@@ -160,7 +160,7 @@ describe( 'actions', () => {
 			nock( 'https://public-api.wordpress.com:443' )
 				.persist()
 				.post( '/rest/v1.1/jetpack-blogs/123/rest-api/' )
-				.query( { path: '/wc/v3/mailchimp/store_info&_method=put', json: true } )
+				.query( { path: '/wc/v3/mailchimp/store_info&_via_calypso&_method=put', json: true } )
 				.reply( 200, {
 					data: {
 						mailchimp_api_key: '12345testing',
@@ -222,7 +222,7 @@ describe( 'actions', () => {
 			nock( 'https://public-api.wordpress.com:443' )
 				.persist()
 				.post( '/rest/v1.1/jetpack-blogs/123/rest-api/' )
-				.query( { path: '/wc/v3/mailchimp/store_info&_method=put', json: true } )
+				.query( { path: '/wc/v3/mailchimp/store_info&_via_calypso&_method=put', json: true } )
 				.reply( 200, {
 					data: {
 						mailchimp_api_key: '12345testing',
@@ -293,7 +293,7 @@ describe( 'actions', () => {
 			nock( 'https://public-api.wordpress.com:443' )
 				.persist()
 				.get( '/rest/v1.1/jetpack-blogs/123/rest-api/' )
-				.query( { path: '/wc/v3/mailchimp/sync&_method=get', json: true } )
+				.query( { path: '/wc/v3/mailchimp/sync&_via_calypso&_method=get', json: true } )
 				.reply( 200, {
 					data: {
 						last_updated_time: '2017-10-17T22:22:44',
@@ -347,8 +347,85 @@ describe( 'actions', () => {
 	describe( '#mailChimpSaveSettings()', () => {
 		const siteId = '123';
 
-		test( 'should dispatch an action', () => {
+		test( 'should not dispatch an action if there are not settings in state', () => {
 			const getState = () => ( {} );
+			const dispatch = spy();
+			mailChimpSaveSettings( siteId )( dispatch, getState );
+			expect( dispatch ).to.have.not.been.calledWith( {
+				type: WOOCOMMERCE_MAILCHIMP_SAVE_SETTINGS,
+				siteId,
+			} );
+		} );
+
+		test( 'should not dispatch an action if the state does not represent completed setup', () => {
+			const getState = () => ( {
+				extensions: {
+					woocommerce: {
+						sites: {
+							[ siteId ]: {
+								settings: {
+									mailchimp: {
+										settings: {
+											mailchimp_api_key: '12345testing',
+											mailchimp_debugging: false,
+											mailchimp_account_info_id: '64c533c4',
+											mailchimp_account_info_username: 'ski',
+											mailchimp_active_tab: 'campaign_defaults',
+											store_name: 'mystore',
+											store_street: 'street',
+											store_city: 'Valhalla',
+											campaign_from_name: 'woo',
+											campaign_from_email: 'mystore@woo.woo',
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			} );
+
+			const dispatch = spy();
+			mailChimpSaveSettings( siteId )( dispatch, getState );
+			expect( dispatch ).to.have.not.been.calledWith( {
+				type: WOOCOMMERCE_MAILCHIMP_SAVE_SETTINGS,
+				siteId,
+			} );
+		} );
+
+		test( 'should dispatch an action if the state represents completed setup', () => {
+			const getState = () => ( {
+				extensions: {
+					woocommerce: {
+						sites: {
+							[ siteId ]: {
+								settings: {
+									mailchimp: {
+										settings: {
+											mailchimp_api_key: '6e46d0621d-us16',
+											mailchimp_debugging: false,
+											mailchimp_account_info_id: '64c533c4',
+											mailchimp_account_info_username: 'ski',
+											active_tab: 'sync',
+											store_name: 'sdsd',
+											campaign_from_name: 'sdsd',
+											campaign_from_email: 'user@gmail.com',
+											campaign_subject: 'sdsd',
+											campaign_language: 'en',
+											campaign_permission_reminder:
+												'You were subscribed to the newsletter from sdsd.',
+											mailchimp_list: '633bwew8',
+											newsletter_label: 'Subscribe to our newsletter',
+											mailchimp_active_tab: 'sync',
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			} );
+
 			const dispatch = spy();
 			mailChimpSaveSettings( siteId )( dispatch, getState );
 			expect( dispatch ).to.have.been.calledWith( {

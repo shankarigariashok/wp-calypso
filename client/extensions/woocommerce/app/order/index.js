@@ -3,7 +3,6 @@
  * External dependencies
  */
 import { bindActionCreators } from 'redux';
-import config from 'config';
 import { connect } from 'react-redux';
 import { isEmpty } from 'lodash';
 import { localize } from 'i18n-calypso';
@@ -12,21 +11,19 @@ import React, { Component } from 'react';
 /**
  * Internal dependencies
  */
-import ActionHeader from 'woocommerce/components/action-header';
-import Button from 'components/button';
-import { clearOrderEdits, editOrder } from 'woocommerce/state/ui/orders/actions';
+import { clearOrderEdits } from 'woocommerce/state/ui/orders/actions';
 import { fetchNotes } from 'woocommerce/state/sites/orders/notes/actions';
-import { fetchOrder, updateOrder } from 'woocommerce/state/sites/orders/actions';
+import { fetchOrder } from 'woocommerce/state/sites/orders/actions';
 import { getSelectedSiteWithFallback } from 'woocommerce/state/sites/selectors';
-import { getLink } from 'woocommerce/lib/nav-utils';
 import {
 	isCurrentlyEditingOrder,
 	getOrderEdits,
 	getOrderWithEdits,
 } from 'woocommerce/state/ui/orders/selectors';
-import { isOrderUpdating, getOrder } from 'woocommerce/state/sites/orders/selectors';
+import { getOrder } from 'woocommerce/state/sites/orders/selectors';
 import LabelsSetupNotice from 'woocommerce/woocommerce-services/components/labels-setup-notice';
 import Main from 'components/main';
+import OrderActionHeader from './header';
 import OrderCustomer from './order-customer';
 import OrderDetails from './order-details';
 import OrderActivityLog from './order-activity-log';
@@ -43,19 +40,20 @@ class Order extends Component {
 	}
 
 	componentWillReceiveProps( newProps ) {
-		if ( newProps.orderId !== this.props.orderId || newProps.siteId !== this.props.siteId ) {
+		const { orderId: oldOrderId, siteId: oldSiteId } = this.props;
+		const { orderId: newOrderId, siteId: newSiteId } = newProps;
+		if ( newOrderId !== oldOrderId || newSiteId !== oldSiteId ) {
 			// New order or site should clear any pending edits
-			this.props.clearOrderEdits( this.props.siteId );
+			this.props.clearOrderEdits( oldSiteId );
 			// And fetch the new order's info
-			this.props.fetchOrder( newProps.siteId, newProps.orderId );
-			this.props.fetchNotes( newProps.siteId, newProps.orderId );
-		} else if (
-			newProps.order &&
-			this.props.order &&
-			newProps.order.status !== this.props.order.status
-		) {
-			// A status change should force a notes refresh
-			this.props.fetchNotes( newProps.siteId, newProps.orderId, true );
+			this.props.fetchOrder( newSiteId, newOrderId );
+			this.props.fetchNotes( newSiteId, newOrderId );
+			return;
+		}
+
+		if ( this.props.isEditing && ! newProps.isEditing ) {
+			// Leaving edit state should re-fetch notes
+			this.props.fetchNotes( newSiteId, newOrderId );
 		}
 	}
 
@@ -64,82 +62,22 @@ class Order extends Component {
 		this.props.clearOrderEdits( this.props.siteId );
 	}
 
-	// Put this order into the editing state
-	toggleEditing = () => {
-		const { siteId, orderId } = this.props;
-		if ( siteId ) {
-			this.props.editOrder( siteId, { id: orderId } );
-		}
-	};
-
-	// Clear this order's edits, takes it out of edit state
-	cancelEditing = () => {
-		const { siteId } = this.props;
-		this.props.clearOrderEdits( siteId );
-	};
-
-	// Saves changes to the remote site via API
-	saveOrder = () => {
-		const { siteId, order } = this.props;
-		this.props.updateOrder( siteId, order );
-	};
-
 	render() {
-		const {
-			className,
-			hasOrderEdits,
-			isEditing,
-			isSaving,
-			order,
-			orderId,
-			site,
-			translate,
-		} = this.props;
-		if ( isEmpty( order ) ) {
+		const { className, hasOrder, hasOrderEdits, isEditing, orderId, siteId } = this.props;
+		if ( ! hasOrder ) {
 			return null;
 		}
 
-		const breadcrumbs = [
-			<a href={ getLink( '/store/orders/:site/', site ) }>{ translate( 'Orders' ) }</a>,
-			<span>
-				{ translate( 'Order %(orderId)s Details', { args: { orderId: `#${ orderId }` } } ) }
-			</span>,
-		];
-
-		let button = [
-			<Button key="cancel" onClick={ this.cancelEditing }>
-				{ translate( 'Cancel' ) }
-			</Button>,
-			<Button
-				key="save"
-				primary
-				onClick={ this.saveOrder }
-				busy={ isSaving }
-				disabled={ ! hasOrderEdits }
-			>
-				{ translate( 'Save Order' ) }
-			</Button>,
-		];
-		if ( ! isEditing ) {
-			button = (
-				<Button primary onClick={ this.toggleEditing }>
-					{ translate( 'Edit Order' ) }
-				</Button>
-			);
-		}
-
 		return (
-			<Main className={ className }>
-				<ActionHeader breadcrumbs={ breadcrumbs }>
-					{ config.isEnabled( 'woocommerce/extension-orders-edit' ) && button }
-				</ActionHeader>
+			<Main className={ className } wideLayout>
+				<OrderActionHeader orderId={ orderId } />
 
 				<div className="order__container">
 					<LabelsSetupNotice />
 					{ isEditing && <ProtectFormGuard isChanged={ hasOrderEdits } /> }
 					<OrderDetails orderId={ orderId } />
-					<OrderActivityLog orderId={ orderId } siteId={ site.ID } />
 					<OrderCustomer orderId={ orderId } />
+					<OrderActivityLog orderId={ orderId } siteId={ siteId } />
 				</div>
 			</Main>
 		);
@@ -151,24 +89,18 @@ export default connect(
 		const site = getSelectedSiteWithFallback( state );
 		const siteId = site ? site.ID : false;
 		const orderId = parseInt( props.params.order );
-		const isSaving = isOrderUpdating( state, orderId );
 		const isEditing = isCurrentlyEditingOrder( state );
-		const hasOrderEdits = ! isEmpty( getOrderEdits( state ) );
 		const order = isEditing ? getOrderWithEdits( state ) : getOrder( state, orderId );
+		const hasOrder = ! isEmpty( order );
+		const hasOrderEdits = ! isEmpty( getOrderEdits( state ) );
 
 		return {
 			hasOrderEdits,
+			hasOrder,
 			isEditing,
-			isSaving,
-			order,
 			orderId,
-			site,
 			siteId,
 		};
 	},
-	dispatch =>
-		bindActionCreators(
-			{ clearOrderEdits, editOrder, fetchNotes, fetchOrder, updateOrder },
-			dispatch
-		)
+	dispatch => bindActionCreators( { clearOrderEdits, fetchNotes, fetchOrder }, dispatch )
 )( localize( Order ) );

@@ -41,11 +41,9 @@ export class RecommendedSites extends React.PureComponent {
 	};
 
 	render() {
-		const { sites, followSource } = this.props;
-
-		if ( isEmpty( sites ) ) {
-			return null;
-		}
+		const { followSource } = this.props;
+		const placeholders = [ {}, {} ];
+		const sites = isEmpty( this.props.sites ) ? placeholders : this.props.sites;
 
 		function recordRecommendationRender( index ) {
 			return function( railcar ) {
@@ -68,7 +66,7 @@ export class RecommendedSites extends React.PureComponent {
 						return (
 							<li
 								className="reader-recommended-sites__site-list-item"
-								key={ `site-rec-${ siteId }` }
+								key={ `site-rec-${ index }` }
 							>
 								<div className="reader-recommended-sites__recommended-site-dismiss">
 									<Button
@@ -82,7 +80,7 @@ export class RecommendedSites extends React.PureComponent {
 								<ConnectedSubscriptionListItem
 									siteId={ siteId }
 									railcar={ site.railcar }
-									showEmailSettings={ false }
+									showNotificationSettings={ false }
 									showLastUpdatedDate={ false }
 									followSource={ followSource }
 									onComponentMountWithNewRailcar={ recordRecommendationRender( index ) }

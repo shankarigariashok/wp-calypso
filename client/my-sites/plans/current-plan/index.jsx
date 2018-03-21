@@ -3,9 +3,8 @@
 /**
  * External dependencies
  */
-
+import React, { Component, Fragment } from 'react';
 import PropTypes from 'prop-types';
-import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
 
@@ -18,13 +17,13 @@ import {
 	isCurrentPlanExpiring,
 	isRequestingSitePlans,
 } from 'state/sites/plans/selectors';
+import { isFreeJetpackPlan } from 'lib/products-values';
 import { getSelectedSite, getSelectedSiteId } from 'state/ui/selectors';
 import { isJetpackSite } from 'state/sites/selectors';
 import DocumentHead from 'components/data/document-head';
 import TrackComponentView from 'lib/analytics/track-component-view';
 import PlansNavigation from 'my-sites/domains/navigation';
-import ProductPurchaseFeatures from 'blocks/product-purchase-features';
-import ProductPurchaseFeaturesList from 'blocks/product-purchase-features/product-purchase-features-list';
+import ProductPurchaseFeaturesList from 'blocks/product-purchase-features-list';
 import CurrentPlanHeader from './header';
 import QuerySites from 'components/data/query-sites';
 import QuerySitePlans from 'components/data/query-site-plans';
@@ -98,11 +97,10 @@ class CurrentPlan extends Component {
 
 		const shouldQuerySiteDomains = selectedSiteId && shouldShowDomainWarnings;
 		const showDomainWarnings = hasDomainsLoaded && shouldShowDomainWarnings;
-
 		return (
 			<Main className="current-plan" wideLayout>
 				<SidebarNavigation />
-				<DocumentHead title={ translate( 'Plans', { textOnly: true } ) } />
+				<DocumentHead title={ translate( 'Plans' ) } />
 				<QuerySites siteId={ selectedSiteId } />
 				<QuerySitePlans siteId={ selectedSiteId } />
 				{ shouldQuerySiteDomains && <QuerySiteDomains siteId={ selectedSiteId } /> }
@@ -125,7 +123,7 @@ class CurrentPlan extends Component {
 					/>
 				) }
 
-				<ProductPurchaseFeatures>
+				<Fragment>
 					<CurrentPlanHeader
 						selectedSite={ selectedSite }
 						isPlaceholder={ isLoading }
@@ -135,9 +133,10 @@ class CurrentPlan extends Component {
 						currentPlan={ currentPlan }
 						isExpiring={ isExpiring }
 						isAutomatedTransfer={ isAutomatedTransfer }
+						includePlansLink={ currentPlan && isFreeJetpackPlan( currentPlan ) }
 					/>
 					<ProductPurchaseFeaturesList plan={ currentPlanSlug } isPlaceholder={ isLoading } />
-				</ProductPurchaseFeatures>
+				</Fragment>
 
 				<TrackComponentView eventName={ 'calypso_plans_my_plan_view' } />
 			</Main>

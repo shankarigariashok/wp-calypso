@@ -15,7 +15,7 @@ import {
 	arePaymentMethodsLoaded,
 } from 'woocommerce/state/sites/payment-methods/selectors';
 
-const getPaymentMethodsEdits = ( state, siteId ) => {
+export const getPaymentMethodsEdits = ( state, siteId ) => {
 	return get( state, [ 'extensions', 'woocommerce', 'ui', 'payments', siteId, 'methods' ] );
 };
 
@@ -75,6 +75,11 @@ export const getPaymentMethodsWithEdits = ( state, siteId = getSelectedSiteId( s
 			if ( 'description' === updateKey ) {
 				method.description = update[ updateKey ].value;
 				return;
+			}
+			if ( 'title' === updateKey ) {
+				// Edits to title need to update base title attribute
+				// and settings value too, thus no return here.
+				method.title = update[ updateKey ].value;
 			}
 			method.settings[ updateKey ] = {
 				...method.settings[ updateKey ],

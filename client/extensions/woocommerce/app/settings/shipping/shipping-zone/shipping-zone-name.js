@@ -77,19 +77,21 @@ const ShippingZoneName = ( {
 	);
 };
 
-ShippingZoneName.PropTypes = {
+ShippingZoneName.propTypes = {
 	siteId: PropTypes.number,
 };
 
 export default connect(
-	state => {
-		const loaded = areShippingZonesFullyLoaded( state ) && areSettingsGeneralLoaded( state );
-		const zone = loaded && getCurrentlyEditingShippingZone( state );
+	( state, ownProps ) => {
+		const loaded =
+			areShippingZonesFullyLoaded( state, ownProps.siteId ) &&
+			areSettingsGeneralLoaded( state, ownProps.siteId );
+		const zone = loaded && getCurrentlyEditingShippingZone( state, ownProps.siteId );
 		return {
 			loaded,
-			fetchError: areSettingsGeneralLoadError( state ), // TODO: add shipping zones/methods fetch errors too
+			fetchError: areSettingsGeneralLoadError( state, ownProps.siteId ), // TODO: add shipping zones/methods fetch errors too
 			zoneName: zone && zone.name,
-			generatedZoneName: generateCurrentlyEditingZoneName( state ),
+			generatedZoneName: generateCurrentlyEditingZoneName( state, ownProps.siteId ),
 		};
 	},
 	( dispatch, ownProps ) => ( {

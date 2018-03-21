@@ -34,6 +34,7 @@ const TEXTAREA_VERTICAL_BORDER = 2;
 export class CommentReply extends Component {
 	static propTypes = {
 		commentId: PropTypes.number,
+		commentsListQuery: PropTypes.object,
 		isReplyVisible: PropTypes.bool,
 	};
 
@@ -113,6 +114,13 @@ export class CommentReply extends Component {
 		if ( alsoApprove ) {
 			approveComment( siteId, postId, { previousStatus: commentStatus } );
 		}
+
+		// Back navigation scrolling fix
+		if ( window ) {
+			const path = get( window, 'history.state.path' );
+			const newPath = path.replace( /[#].*/, '' );
+			window.history.replaceState( window.history.state, '', newPath );
+		}
 	};
 
 	updateTextarea = event => {
@@ -188,7 +196,7 @@ const mapStateToProps = ( state, { commentId } ) => {
 	};
 };
 
-const mapDispatchToProps = ( dispatch, { commentId } ) => ( {
+const mapDispatchToProps = ( dispatch, { commentId, commentsListQuery } ) => ( {
 	approveComment: ( siteId, postId, analytics = {} ) =>
 		dispatch(
 			withAnalytics(
@@ -214,7 +222,7 @@ const mapDispatchToProps = ( dispatch, { commentId } ) => ( {
 					} ),
 					bumpStat( 'calypso_comment_management', 'comment_reply' )
 				),
-				replyComment( replyContent, siteId, postId, commentId )
+				replyComment( replyContent, siteId, postId, commentId, commentsListQuery )
 			)
 		),
 	successNotice: ( text, options ) => dispatch( successNotice( text, options ) ),

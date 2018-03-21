@@ -15,7 +15,6 @@ import domains from './domains/reducer';
 import guidedTransfer from './guided-transfer/reducer';
 import monitor from './monitor/reducer';
 import vouchers from './vouchers/reducer';
-import updates from './updates/reducer';
 import sharingButtons from './sharing-buttons/reducer';
 import mediaStorage from './media-storage/reducer';
 import blogStickers from './blog-stickers/reducer';
@@ -36,11 +35,11 @@ import {
 	SITES_REQUEST,
 	SITES_REQUEST_FAILURE,
 	SITES_REQUEST_SUCCESS,
-	SITES_UPDATE,
 	THEME_ACTIVATE_SUCCESS,
 	WORDADS_SITE_APPROVE_REQUEST_SUCCESS,
+	SITE_PLUGIN_UPDATED,
 } from 'state/action-types';
-import { sitesSchema } from './schema';
+import { sitesSchema, hasAllSitesListSchema } from './schema';
 import { combineReducers, createReducer, keyedReducer } from 'state/utils';
 
 /**
@@ -57,7 +56,10 @@ const VALID_SITE_KEYS = Object.keys( sitesSchema.patternProperties[ '^\\d+$' ].p
  * @param  {Object} action Action payload
  * @return {Object}        Updated state
  */
-export function items( state = {}, action ) {
+export function items( state = null, action ) {
+	if ( state === null && action.type !== SITE_RECEIVE && action.type !== SITES_RECEIVE ) {
+		return null;
+	}
 	switch ( action.type ) {
 		case WORDADS_SITE_APPROVE_REQUEST_SUCCESS:
 			const prevSite = state[ action.siteId ];
@@ -70,7 +72,6 @@ export function items( state = {}, action ) {
 
 		case SITE_RECEIVE:
 		case SITES_RECEIVE:
-		case SITES_UPDATE:
 			// Normalize incoming site(s) to array
 			const sites = action.site ? [ action.site ] : action.sites;
 
@@ -81,15 +82,6 @@ export function items( state = {}, action ) {
 			return reduce(
 				sites,
 				( memo, site ) => {
-					// If we're not already tracking the site upon an update, don't
-					// merge into state (we only currently maintain sites which
-					// have at one point been selected in state)
-					//
-					// TODO: Consider dropping condition once sites-list abolished
-					if ( SITES_UPDATE === action.type && ! memo[ site.ID ] ) {
-						return memo;
-					}
-
 					// Bypass if site object hasn't change
 					const transformedSite = pick( site, VALID_SITE_KEYS );
 					if ( isEqual( memo[ site.ID ], transformedSite ) ) {
@@ -104,12 +96,10 @@ export function items( state = {}, action ) {
 					memo[ site.ID ] = transformedSite;
 					return memo;
 				},
-				initialNextState
+				initialNextState || {}
 			);
 
 		case SITE_DELETE_RECEIVE:
-			return omit( state, action.siteId );
-
 		case JETPACK_DISCONNECT_RECEIVE:
 			return omit( state, action.siteId );
 
@@ -214,6 +204,26 @@ export function items( state = {}, action ) {
 
 			return state;
 		}
+
+		case SITE_PLUGIN_UPDATED: {
+			const { siteId } = action;
+			const siteUpdates = get( state[ siteId ], 'updates' );
+			if ( ! siteUpdates ) {
+				return state;
+			}
+
+			return {
+				...state,
+				[ siteId ]: {
+					...state[ siteId ],
+					updates: {
+						...siteUpdates,
+						plugins: siteUpdates.plugins - 1,
+						total: siteUpdates.total - 1,
+					},
+				},
+			};
+		}
 	}
 
 	return state;
@@ -278,6 +288,21 @@ export const deleting = keyedReducer(
 	)
 );
 
+/**
+ * Tracks whether all sites have been fetched.
+ *
+ * @param  {Object} state  Current state
+ * @param  {Object} action Action object
+ * @return {Object}        Updated state
+ */
+export const hasAllSitesList = createReducer(
+	false,
+	{
+		[ SITES_RECEIVE ]: () => true,
+	},
+	hasAllSitesListSchema
+);
+
 export default combineReducers( {
 	connection,
 	deleting,
@@ -289,8 +314,8 @@ export default combineReducers( {
 	guidedTransfer,
 	monitor,
 	vouchers,
-	updates,
 	requesting,
 	sharingButtons,
 	blogStickers,
+	hasAllSitesList,
 } );

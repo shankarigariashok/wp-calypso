@@ -1,12 +1,9 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import React from 'react';
 import page from 'page';
-import route from 'lib/route';
 import i18n from 'i18n-calypso';
 
 /**
@@ -19,16 +16,18 @@ import titlecase from 'to-title-case';
 import PeopleLogStore from 'lib/people/log-store';
 import { setDocumentHeadTitle as setTitle } from 'state/document-head/actions';
 import InvitePeople from './invite-people';
-import { renderWithReduxStore } from 'lib/react-helpers';
+import PeopleInvites from './people-invites';
+import PeopleInviteDetails from './people-invite-details';
 import { getCurrentLayoutFocus } from 'state/ui/layout-focus/selectors';
 import { setNextLayoutFocus } from 'state/ui/layout-focus/actions';
 import { getSelectedSite } from 'state/ui/selectors';
+import { getSiteFragment } from 'lib/route';
 
 export default {
 	redirectToTeam,
 
 	enforceSiteEnding( context, next ) {
-		const siteId = route.getSiteFragment( context.path );
+		const siteId = getSiteFragment( context.path );
 
 		if ( ! siteId ) {
 			redirectToTeam( context );
@@ -37,16 +36,24 @@ export default {
 		next();
 	},
 
-	people( context ) {
-		renderPeopleList( context );
+	people( context, next ) {
+		renderPeopleList( context, next );
 	},
 
-	invitePeople( context ) {
-		renderInvitePeople( context );
+	invitePeople( context, next ) {
+		renderInvitePeople( context, next );
 	},
 
-	person( context ) {
-		renderSingleTeamMember( context );
+	person( context, next ) {
+		renderSingleTeamMember( context, next );
+	},
+
+	peopleInvites( context, next ) {
+		renderPeopleInvites( context, next );
+	},
+
+	peopleInviteDetails( context, next ) {
+		renderPeopleInviteDetails( context, next );
 	},
 };
 
@@ -59,48 +66,55 @@ function redirectToTeam( context ) {
 	page.redirect( '/people/team' );
 }
 
-function renderPeopleList( context ) {
+function renderPeopleList( context, next ) {
 	const filter = context.params.filter;
 
 	// FIXME: Auto-converted from the Flux setTitle action. Please use <DocumentHead> instead.
 	context.store.dispatch( setTitle( i18n.translate( 'People', { textOnly: true } ) ) );
 
-	renderWithReduxStore(
-		React.createElement( PeopleList, {
-			peopleLog: PeopleLogStore,
-			filter: filter,
-			search: context.query.s,
-		} ),
-		document.getElementById( 'primary' ),
-		context.store
-	);
+	context.primary = React.createElement( PeopleList, {
+		peopleLog: PeopleLogStore,
+		filter: filter,
+		search: context.query.s,
+	} );
 	analytics.pageView.record( 'people/' + filter + '/:site', 'People > ' + titlecase( filter ) );
+	next();
 }
 
-function renderInvitePeople( context ) {
+function renderInvitePeople( context, next ) {
 	const state = context.store.getState();
 	const site = getSelectedSite( state );
 
 	context.store.dispatch( setTitle( i18n.translate( 'Invite People', { textOnly: true } ) ) ); // FIXME: Auto-converted from the Flux setTitle action. Please use <DocumentHead> instead.
 
-	renderWithReduxStore(
-		React.createElement( InvitePeople, {
-			site: site,
-		} ),
-		document.getElementById( 'primary' ),
-		context.store
-	);
+	context.primary = React.createElement( InvitePeople, {
+		site: site,
+	} );
+	next();
 }
 
-function renderSingleTeamMember( context ) {
+function renderPeopleInvites( context, next ) {
+	context.store.dispatch( setTitle( i18n.translate( 'Invites', { textOnly: true } ) ) );
+
+	context.primary = React.createElement( PeopleInvites );
+	next();
+}
+
+function renderPeopleInviteDetails( context, next ) {
+	context.store.dispatch( setTitle( i18n.translate( 'Invite Details', { textOnly: true } ) ) );
+
+	context.primary = React.createElement( PeopleInviteDetails, {
+		inviteKey: context.params.invite_key,
+	} );
+	next();
+}
+
+function renderSingleTeamMember( context, next ) {
 	context.store.dispatch( setTitle( i18n.translate( 'View Team Member', { textOnly: true } ) ) ); // FIXME: Auto-converted from the Flux setTitle action. Please use <DocumentHead> instead.
 
-	renderWithReduxStore(
-		React.createElement( EditTeamMember, {
-			userLogin: context.params.user_login,
-			prevPath: context.prevPath,
-		} ),
-		document.getElementById( 'primary' ),
-		context.store
-	);
+	context.primary = React.createElement( EditTeamMember, {
+		userLogin: context.params.user_login,
+		prevPath: context.prevPath,
+	} );
+	next();
 }

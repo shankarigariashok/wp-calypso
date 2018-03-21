@@ -1,23 +1,10 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import React from 'react';
 import { connect } from 'react-redux';
-import { Set } from 'immutable';
-import {
-	get,
-	includes,
-	isArray,
-	isEqual,
-	mapValues,
-	omit,
-	overSome,
-	pickBy,
-	partial,
-} from 'lodash';
+import { get, isArray, isEqual, mapValues, omit, overSome, pickBy, partial } from 'lodash';
 import { localize } from 'i18n-calypso';
 
 /**
@@ -51,23 +38,28 @@ import { getSelectedSite, getSelectedSiteId } from 'state/ui/selectors';
 import { isJetpackModuleActive, isHiddenSite, isPrivateSite } from 'state/selectors';
 import { toApi as seoTitleToApi } from 'components/seo/meta-title-editor/mappings';
 import { recordTracksEvent } from 'state/analytics/actions';
-import WebPreview from 'components/web-preview';
 import { requestSite } from 'state/sites/actions';
-import { activateModule } from 'state/jetpack/modules/actions';
-import { isBusiness, isEnterprise, isJetpackBusiness } from 'lib/products-values';
+import { isBusiness, isEnterprise, isJetpackBusiness, isJetpackPremium } from 'lib/products-values';
 import { hasFeature } from 'state/sites/plans/selectors';
 import { getPlugins } from 'state/plugins/installed/selectors';
-import { FEATURE_SEO_PREVIEW_TOOLS, PLAN_BUSINESS } from 'lib/plans/constants';
+import {
+	FEATURE_ADVANCED_SEO,
+	FEATURE_SEO_PREVIEW_TOOLS,
+	PLAN_BUSINESS,
+	PLAN_JETPACK_BUSINESS,
+} from 'lib/plans/constants';
 import QueryJetpackModules from 'components/data/query-jetpack-modules';
 import QueryJetpackPlugins from 'components/data/query-jetpack-plugins';
 import QuerySiteSettings from 'components/data/query-site-settings';
 import { requestSiteSettings, saveSiteSettings } from 'state/site-settings/actions';
+import WebPreview from 'components/web-preview';
+import { getFirstConflictingPlugin } from 'lib/seo';
 
 // Basic matching for HTML tags
 // Not perfect but meets the needs of this component well
 const anyHtmlTag = /<\/?[a-z][a-z0-9]*\b[^>]*>/i;
 
-const hasBusinessPlan = overSome( isBusiness, isEnterprise, isJetpackBusiness );
+const hasSupportingPlan = overSome( isBusiness, isEnterprise, isJetpackBusiness, isJetpackPremium );
 
 function getGeneralTabUrl( slug ) {
 	return `/settings/general/${ slug }`;
@@ -94,7 +86,7 @@ export class SeoForm extends React.Component {
 		// from overwriting local stateful edits that
 		// are in progress and haven't yet been saved
 		// to the server
-		dirtyFields: Set(),
+		dirtyFields: new Set(),
 		invalidatedSiteObject: this.props.selectedSite,
 	};
 
@@ -128,7 +120,7 @@ export class SeoForm extends React.Component {
 					...stateForSite( nextSite ),
 					seoTitleFormats: nextProps.storedTitleFormats,
 					invalidatedSiteObject: nextSite,
-					dirtyFields: Set(),
+					dirtyFields: new Set(),
 				},
 				this.refreshCustomTitles
 			);
@@ -140,10 +132,13 @@ export class SeoForm extends React.Component {
 		};
 
 		if ( ! isFetchingSite ) {
+			const nextDirtyFields = new Set( dirtyFields );
+			nextDirtyFields.delete( 'seoTitleFormats' );
+
 			nextState = {
 				...nextState,
 				seoTitleFormats: nextProps.storedTitleFormats,
-				dirtyFields: dirtyFields.delete( 'seoTitleFormats' ),
+				dirtyFields: nextDirtyFields,
 			};
 		}
 
@@ -152,32 +147,33 @@ export class SeoForm extends React.Component {
 		}
 
 		// Don't update state for fields the user has edited
-		nextState = omit( nextState, dirtyFields.toArray() );
+		nextState = omit( nextState, Array.from( dirtyFields ) );
 
-		this.setState( {
-			...nextState,
-		} );
+		this.setState( nextState );
 	}
 
 	handleMetaChange = ( { target: { value: frontPageMetaDescription } } ) => {
-		const { dirtyFields } = this.state;
+		const dirtyFields = new Set( this.state.dirtyFields );
+		dirtyFields.add( 'frontPageMetaDescription' );
 
 		// Don't allow html tags in the input field
 		const hasHtmlTagError = anyHtmlTag.test( frontPageMetaDescription );
 
 		this.setState(
-			Object.assign( { hasHtmlTagError }, ! hasHtmlTagError && { frontPageMetaDescription }, {
-				dirtyFields: dirtyFields.add( 'frontPageMetaDescription' ),
-			} )
+			Object.assign(
+				{ dirtyFields, hasHtmlTagError },
+				! hasHtmlTagError && { frontPageMetaDescription }
+			)
 		);
 	};
 
 	updateTitleFormats = seoTitleFormats => {
-		const { dirtyFields } = this.state;
+		const dirtyFields = new Set( this.state.dirtyFields );
+		dirtyFields.add( 'seoTitleFormats' );
 
 		this.setState( {
 			seoTitleFormats,
-			dirtyFields: dirtyFields.add( 'seoTitleFormats' ),
+			dirtyFields,
 		} );
 	};
 
@@ -262,21 +258,9 @@ export class SeoForm extends React.Component {
 		this.setState( { showPreview: false } );
 	};
 
-	getConflictingSeoPlugins = activePlugins => {
-		const conflictingSeoPlugins = [
-			'Yoast SEO',
-			'Yoast SEO Premium',
-			'All In One SEO Pack',
-			'All in One SEO Pack Pro',
-		];
-
-		return activePlugins
-			.filter( ( { name } ) => includes( conflictingSeoPlugins, name ) )
-			.map( ( { name, slug } ) => ( { name, slug } ) );
-	};
-
 	render() {
 		const {
+			conflictedSeoPlugin,
 			siteId,
 			siteIsJetpack,
 			jetpackVersionSupportsSeo,
@@ -287,7 +271,6 @@ export class SeoForm extends React.Component {
 			isSeoToolsActive,
 			isSitePrivate,
 			isSiteHidden,
-			activePlugins,
 			translate,
 		} = this.props;
 		const { slug = '', URL: siteUrl = '' } = site;
@@ -302,7 +285,6 @@ export class SeoForm extends React.Component {
 			showPreview = false,
 		} = this.state;
 
-		const activateSeoTools = () => this.props.activateModule( siteId, 'seo-tools' );
 		const isJetpackUnsupported = siteIsJetpack && ! jetpackVersionSupportsSeo;
 		const isDisabled = isJetpackUnsupported || isSubmittingForm || isFetchingSettings;
 		const isSeoDisabled = isDisabled || isSeoToolsActive === false;
@@ -328,11 +310,6 @@ export class SeoForm extends React.Component {
 			</Button>
 		);
 
-		const conflictedSeoPlugin = siteIsJetpack
-			? // Let's just pick the first one to keep the notice short.
-				this.getConflictingSeoPlugins( activePlugins )[ 0 ]
-			: null;
-
 		/* eslint-disable react/jsx-no-target-blank */
 		return (
 			<div>
@@ -341,7 +318,7 @@ export class SeoForm extends React.Component {
 				{ siteIsJetpack && <QueryJetpackModules siteId={ siteId } /> }
 				<PageViewTracker path="/settings/seo/:site" title="Site Settings > SEO" />
 				{ ( isSitePrivate || isSiteHidden ) &&
-					hasBusinessPlan( site.plan ) && (
+					hasSupportingPlan( site.plan ) && (
 						<Notice
 							status="is-warning"
 							showDismiss={ false }
@@ -360,7 +337,6 @@ export class SeoForm extends React.Component {
 							</NoticeAction>
 						</Notice>
 					) }
-
 				{ conflictedSeoPlugin && (
 					<Notice
 						status="is-warning"
@@ -375,7 +351,6 @@ export class SeoForm extends React.Component {
 						</NoticeAction>
 					</Notice>
 				) }
-
 				{ isJetpackUnsupported && (
 					<Notice
 						status="is-warning"
@@ -386,30 +361,18 @@ export class SeoForm extends React.Component {
 					</Notice>
 				) }
 
-				{ siteIsJetpack &&
-					hasBusinessPlan( site.plan ) &&
-					isSeoToolsActive === false && (
-						<Notice
-							status="is-warning"
-							showDismiss={ false }
-							text={ translate( 'SEO Tools module is disabled in Jetpack.' ) }
-						>
-							<NoticeAction onClick={ activateSeoTools }>{ translate( 'Enable' ) }</NoticeAction>
-						</Notice>
+				{ ! this.props.hasSeoPreviewFeature &&
+					! this.props.hasAdvancedSEOFeature && (
+						<Banner
+							description={ translate(
+								'Get tools to optimize your site for improved performance in search engine results.'
+							) }
+							event={ 'calypso_seo_settings_upgrade_nudge' }
+							feature={ siteIsJetpack ? FEATURE_SEO_PREVIEW_TOOLS : FEATURE_ADVANCED_SEO }
+							plan={ siteIsJetpack ? PLAN_JETPACK_BUSINESS : PLAN_BUSINESS }
+							title={ nudgeTitle }
+						/>
 					) }
-
-				{ ! this.props.hasSeoPreviewFeature && (
-					<Banner
-						description={ translate(
-							'Get tools to optimize your site for improved performance in search engine results.'
-						) }
-						event={ 'calypso_seo_settings_upgrade_nudge' }
-						feature={ FEATURE_SEO_PREVIEW_TOOLS }
-						plan={ PLAN_BUSINESS }
-						title={ nudgeTitle }
-					/>
-				) }
-
 				<form onChange={ this.props.markChanged } className="seo-settings__seo-form">
 					{ showAdvancedSeo &&
 						! conflictedSeoPlugin && (
@@ -488,7 +451,6 @@ export class SeoForm extends React.Component {
 							</div>
 						) }
 				</form>
-
 				<WebPreview
 					showPreview={ showPreview }
 					onClose={ this.hidePreview }
@@ -507,14 +469,20 @@ export class SeoForm extends React.Component {
 const mapStateToProps = ( state, ownProps ) => {
 	const { site } = ownProps;
 	// SEO Tools are available with Business plan on WordPress.com, and with Premium plan on Jetpack sites
-	const isAdvancedSeoEligible = site && site.plan && hasBusinessPlan( site.plan );
+	const isAdvancedSeoEligible = site && site.plan && hasSupportingPlan( site.plan );
 	const siteId = getSelectedSiteId( state );
 	const siteIsJetpack = isJetpackSite( state, siteId );
 	const jetpackVersionSupportsSeo = isJetpackMinimumVersion( state, siteId, '4.4-beta1' );
 	const isAdvancedSeoSupported =
 		site && ( ! siteIsJetpack || ( siteIsJetpack && jetpackVersionSupportsSeo ) );
 
+	const activePlugins = getPlugins( state, [ siteId ], 'active' );
+	const conflictedSeoPlugin = siteIsJetpack
+		? getFirstConflictingPlugin( activePlugins ) // Pick first one to keep the notice short.
+		: null;
+
 	return {
+		conflictedSeoPlugin,
 		siteId,
 		siteIsJetpack,
 		selectedSite: getSelectedSite( state ),
@@ -526,7 +494,7 @@ const mapStateToProps = ( state, ownProps ) => {
 		isSeoToolsActive: isJetpackModuleActive( state, siteId, 'seo-tools' ),
 		isSiteHidden: isHiddenSite( state, siteId ),
 		isSitePrivate: isPrivateSite( state, siteId ),
-		activePlugins: getPlugins( state, [ siteId ], 'active' ),
+		hasAdvancedSEOFeature: hasFeature( state, siteId, FEATURE_ADVANCED_SEO ),
 		hasSeoPreviewFeature: hasFeature( state, siteId, FEATURE_SEO_PREVIEW_TOOLS ),
 		isSaveSuccess: isSiteSettingsSaveSuccessful( state, siteId ),
 		saveError: getSiteSettingsSaveError( state, siteId ),
@@ -543,7 +511,6 @@ const mapDispatchToProps = {
 		recordTracksEvent,
 		'calypso_seo_tools_front_page_meta_updated'
 	),
-	activateModule,
 };
 
 export default connect(

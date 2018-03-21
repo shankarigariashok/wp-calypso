@@ -6,9 +6,9 @@ The "header cake" component should be used at the top of an item's detail page. 
 ## Usage
 
 ```js
-	var HeaderCake = require( 'components/header-cake' );
+import HeaderCake from 'components/header-cake';
 
-	<HeaderCake onClick={ callback }>Item Details</HeaderCake>
+<HeaderCake onClick={ callback }>Item Details</HeaderCake>
 ```
 
 ## Props
@@ -23,3 +23,4 @@ The "header cake" component should be used at the top of an item's detail page. 
 * `actionHref` - You can optionally add a button to the right side of the header, this the link on that button
 * `actionIcon` - You can optionally add a button to the right side of the header, this is the Gridicon used
 * `actionOnClick` - You can optionally add a button to the right side of the header, this is called onClick of that button
+* `alwaysShowActionText` - Force showing the right button text instead of hiding it on small screens

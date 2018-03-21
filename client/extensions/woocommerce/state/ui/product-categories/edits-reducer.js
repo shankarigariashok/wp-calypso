@@ -12,6 +12,7 @@ import { compact, isEqual } from 'lodash';
 import { createReducer } from 'state/utils';
 import {
 	WOOCOMMERCE_PRODUCT_CATEGORY_CREATE,
+	WOOCOMMERCE_PRODUCT_CATEGORY_UPDATE,
 	WOOCOMMERCE_PRODUCT_CATEGORY_EDIT,
 	WOOCOMMERCE_PRODUCT_CATEGORY_EDIT_CLEAR,
 	WOOCOMMERCE_PRODUCT_CATEGORY_UPDATED,
@@ -47,7 +48,27 @@ function productCategoryUpdatedAction( edits, action ) {
 			creates: newCreates.length ? newCreates : undefined,
 		};
 	}
-	// TODO: Add support for update and delete.
+
+	if ( WOOCOMMERCE_PRODUCT_CATEGORY_UPDATE === originatingAction.type ) {
+		const prevCategoryId = originatingAction.category.id;
+		const prevEdits = edits || {};
+		const prevUpdates = prevEdits.updates || [];
+
+		const newUpdates = compact(
+			prevUpdates.map( category => {
+				if ( isEqual( prevCategoryId, category.id ) ) {
+					return undefined;
+				}
+				return category;
+			} )
+		);
+
+		return {
+			...prevEdits,
+			updates: newUpdates.length ? newUpdates : undefined,
+		};
+	}
+	// TODO: Add support for delete.
 
 	return edits;
 }
@@ -77,7 +98,7 @@ function editProductCategory( array, category, data ) {
 	// Look for this object in the appropriate create or edit array first.
 	const newArray = compact(
 		prevArray.map( c => {
-			if ( category.id === c.id ) {
+			if ( isEqual( category.id, c.id ) ) {
 				found = true;
 
 				// If data is null, remove this edit, otherwise update the edit data.

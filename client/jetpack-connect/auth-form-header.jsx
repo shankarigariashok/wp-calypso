@@ -2,22 +2,34 @@
 /**
  * External dependencies
  */
+import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import urlModule from 'url';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
-import { get } from 'lodash';
 
 /**
  * Internal dependencies
  */
-import { getAuthorizationData, isRemoteSiteOnSitesList } from 'state/jetpack-connect/selectors';
-import { getCurrentUser } from 'state/current-user/selectors';
+import CompactCard from 'components/card/compact';
 import FormattedHeader from 'components/formatted-header';
-import SiteCard from './site-card';
+import safeImageUrl from 'lib/safe-image-url';
+import Site from 'blocks/site';
 import versionCompare from 'lib/version-compare';
-import { getJetpackConnectJetpackVersion, getJetpackConnectPartnerId } from 'state/selectors';
+import { authQueryPropTypes } from './utils';
+import { decodeEntities } from 'lib/formatting';
+import { getAuthorizationData } from 'state/jetpack-connect/selectors';
+import { getCurrentUser } from 'state/current-user/selectors';
 
-class AuthFormHeader extends Component {
+export class AuthFormHeader extends Component {
+	static propTypes = {
+		authQuery: authQueryPropTypes.isRequired,
+
+		// Connected props
+		translate: PropTypes.func.isRequired,
+		user: PropTypes.object,
+	};
+
 	getState() {
 		const { user, authorize } = this.props;
 
@@ -37,7 +49,7 @@ class AuthFormHeader extends Component {
 	}
 
 	getPartnerSlug() {
-		const { partnerId } = this.props;
+		const { partnerId } = this.props.authQuery;
 
 		switch ( partnerId ) {
 			case 51945:
@@ -94,7 +106,7 @@ class AuthFormHeader extends Component {
 
 		switch ( this.getState() ) {
 			case 'logged-out':
-				return translate( 'Create your account' );
+				return translate( 'Create an account to set up Jetpack' );
 			case 'logged-in-success':
 				return translate( 'You are connected!' );
 			case 'logged-in':
@@ -120,16 +132,31 @@ class AuthFormHeader extends Component {
 	}
 
 	getSiteCard() {
-		const { jetpackVersion } = this.props;
-		if ( ! versionCompare( jetpackVersion, '4.0.3', '>' ) ) {
+		const { jpVersion } = this.props.authQuery;
+		if ( ! versionCompare( jpVersion, '4.0.3', '>' ) ) {
 			return null;
 		}
 
+		const { blogname, homeUrl, siteIcon, siteUrl } = this.props.authQuery;
+		const safeIconUrl = siteIcon ? safeImageUrl( siteIcon ) : false;
+		const icon = safeIconUrl ? { img: safeIconUrl } : false;
+		const url = decodeEntities( homeUrl );
+		const parsedUrl = urlModule.parse( url );
+		const path = parsedUrl.path === '/' ? '' : parsedUrl.path;
+		const site = {
+			admin_url: decodeEntities( siteUrl + '/wp-admin' ),
+			domain: parsedUrl.host + path,
+			icon,
+			ID: null,
+			is_vip: false,
+			title: decodeEntities( blogname ),
+			url: url,
+		};
+
 		return (
-			<SiteCard
-				queryObject={ get( this.props, [ 'authorize', 'queryObject' ], {} ) }
-				isAlreadyOnSitesList={ !! this.props.isAlreadyOnSitesList }
-			/>
+			<CompactCard className="jetpack-connect__site">
+				<Site site={ site } />
+			</CompactCard>
 		);
 	}
 
@@ -150,9 +177,6 @@ class AuthFormHeader extends Component {
 export default connect( state => {
 	return {
 		authorize: getAuthorizationData( state ),
-		isAlreadyOnSitesList: isRemoteSiteOnSitesList( state ),
-		jetpackVersion: getJetpackConnectJetpackVersion( state ),
-		partnerId: getJetpackConnectPartnerId( state ),
 		user: getCurrentUser( state ),
 	};
 } )( localize( AuthFormHeader ) );

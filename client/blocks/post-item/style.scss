@@ -41,20 +41,25 @@ $expanded-post-item-outline: 4px solid $post-item-border-color;
 .post-item__select {
 	align-self: stretch;
 	display: flex;
-	align-items: center;
+	align-items: start;
 	cursor: pointer;
 
 	&:hover .form-checkbox {
-		border-color: lighten( $gray, 10% );
+		border-color: $gray-lighten-10;
 	}
 
-	padding: 0 16px;
+	padding: 16px 16px 0;
 	margin-left: -16px;
 
 	@include breakpoint( ">480px" ) {
 		padding-left: 24px;
 		margin-left: -24px;
 	}
+}
+
+.post-item__site-info-link,
+.post-item__post-author-link {
+	display: block;
 }
 
 .post-item__detail {
@@ -72,7 +77,8 @@ $expanded-post-item-outline: 4px solid $post-item-border-color;
 
 .post-item__title {
 	@extend %content-font;
-	margin-bottom: 2px;
+	margin: 0;
+	padding: 0;
 	font-weight: 700;
 	font-size: 18px;
 	line-height: 1.2;
@@ -81,9 +87,12 @@ $expanded-post-item-outline: 4px solid $post-item-border-color;
 a.post-item__title-link,
 a.post-item__title-link:visited {
 	color: $gray-dark;
+	display: block;
+	padding-bottom: 2px;
+	padding-right: 8px;
 
 	&:hover {
-		color: darken( $gray, 20% );
+		color: $gray-darken-20;
 	}
 
 	.post-item__panel.is-untitled & {
@@ -93,12 +102,12 @@ a.post-item__title-link:visited {
 
 	.post-item__panel.is-placeholder & {
 		@include placeholder;
+		display: inline-block;
 	}
 }
 
 .post-item__meta {
 	font-size: 12px;
-	line-height: 14px;
 	color: $gray-text-min;
 }
 
@@ -106,7 +115,6 @@ a.post-item__title-link:visited {
 .post-item__meta .post-status,
 .post-item__meta .post-status__text {
 	margin-bottom: 0;
-	vertical-align: top;
 }
 
 .post-item__meta .post-status {
@@ -116,6 +124,54 @@ a.post-item__title-link:visited {
 .post-item__meta .post-status__icon {
 	width: 14px;
 	height: 14px;
-	margin-top: -3px;
 	margin-right: 2px;
+}
+
+.post-item__meta-time-status {
+	display: inline-block;
+	margin-right: 16px;
+}
+
+.post-item__time-status-link,
+.post-item__time-status-link:active,
+.post-item__time-status-link:visited {
+	color: $gray-text-min;
+	display: block;
+}
+
+.post-type-list__post-thumbnail-wrapper {
+	display: none;
+	position: relative;
+	width: 80px;
+	align-self: stretch;
+	overflow: hidden;
+
+	margin: 8px 0;
+	.post-item__card.is-mini & {
+		margin: 0;
+	}
+
+	&.has-image,
+	.post-item__card.is-placeholder & {
+		display: block;
+	}
+
+	.post-item__card.is-placeholder & {
+		@include placeholder;
+	}
+}
+
+.post-type-list__post-thumbnail-link {
+	display: block;
+	height: 100%;
+}
+
+.post-type-list__post-thumbnail {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate( -50%, -50% );
+	height: 100%;
+	max-height: 80px;
+	max-width: none;
 }

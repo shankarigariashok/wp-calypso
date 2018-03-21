@@ -27,7 +27,11 @@ import { getSiteComment } from 'state/selectors';
 import {
 	receiveComments,
 	receiveCommentsError as receiveCommentErrorAction,
+	requestComment as requestCommentAction,
+	requestCommentsList,
 } from 'state/comments/actions';
+import { updateCommentsQuery } from 'state/ui/comments/actions';
+import { noRetry } from 'state/data-layer/wpcom-http/pipeline/retry-on-failure/policies';
 
 const changeCommentStatus = ( { dispatch, getState }, action ) => {
 	const { siteId, commentId, status } = action;
@@ -48,17 +52,25 @@ const changeCommentStatus = ( { dispatch, getState }, action ) => {
 			},
 			{
 				...action,
-				previousStatus,
+				meta: Object.assign( {}, action.meta, { comment: { previousStatus } } ),
 			}
 		)
 	);
 };
 
-export const removeCommentStatusErrorNotice = ( { dispatch }, { commentId } ) =>
+export const handleChangeCommentStatusSuccess = (
+	{ dispatch },
+	{ commentId, refreshCommentListQuery }
+) => {
 	dispatch( removeNotice( `comment-notice-error-${ commentId }` ) );
+	if ( !! refreshCommentListQuery ) {
+		dispatch( requestCommentsList( refreshCommentListQuery ) );
+	}
+};
 
 const announceStatusChangeFailure = ( { dispatch }, action ) => {
-	const { commentId, status, previousStatus } = action;
+	const { commentId, status } = action;
+	const previousStatus = get( action, 'meta.comment.previousStatus' );
 
 	dispatch( removeNotice( `comment-notice-${ commentId }` ) );
 
@@ -89,12 +101,16 @@ const announceStatusChangeFailure = ( { dispatch }, action ) => {
 export const requestComment = action => {
 	const { siteId, commentId, query } = action;
 	return http(
-		{
-			method: 'GET',
-			path: `/sites/${ siteId }/comments/${ commentId }`,
-			apiVersion: '1.1',
-			query,
-		},
+		Object.assign(
+			{
+				method: 'GET',
+				path: `/sites/${ siteId }/comments/${ commentId }`,
+				apiVersion: '1.1',
+				query,
+			},
+			//if we see ?force=wpcom, on failure, retry against the real site instead.
+			query.force && { retryPolicy: noRetry() }
+		),
 		action
 	);
 };
@@ -105,7 +121,13 @@ export const receiveCommentSuccess = ( action, response ) => {
 	return receiveComments( { siteId, postId, comments: [ response ], commentById: true } );
 };
 
-export const receiveCommentError = ( { siteId, commentId } ) => {
+export const receiveCommentError = ( { siteId, commentId, query = {} } ) => {
+	// we can't tell the difference between a network failure and a shadow sync failure
+	// so if the request drops out automatically retry against the real site
+	const { force, ...retryQuery } = query;
+	if ( force === 'wpcom' ) {
+		return requestCommentAction( { siteId, commentId, query: retryQuery } );
+	}
 	return receiveCommentErrorAction( { siteId, commentId } );
 };
 
@@ -115,10 +137,14 @@ export const fetchCommentsList = ( { dispatch }, action ) => {
 		return;
 	}
 
-	const { siteId, status = 'unapproved', type = 'comment' } = action.query;
+	const { postId, siteId, status = 'unapproved', type = 'comment' } = action.query;
+
+	const path = postId
+		? `/sites/${ siteId }/posts/${ postId }/replies`
+		: `/sites/${ siteId }/comments`;
 
 	const query = {
-		...omit( action.query, [ 'listType', 'siteId' ] ),
+		...omit( action.query, [ 'listType', 'postId', 'siteId' ] ),
 		status,
 		type,
 	};
@@ -127,7 +153,7 @@ export const fetchCommentsList = ( { dispatch }, action ) => {
 		http(
 			{
 				method: 'GET',
-				path: `/sites/${ siteId }/comments`,
+				path,
 				apiVersion: '1.1',
 				query,
 			},
@@ -136,12 +162,14 @@ export const fetchCommentsList = ( { dispatch }, action ) => {
 	);
 };
 
-export const addComments = ( { dispatch }, { query: { siteId, status } }, { comments } ) => {
+export const addComments = ( { dispatch }, { query }, { comments } ) => {
+	const { siteId, status } = query;
 	// Initialize the comments tree to let CommentList know if a tree is actually loaded and empty.
 	// This is needed as a workaround for Jetpack sites populating their comments trees
 	// via `fetchCommentsList` instead of `fetchCommentsTreeForSite`.
 	// @see https://github.com/Automattic/wp-calypso/pull/16997#discussion_r132161699
 	if ( 0 === comments.length ) {
+		dispatch( updateCommentsQuery( siteId, [], query ) );
 		dispatch( {
 			type: COMMENTS_TREE_SITE_ADD,
 			siteId,
@@ -151,13 +179,15 @@ export const addComments = ( { dispatch }, { query: { siteId, status } }, { comm
 		return;
 	}
 
+	dispatch( updateCommentsQuery( siteId, comments, query ) );
+
 	const byPost = groupBy( comments, ( { post: { ID } } ) => ID );
 
-	forEach( byPost, ( postComments, postId ) =>
+	forEach( byPost, ( postComments, post ) =>
 		dispatch(
 			receiveComments( {
 				siteId,
-				postId: +postId, // keyBy => object property names are strings
+				postId: parseInt( post, 10 ), // keyBy => object property names are strings
 				comments: postComments,
 			} )
 		)
@@ -210,7 +240,7 @@ export const editComment = ( { dispatch, getState }, action ) => {
 };
 
 export const updateComment = ( store, action, data ) => {
-	removeCommentStatusErrorNotice( store, action );
+	store.dispatch( removeNotice( `comment-notice-error-${ action.commentId }` ) );
 	store.dispatch(
 		bypassDataLayer( {
 			...omit( action, [ 'originalComment' ] ),
@@ -238,7 +268,7 @@ export const fetchHandler = {
 	[ COMMENTS_CHANGE_STATUS ]: [
 		dispatchRequest(
 			changeCommentStatus,
-			removeCommentStatusErrorNotice,
+			handleChangeCommentStatusSuccess,
 			announceStatusChangeFailure
 		),
 	],

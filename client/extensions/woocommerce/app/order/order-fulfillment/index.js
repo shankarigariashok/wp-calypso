@@ -7,37 +7,43 @@ import PropTypes from 'prop-types';
 import { bindActionCreators } from 'redux';
 import classNames from 'classnames';
 import { connect } from 'react-redux';
+import { first } from 'lodash';
 import Gridicon from 'gridicons';
 import { localize } from 'i18n-calypso';
-import { first } from 'lodash';
 
 /**
  * Internal dependencies
  */
-import { createNote } from 'woocommerce/state/sites/orders/notes/actions';
+import {
+	areLabelsEnabled,
+	getSelectedPaymentMethodId,
+} from 'woocommerce/woocommerce-services/state/label-settings/selectors';
+import {
+	areLabelsFullyLoaded,
+	getCountriesData,
+	getLabels,
+	isLabelDataFetchError,
+} from 'woocommerce/woocommerce-services/state/shipping-label/selectors';
+import {
+	areSettingsGeneralLoaded,
+	getStoreLocation,
+} from 'woocommerce/state/sites/settings/general/selectors';
 import Button from 'components/button';
-import config from 'config';
+import { createNote } from 'woocommerce/state/sites/orders/notes/actions';
 import Dialog from 'components/dialog';
 import FormFieldset from 'components/forms/form-fieldset';
 import FormLabel from 'components/forms/form-label';
 import FormInputCheckbox from 'components/forms/form-checkbox';
 import FormTextInput from 'components/forms/form-text-input';
 import { isOrderFinished } from 'woocommerce/lib/order-status';
+import { isOrderUpdating } from 'woocommerce/state/sites/orders/selectors';
+import { isWcsEnabled } from 'woocommerce/state/selectors/plugins';
 import LabelPurchaseDialog from 'woocommerce/woocommerce-services/views/shipping-label/label-purchase-modal';
 import Notice from 'components/notice';
-import QueryLabels from 'woocommerce/woocommerce-services/components/query-labels';
-import { updateOrder } from 'woocommerce/state/sites/orders/actions';
 import { openPrintingFlow } from 'woocommerce/woocommerce-services/state/shipping-label/actions';
-import {
-	getLabels,
-	areLabelsFullyLoaded,
-} from 'woocommerce/woocommerce-services/state/shipping-label/selectors';
-import {
-	areLabelsEnabled,
-	getSelectedPaymentMethodId,
-} from 'woocommerce/woocommerce-services/state/label-settings/selectors';
-
-const wcsEnabled = config.isEnabled( 'woocommerce/extension-wcservices' );
+import QueryLabels from 'woocommerce/woocommerce-services/components/query-labels';
+import QuerySettingsGeneral from 'woocommerce/components/query-settings-general';
+import { saveOrder } from 'woocommerce/state/sites/orders/actions';
 
 class OrderFulfillment extends Component {
 	static propTypes = {
@@ -87,7 +93,7 @@ class OrderFulfillment extends Component {
 			return;
 		}
 
-		this.props.updateOrder( site.ID, {
+		this.props.saveOrder( site.ID, {
 			id: order.id,
 			status: 'completed',
 		} );
@@ -135,31 +141,62 @@ class OrderFulfillment extends Component {
 		}
 	};
 
+	isAddressValidForLabels( address ) {
+		const { labelCountriesData } = this.props;
+		if ( ! labelCountriesData ) {
+			return false;
+		}
+
+		const countryData = labelCountriesData[ address.country ];
+
+		//country not supported
+		if ( ! countryData ) {
+			return false;
+		}
+
+		//supported country doesn't have a states data
+		if ( ! countryData.states ) {
+			return true;
+		}
+
+		//check if the address state is supported
+		return Boolean( countryData.states[ address.state ] );
+	}
+
+	shouldShowLabels() {
+		const { labelsLoaded, labelsEnabled, order, storeAddress, hasLabelsPaymentMethod } = this.props;
+
+		if ( ! labelsLoaded ) {
+			return false;
+		}
+
+		const { shipping } = order;
+
+		return (
+			labelsEnabled &&
+			hasLabelsPaymentMethod &&
+			this.isAddressValidForLabels( storeAddress ) &&
+			this.isAddressValidForLabels( shipping )
+		);
+	}
+
 	renderFulfillmentAction() {
-		const {
-			labelsLoaded,
-			labelsEnabled,
-			order,
-			site,
-			translate,
-			hasLabelsPaymentMethod,
-		} = this.props;
+		const { wcsEnabled, isSaving, labelsLoaded, labelsError, order, site, translate } = this.props;
 		const orderFinished = isOrderFinished( order.status );
-		const showLabels = wcsEnabled && labelsLoaded && labelsEnabled && hasLabelsPaymentMethod;
 		const labelsLoading = wcsEnabled && ! labelsLoaded;
 
 		if ( orderFinished ) {
 			return null;
 		}
 
-		if ( labelsLoading ) {
+		if ( ! labelsError && labelsLoading ) {
 			const buttonClassName = 'is-placeholder';
 			return <Button className={ buttonClassName }>{ translate( 'Fulfill' ) }</Button>;
 		}
 
-		if ( ! showLabels ) {
+		if ( ! this.shouldShowLabels() ) {
 			return (
-				<Button primary onClick={ this.toggleDialog }>
+				<Button primary onClick={ this.toggleDialog } busy={ isSaving } disabled={ isSaving }>
 					{ translate( 'Fulfill' ) }
 				</Button>
 			);
@@ -167,16 +204,17 @@ class OrderFulfillment extends Component {
 
 		const onLabelPrint = () => this.props.openPrintingFlow( order.id, site.ID );
 
-		if ( orderFinished ) {
-			return <Button onClick={ onLabelPrint }>{ translate( 'Print new label' ) }</Button>;
-		}
-
 		return (
 			<div className="order-fulfillment__print-container">
-				<a href="#" onClick={ this.toggleDialog }>
+				<Button borderless onClick={ this.toggleDialog } busy={ isSaving } disabled={ isSaving }>
 					{ translate( 'Fulfill without printing a label' ) }
-				</a>
-				<Button primary={ labelsLoaded } onClick={ onLabelPrint }>
+				</Button>
+				<Button
+					primary={ labelsLoaded }
+					onClick={ onLabelPrint }
+					busy={ isSaving }
+					disabled={ isSaving }
+				>
 					{ translate( 'Print label & fulfill' ) }
 				</Button>
 			</div>
@@ -184,7 +222,7 @@ class OrderFulfillment extends Component {
 	}
 
 	render() {
-		const { order, site, translate } = this.props;
+		const { wcsEnabled, order, site, translate } = this.props;
 		const { errorMessage, showDialog, trackingNumber } = this.state;
 		const dialogClass = 'woocommerce order-fulfillment'; // eslint/css specificity hack
 		if ( ! order ) {
@@ -245,6 +283,7 @@ class OrderFulfillment extends Component {
 						) }
 					</form>
 				</Dialog>
+				<QuerySettingsGeneral siteId={ site.ID } />
 				{ wcsEnabled && <QueryLabels orderId={ order.id } siteId={ site.ID } /> }
 				{ wcsEnabled && <LabelPurchaseDialog orderId={ order.id } siteId={ site.ID } /> }
 			</div>
@@ -254,16 +293,28 @@ class OrderFulfillment extends Component {
 
 export default connect(
 	( state, { order, site } ) => {
-		const labelsLoaded = wcsEnabled && Boolean( areLabelsFullyLoaded( state, order.id, site.ID ) );
+		const wcsEnabled = isWcsEnabled( state, site.ID );
+		const labelsLoaded =
+			wcsEnabled &&
+			Boolean( areLabelsFullyLoaded( state, order.id, site.ID ) ) &&
+			areSettingsGeneralLoaded( state );
 		const hasLabelsPaymentMethod =
 			wcsEnabled && labelsLoaded && getSelectedPaymentMethodId( state, site.ID );
+		const storeAddress = labelsLoaded && getStoreLocation( state );
+		const labelCountriesData = getCountriesData( state, order.id, site.ID );
+		const isSaving = isOrderUpdating( state, order.id );
 
 		return {
+			wcsEnabled,
+			isSaving,
 			labelsLoaded,
+			labelsError: isLabelDataFetchError( state, order.id, site.ID ),
 			labelsEnabled: areLabelsEnabled( state, site.ID ),
 			labels: getLabels( state, order.id, site.ID ),
 			hasLabelsPaymentMethod,
+			storeAddress,
+			labelCountriesData,
 		};
 	},
-	dispatch => bindActionCreators( { createNote, updateOrder, openPrintingFlow }, dispatch )
+	dispatch => bindActionCreators( { createNote, saveOrder, openPrintingFlow }, dispatch )
 )( localize( OrderFulfillment ) );

@@ -6,6 +6,7 @@
 import { Component } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
+import { localize } from 'i18n-calypso';
 import { get } from 'lodash';
 
 /**
@@ -17,8 +18,9 @@ import {
 	recordTracksEvent,
 	withAnalytics,
 } from 'state/analytics/actions';
-import { changeCommentStatus, deleteComment } from 'state/comments/actions';
+import { changeCommentStatus } from 'state/comments/actions';
 import { getSiteComment } from 'state/selectors';
+import { removeNotice, successNotice } from 'state/notices/actions';
 
 class ModerateComment extends Component {
 	static propTypes = {
@@ -28,7 +30,6 @@ class ModerateComment extends Component {
 		newStatus: PropTypes.string,
 		currentStatus: PropTypes.string,
 		updateCommentStatus: PropTypes.func.isRequired,
-		destroyComment: PropTypes.func.isRequired,
 	};
 
 	componentDidMount() {
@@ -48,25 +49,44 @@ class ModerateComment extends Component {
 		this.moderate( nextProps );
 	}
 
-	moderate( {
-		siteId,
-		postId,
-		commentId,
-		newStatus,
-		currentStatus,
-		updateCommentStatus,
-		destroyComment,
-	} ) {
-		if ( ! siteId || ! postId || ! commentId || ! newStatus || newStatus === currentStatus ) {
-			return;
-		}
+	showNotice( status ) {
+		const { translate } = this.props;
 
-		if ( 'delete' === newStatus ) {
-			destroyComment();
+		this.props.removeNotice( 'comment-notice' );
+
+		const message = get(
+			{
+				approved: translate( 'Comment approved.' ),
+				unapproved: translate( 'Comment unapproved.' ),
+				spam: translate( 'Comment marked as spam.' ),
+				trash: translate( 'Comment moved to trash.' ),
+			},
+			status
+		);
+
+		const noticeOptions = {
+			id: 'comment-notice',
+			isPersistent: true,
+		};
+
+		this.props.successNotice( message, noticeOptions );
+	}
+
+	moderate( { siteId, postId, commentId, newStatus, currentStatus, updateCommentStatus } ) {
+		if (
+			! siteId ||
+			! postId ||
+			! commentId ||
+			! newStatus ||
+			newStatus === currentStatus ||
+			'edit' === newStatus ||
+			'delete' === newStatus
+		) {
 			return;
 		}
 
 		updateCommentStatus();
+		this.showNotice( newStatus );
 	}
 
 	render() {
@@ -83,6 +103,8 @@ const mapStateToProps = ( state, { siteId, commentId } ) => {
 };
 
 const mapDispatchToProps = ( dispatch, { siteId, postId, commentId, newStatus } ) => ( {
+	removeNotice: noticeId => dispatch( removeNotice( noticeId ) ),
+	successNotice: ( text, options ) => dispatch( successNotice( text, options ) ),
 	updateCommentStatus: () =>
 		dispatch(
 			withAnalytics(
@@ -95,16 +117,6 @@ const mapDispatchToProps = ( dispatch, { siteId, postId, commentId, newStatus } 
 				changeCommentStatus( siteId, postId, commentId, newStatus )
 			)
 		),
-	destroyComment: () =>
-		dispatch(
-			withAnalytics(
-				composeAnalytics(
-					recordTracksEvent( 'calypso_comment_management_delete' ),
-					bumpStat( 'calypso_comment_management', 'comment_deleted' )
-				),
-				deleteComment( siteId, postId, commentId )
-			)
-		),
 } );
 
-export default connect( mapStateToProps, mapDispatchToProps )( ModerateComment );
+export default connect( mapStateToProps, mapDispatchToProps )( localize( ModerateComment ) );

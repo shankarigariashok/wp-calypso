@@ -3,6 +3,7 @@
  * External dependencies
  */
 import { translate } from 'i18n-calypso';
+import { isObject } from 'lodash';
 
 /**
  * Custom statuses for Calypso
@@ -63,6 +64,24 @@ export function getOrderStatusList() {
 }
 
 /**
+ * Return a list of statuses from a given calypso label "group"
+ *
+ * @param {String} status Calypso version of status label
+ * @return {String} A comma-separated list of WC core statuses matching this group
+ */
+export function getOrderStatusGroup( status ) {
+	// Convert URL status to status group
+	if ( ORDER_UNPAID === status ) {
+		return statusWaitingPayment.join( ',' );
+	} else if ( ORDER_UNFULFILLED === status ) {
+		return statusWaitingFulfillment.join( ',' );
+	} else if ( ORDER_COMPLETED === status ) {
+		return statusFinished.join( ',' );
+	}
+	return status;
+}
+
+/**
  * Checks if this status (from an order) is in the "waiting for payment" group
  *
  * @param {String} status Order status
@@ -78,8 +97,8 @@ export function isOrderWaitingPayment( status ) {
  * @param {String} status Order status
  * @return {Boolean} true if the status is editable
  */
-export function isOrderEditable( status ) {
-	return -1 !== statusEditable.indexOf( status );
+export function isOrderEditable( { id, status } ) {
+	return isObject( id ) || -1 !== statusEditable.indexOf( status );
 }
 
 /**

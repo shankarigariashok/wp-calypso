@@ -5,20 +5,26 @@
  */
 
 import React, { Component } from 'react';
-import PropTypes from 'prop-types';
+import { bindActionCreators } from 'redux';
 import { connect } from 'react-redux';
-import page from 'page';
 import { localize } from 'i18n-calypso';
+import page from 'page';
+import PropTypes from 'prop-types';
 
 /**
  * Internal dependencies
  */
-import { canCurrentUser } from 'state/selectors';
+import {
+	canCurrentUser,
+	isSiteAutomatedTransfer,
+	hasSitePendingAutomatedTransfer,
+} from 'state/selectors';
 import config from 'config';
 import DocumentHead from 'components/data/document-head';
+import { fetchSetupChoices } from 'woocommerce/state/sites/setup-choices/actions';
 import { getSelectedSiteId } from 'state/ui/selectors';
-import { isSiteAutomatedTransfer, hasSitePendingAutomatedTransfer } from 'state/selectors';
-import route from 'lib/route';
+import QueryJetpackPlugins from 'components/data/query-jetpack-plugins';
+import { getSiteFragment } from 'lib/route';
 
 class App extends Component {
 	static propTypes = {
@@ -31,9 +37,26 @@ class App extends Component {
 		children: PropTypes.element.isRequired,
 	};
 
+	componentDidMount = () => {
+		const { siteId } = this.props;
+
+		if ( siteId ) {
+			this.props.fetchSetupChoices( siteId );
+		}
+	};
+
 	componentWillReceiveProps( newProps ) {
 		if ( this.props.children !== newProps.children ) {
 			window.scrollTo( 0, 0 );
+		}
+	}
+
+	componentDidUpdate( prevProps ) {
+		const { siteId } = this.props;
+		const oldSiteId = prevProps.siteId ? prevProps.siteId : null;
+
+		if ( siteId && oldSiteId !== siteId ) {
+			this.props.fetchSetupChoices( siteId );
 		}
 	}
 
@@ -55,7 +78,7 @@ class App extends Component {
 		// TODO This is temporary, until we have a valid "all sites" path to show.
 		// Calypso will detect if a user doesn't have access to a site at all, and redirects to the 'all sites'
 		// version of that URL. We don't want to render anything right now, so continue redirecting to my-sites.
-		if ( ! route.getSiteFragment( currentRoute ) ) {
+		if ( ! getSiteFragment( currentRoute ) ) {
 			this.redirect();
 			return null;
 		}
@@ -84,6 +107,7 @@ class App extends Component {
 		return (
 			<div className={ className }>
 				<DocumentHead title={ documentTitle } />
+				<QueryJetpackPlugins siteIds={ [ siteId ] } />
 				{ children }
 			</div>
 		);
@@ -107,4 +131,13 @@ function mapStateToProps( state ) {
 	};
 }
 
-export default connect( mapStateToProps )( localize( App ) );
+function mapDispatchToProps( dispatch ) {
+	return bindActionCreators(
+		{
+			fetchSetupChoices,
+		},
+		dispatch
+	);
+}
+
+export default connect( mapStateToProps, mapDispatchToProps )( localize( App ) );

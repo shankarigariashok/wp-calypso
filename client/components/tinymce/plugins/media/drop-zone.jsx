@@ -16,7 +16,7 @@ import analytics from 'lib/analytics';
 import PostActions from 'lib/posts/actions';
 import MediaDropZone from 'my-sites/media-library/drop-zone';
 import MediaActions from 'lib/media/actions';
-import MediaUtils from 'lib/media/utils';
+import { getMimePrefix } from 'lib/media/utils';
 import MediaLibrarySelectedStore from 'lib/media/library-selected-store';
 import MediaValidationStore from 'lib/media/validation-store';
 import markup from 'post-editor/media-modal/markup';
@@ -48,10 +48,12 @@ class TinyMCEDropZone extends React.Component {
 
 	componentWillUnmount() {
 		const { editor } = this.props;
-		editor.dom.unbind( editor.getWin(), 'dragenter', this.redirectEditorDragEvent );
 		window.removeEventListener( 'dragleave', this.stopDragging );
-		editor.dom.unbind( editor.getWin(), 'dragleave', this.stopDragging );
-		editor.dom.unbind( editor.getWin(), 'dragover', this.fakeDragEnterIfNecessary );
+		if ( editor.getWin() ) {
+			editor.dom.unbind( editor.getWin(), 'dragenter', this.redirectEditorDragEvent );
+			editor.dom.unbind( editor.getWin(), 'dragleave', this.stopDragging );
+			editor.dom.unbind( editor.getWin(), 'dragover', this.fakeDragEnterIfNecessary );
+		}
 	}
 
 	redirectEditorDragEvent = event => {
@@ -100,7 +102,7 @@ class TinyMCEDropZone extends React.Component {
 		// inserted directly into the post contents.
 		const selectedItems = MediaLibrarySelectedStore.getAll( site.ID );
 		const isSingleImage =
-			1 === selectedItems.length && 'image' === MediaUtils.getMimePrefix( selectedItems[ 0 ] );
+			1 === selectedItems.length && 'image' === getMimePrefix( selectedItems[ 0 ] );
 
 		if ( isSingleImage && ! MediaValidationStore.hasErrors( site.ID ) ) {
 			// For single image upload, insert into post content, blocking save

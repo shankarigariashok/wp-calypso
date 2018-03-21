@@ -1,10 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
-import ReactDom from 'react-dom';
 import React from 'react';
 import store from 'store';
 import page from 'page';
@@ -18,11 +15,10 @@ import i18n from 'i18n-calypso';
 import { setDocumentHeadTitle as setTitle } from 'state/document-head/actions';
 import InviteAccept from 'my-sites/invites/invite-accept';
 import { setSection } from 'state/ui/actions';
-import { renderWithReduxStore } from 'lib/react-helpers';
 import { getRedirectAfterAccept } from 'my-sites/invites/utils';
 import { acceptInvite as acceptInviteAction } from 'lib/invites/actions';
 import _user from 'lib/user';
-import i18nUtils from 'lib/i18n-utils';
+import { getLanguage, getLocaleFromPath, removeLocaleFromPath } from 'lib/i18n-utils';
 
 /**
  * Module variables
@@ -36,22 +32,21 @@ function getLocale( parameters ) {
 }
 
 function isLocale( pathFragment ) {
-	return ! isEmpty( i18nUtils.getLanguage( pathFragment ) );
+	return ! isEmpty( getLanguage( pathFragment ) );
 }
 
 export function redirectWithoutLocaleifLoggedIn( context, next ) {
-	if ( user.get() && i18nUtils.getLocaleFromPath( context.path ) ) {
-		let urlWithoutLocale = i18nUtils.removeLocaleFromPath( context.path );
-		return page.redirect( urlWithoutLocale );
+	if ( user.get() && getLocaleFromPath( context.path ) ) {
+		return page.redirect( removeLocaleFromPath( context.path ) );
 	}
 
 	next();
 }
 
-export function acceptInvite( context ) {
-	context.store.dispatch( setTitle( i18n.translate( 'Accept Invite', { textOnly: true } ) ) ); // FIXME: Auto-converted from the Flux setTitle action. Please use <DocumentHead> instead.
+export function acceptInvite( context, next ) {
+	// FIXME: Auto-converted from the Flux setTitle action. Please use <DocumentHead> instead.
+	context.store.dispatch( setTitle( i18n.translate( 'Accept Invite', { textOnly: true } ) ) );
 
-	ReactDom.unmountComponentAtNode( document.getElementById( 'secondary' ) );
 	context.store.dispatch( setSection( null, { hasSidebar: false } ) );
 
 	const acceptedInvite = store.get( 'invite_accepted' );
@@ -80,16 +75,13 @@ export function acceptInvite( context ) {
 		return;
 	}
 
-	renderWithReduxStore(
-		React.createElement( InviteAccept, {
-			siteId: context.params.site_id,
-			inviteKey: context.params.invitation_key,
-			activationKey: context.params.activation_key,
-			authKey: context.params.auth_key,
-			locale: getLocale( context.params ),
-			path: context.path,
-		} ),
-		document.getElementById( 'primary' ),
-		context.store
-	);
+	context.primary = React.createElement( InviteAccept, {
+		siteId: context.params.site_id,
+		inviteKey: context.params.invitation_key,
+		activationKey: context.params.activation_key,
+		authKey: context.params.auth_key,
+		locale: getLocale( context.params ),
+		path: context.path,
+	} );
+	next();
 }

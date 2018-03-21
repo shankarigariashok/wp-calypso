@@ -76,7 +76,7 @@ export function getProductCategoryWithLocalEdits( rootState, categoryId, siteId 
  */
 export function getProductCategoriesWithLocalEdits( rootState, siteId ) {
 	const categoryCreates = getAllProductCategoryEdits( rootState, siteId ).creates || [];
-	const fetchedCategoriesWithUpdates = getProductCategories( rootState, siteId ).map( c =>
+	const fetchedCategoriesWithUpdates = getProductCategories( rootState, {}, siteId ).map( c =>
 		getProductCategoryWithLocalEdits( rootState, c.id, siteId )
 	);
 
@@ -94,4 +94,18 @@ export function getCurrentlyEditingProductCategory( rootState, siteId ) {
 	const { currentlyEditingId } = getAllProductCategoryEdits( rootState, siteId );
 
 	return getProductCategoryWithLocalEdits( rootState, currentlyEditingId, siteId );
+}
+
+/**
+ * Gets the id of the currently editing product category.
+ *
+ * @param {Object} state Global state tree
+ * @param {Number} [siteId] Site ID to check. If not provided, the Site ID selected in the UI will be used
+ * @return {Number|Object} Id of the currently editing product category.
+ */
+export function getCurrentlyEditingId( state, siteId = getSelectedSiteId( state ) ) {
+	const edits = getAllProductCategoryEdits( state, siteId ) || {};
+	const { currentlyEditingId } = edits;
+
+	return currentlyEditingId;
 }

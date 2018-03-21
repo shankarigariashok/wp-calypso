@@ -6,7 +6,6 @@
 
 import React, { Component } from 'react';
 import createReactClass from 'create-react-class';
-import config from 'config';
 import { find, get, includes } from 'lodash';
 import { localize } from 'i18n-calypso';
 
@@ -67,9 +66,9 @@ class PeopleSectionNav extends Component {
 			return false;
 		}
 
-		// Disable search for wpcom followers and viewers
+		// Disable search for wpcom followers, viewers, and invites
 		if ( filter ) {
-			if ( 'followers' === filter || 'viewers' === filter ) {
+			if ( 'followers' === filter || 'viewers' === filter || 'invites' === filter ) {
 				return false;
 			}
 		}
@@ -111,20 +110,21 @@ class PeopleSectionNav extends Component {
 				path: '/people/viewers/' + siteFilter,
 				id: 'viewers',
 			},
+			{
+				title: translate( 'Invites' ),
+				path: '/people/invites/' + siteFilter,
+				id: 'invites',
+			},
 		];
 
 		return filters;
 	}
 
 	getNavigableFilters() {
-		var allowedFilterIds = [ 'team' ];
-		if ( config.isEnabled( 'manage/people/readers' ) ) {
-			allowedFilterIds.push( 'followers' );
-			allowedFilterIds.push( 'email-followers' );
+		const allowedFilterIds = [ 'team', 'followers', 'email-followers', 'invites' ];
 
-			if ( this.shouldDisplayViewers() ) {
-				allowedFilterIds.push( 'viewers' );
-			}
+		if ( this.shouldDisplayViewers() ) {
+			allowedFilterIds.push( 'viewers' );
 		}
 
 		return this.getFilters().filter(

@@ -12,6 +12,9 @@ const debug = debugFactory( 'calypso:me:form-base' );
  * Internal dependencies
  */
 import notices from 'notices';
+import userFactory from 'lib/user';
+
+const user = userFactory();
 
 export default {
 	componentDidMount: function() {
@@ -76,7 +79,6 @@ export default {
 		this.setState( { submittingForm: true } );
 		this.props.userSettings.saveSettings(
 			function( error, response ) {
-				this.setState( { submittingForm: false } );
 				if ( error ) {
 					debug( 'Error saving settings: ' + JSON.stringify( error ) );
 
@@ -86,17 +88,20 @@ export default {
 					} else {
 						notices.error( this.props.translate( 'There was a problem saving your changes.' ) );
 					}
+					this.setState( { submittingForm: false } );
 				} else {
 					this.props.markSaved && this.props.markSaved();
 
 					if ( this.state && this.state.redirect ) {
-						// Sometimes changes in settings require a url refresh to update the UI.
-						// For example when the user changes the language.
-						window.location = this.state.redirect + '?updated=success';
+						user.clear( () => {
+							// Sometimes changes in settings require a url refresh to update the UI.
+							// For example when the user changes the language.
+							window.location = this.state.redirect + '?updated=success';
+						} );
 						return;
 					}
-
-					this.setState( { showNotice: true } );
+					// if we set submittingForm too soon the UI updates before the response is handled
+					this.setState( { showNotice: true, submittingForm: false } );
 					this.showNotice();
 					debug( 'Settings saved successfully ' + JSON.stringify( response ) );
 				}

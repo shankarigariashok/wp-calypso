@@ -4,7 +4,7 @@
  */
 import { expect as chaiExpect } from 'chai';
 import { shallow } from 'enzyme';
-import { translate } from 'i18n-calypso';
+import { translate, moment } from 'i18n-calypso';
 import React from 'react';
 
 /**
@@ -15,15 +15,16 @@ import Notice from 'components/notice';
 
 describe( 'EditorNotice', () => {
 	test( 'should not render a notice if no message is specified', () => {
-		const wrapper = shallow( <EditorNotice /> );
+		const wrapper = shallow( <EditorNotice moment={ moment } /> );
 
 		chaiExpect( wrapper ).to.not.have.descendants( Notice );
 	} );
 
-	test( 'should display an no content error message if recognized', () => {
+	test( 'should display a no content error message if recognized', () => {
 		const wrapper = shallow(
 			<EditorNotice
 				translate={ translate }
+				moment={ moment }
 				status="is-error"
 				message="publishFailure"
 				error={ new Error( 'NO_CONTENT' ) }
@@ -43,6 +44,7 @@ describe( 'EditorNotice', () => {
 		const wrapper = shallow(
 			<EditorNotice
 				translate={ translate }
+				moment={ moment }
 				type="post"
 				status="is-error"
 				message="publishFailure"
@@ -64,9 +66,54 @@ describe( 'EditorNotice', () => {
 		const wrapper = shallow(
 			<EditorNotice
 				translate={ translate }
+				moment={ moment }
 				message="published"
 				status="is-success"
 				type="page"
+				site={ {
+					URL: 'https://example.wordpress.com',
+					title: 'Example Site',
+					slug: 'example.wordpress.com',
+				} }
+			/>
+		);
+
+		expect( wrapper ).toMatchSnapshot();
+		chaiExpect( wrapper.find( Notice ) )
+			.to.have.prop( 'status' )
+			.equal( 'is-success' );
+	} );
+
+	test( 'should display publish success for post', () => {
+		const wrapper = shallow(
+			<EditorNotice
+				translate={ translate }
+				moment={ moment }
+				message="published"
+				status="is-success"
+				type="post"
+				site={ {
+					URL: 'https://example.wordpress.com',
+					title: 'Example Site',
+					slug: 'example.wordpress.com',
+				} }
+			/>
+		);
+
+		expect( wrapper ).toMatchSnapshot();
+		chaiExpect( wrapper.find( Notice ) )
+			.to.have.prop( 'status' )
+			.equal( 'is-success' );
+	} );
+
+	test( 'should display publish success for custom post type', () => {
+		const wrapper = shallow(
+			<EditorNotice
+				translate={ translate }
+				moment={ moment }
+				message="published"
+				status="is-success"
+				type="jetpack-testimonial"
 				site={ {
 					URL: 'https://example.wordpress.com',
 					title: 'Example Site',
@@ -85,13 +132,14 @@ describe( 'EditorNotice', () => {
 		const wrapper = shallow(
 			<EditorNotice
 				translate={ translate }
+				moment={ moment }
 				type="jetpack-portfolio"
 				typeObject={ {
 					labels: {
 						view_item: 'View Project',
 					},
 				} }
-				message="published"
+				message="view"
 				status="is-success"
 				site={ {
 					URL: 'https://example.wordpress.com',

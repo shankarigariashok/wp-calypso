@@ -23,7 +23,6 @@ import { getLink } from 'woocommerce/lib/nav-utils';
 import { setPromotionSearch } from 'woocommerce/state/ui/promotions/actions';
 import { getSelectedSiteWithFallback } from 'woocommerce/state/sites/selectors';
 import Main from 'components/main';
-import SidebarNavigation from 'my-sites/sidebar-navigation';
 import PromotionsList from './promotions-list';
 import SearchCard from 'components/search-card';
 
@@ -105,8 +104,7 @@ class Promotions extends Component {
 		const content = isEmpty ? this.renderEmptyContent() : this.renderContent();
 
 		return (
-			<Main className={ classes }>
-				<SidebarNavigation />
+			<Main className={ classes } wideLayout>
 				<ActionHeader breadcrumbs={ <span>{ translate( 'Promotions' ) }</span> }>
 					<Button primary href={ getLink( '/store/promotion/:site/', site ) }>
 						{ translate( 'Add promotion' ) }

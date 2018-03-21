@@ -4,13 +4,18 @@
 }
 
 .reader-subscription-list-item__byline {
-	color: darken( $gray, 30% );
+	color: $gray-darken-30;
 	margin-right: 16px;
 	flex: 1 1 0px;
 }
 
 .following-manage__subscriptions-list {
 	-webkit-font-smoothing: subpixel-antialiased; // Fixes aliasing in Safari
+}
+
+/* Fix for https://github.com/bvaughn/react-virtualized/issues/454 */
+.following-manage__subscriptions-list .ReactVirtualized__List {
+	direction: ltr !important;
 }
 
 .following-manage__subscriptions-list .reader-subscription-list-item__options {
@@ -40,7 +45,7 @@
 }
 
 .reader-subscription-list-item__by-text .reader-subscription-list-item__link {
-	color: darken( $gray, 30% );
+	color: $gray-darken-30;
 }
 
 .reader-subscription-list-item .gravatar {
@@ -68,7 +73,7 @@
 .reader-subscription-list-item__site-url,
 .reader-subscription-list-item__site-url:visited,
 .reader-subscription-list-item__timestamp {
-	color: lighten( $gray, 10% );
+	color: $gray-lighten-10;
 }
 
 .reader-subscription-list-item__site-title,
@@ -129,6 +134,10 @@
 		@include long-content-fade( $size: 20% );
 		height: 100%;
 		top: auto;
+	}
+
+	.external-link .gridicons-external {
+		margin-left: 4px;
 	}
 }
 

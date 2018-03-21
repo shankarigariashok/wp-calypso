@@ -7,6 +7,7 @@
 import update from 'immutability-helper';
 import {
 	assign,
+	concat,
 	every,
 	filter,
 	find,
@@ -18,8 +19,6 @@ import {
 	merge,
 	reject,
 	some,
-	trimStart,
-	tail,
 	uniq,
 } from 'lodash';
 
@@ -34,6 +33,8 @@ import {
 	isDomainProduct,
 	isDomainRedemption,
 	isDomainRegistration,
+	isDomainTransfer,
+	isBundled,
 	isFreeTrial,
 	isFreeWordPressComDomain,
 	isGoogleApps,
@@ -50,6 +51,7 @@ import {
 } from 'lib/products-values';
 import sortProducts from 'lib/products-values/sort';
 import { PLAN_PERSONAL } from 'lib/plans/constants';
+import { getTld } from 'lib/domains';
 import { domainProductSlugs } from 'lib/domains/constants';
 
 import {
@@ -236,6 +238,18 @@ export function hasPlan( cart ) {
 	return cart && some( getAll( cart ), isPlan );
 }
 
+/**
+ * Does the cart contain only bundled domains and transfers
+ *
+ * @param {Object} cart - cart as `CartValue` object
+ * @return {Boolean} true if there are only bundled domains and transfers
+ */
+export function hasOnlyBundledDomainProducts( cart ) {
+	return (
+		cart && every( [ ...getDomainRegistrations( cart ), ...getDomainTransfers( cart ) ], isBundled )
+	);
+}
+
 export function hasPremiumPlan( cart ) {
 	return some( getAll( cart ), isPremium );
 }
@@ -253,25 +267,15 @@ export function hasDomainCredit( cart ) {
  * @returns {Boolean} - Whether or not the cart contains a domain with that TLD
  */
 export function hasTld( cart, tld ) {
-	return some( getDomainRegistrations( cart ), function( cartItem ) {
-		return getDomainRegistrationTld( cartItem ) === '.' + tld;
-	} );
+	const domains = concat( getDomainRegistrations( cart ), getDomainTransfers( cart ) );
+
+	return some( domains, cartItem => getTld( cartItem.meta ) === tld );
 }
 
 export function getTlds( cart ) {
-	return uniq(
-		map( getDomainRegistrations( cart ), function( cartItem ) {
-			return trimStart( getDomainRegistrationTld( cartItem ), '.' );
-		} )
-	);
-}
+	const domains = concat( getDomainRegistrations( cart ), getDomainTransfers( cart ) );
 
-export function getDomainRegistrationTld( cartItem ) {
-	if ( ! isDomainRegistration( cartItem ) ) {
-		throw new Error( 'This function only works on domain registration cart ' + 'items.' );
-	}
-
-	return '.' + tail( cartItem.meta.split( '.' ) ).join( '.' );
+	return uniq( map( domains, cartItem => getTld( cartItem.meta ) ) );
 }
 
 /**
@@ -320,8 +324,11 @@ export function hasDomainRegistration( cart ) {
 	return some( getAll( cart ), isDomainRegistration );
 }
 
-export function hasOnlyDomainRegistrationsWithPrivacySupport( cart ) {
-	return every( getDomainRegistrations( cart ), privacyAvailable );
+export function hasOnlyDomainProductsWithPrivacySupport( cart ) {
+	return every(
+		concat( getDomainTransfers( cart ), getDomainRegistrations( cart ) ),
+		privacyAvailable
+	);
 }
 
 export function hasDomainMapping( cart ) {
@@ -345,7 +352,7 @@ export function hasRenewalItem( cart ) {
  * @returns {boolean} true if there is at least one domain transfer item, false otherwise
  */
 export function hasTransferProduct( cart ) {
-	return some( getAll( cart ), isTransfer );
+	return some( getAll( cart ), isDomainTransfer );
 }
 
 /**
@@ -432,6 +439,17 @@ export function businessPlan( slug, properties ) {
 }
 
 /**
+ * Determines whether a domain Item supports purchasing a privacy subscription
+ * @param {string} slug - e.g. domain_reg, dotblog_domain
+ * @param {array} productsList - The list of products retrieved using getProductsList from state/products-list/selectors
+ * @return {boolean} true if the domainItem supports privacy protection purchase
+ */
+export function supportsPrivacyProtectionPurchase( productSlug, productsList ) {
+	const product = find( productsList, [ 'product_slug', productSlug ] ) || {};
+	return get( product, 'is_privacy_protection_product_purchase_allowed', false );
+}
+
+/**
  * Creates a new shopping cart item for a domain.
  *
  * @param {Object} productSlug - the unique string that identifies the product
@@ -502,16 +520,6 @@ export function siteRedirect( properties ) {
  */
 export function domainPrivacyProtection( properties ) {
 	return domainItem( 'private_whois', properties.domain, properties.source );
-}
-
-/**
- * Creates a new shopping cart item for a domain redemption late fee.
- *
- * @param {Object} properties - list of properties
- * @returns {Object} the new item as `CartItemValue` object
- */
-export function domainRedemption( properties ) {
-	return domainItem( 'domain_redemption', properties.domain, properties.source );
 }
 
 /**
@@ -817,7 +825,7 @@ export function changePrivacyForDomains( cart, domainItems, changeFunction ) {
 	return flow.apply(
 		null,
 		domainItems.map( function( item ) {
-			if ( isTransfer( item ) ) {
+			if ( isDomainTransfer( item ) ) {
 				return changeFunction( domainTransferPrivacy( { domain: item.meta } ) );
 			}
 			return changeFunction( domainPrivacyProtection( { domain: item.meta } ) );
@@ -852,16 +860,6 @@ export function removePrivacyFromAllDomains( cart ) {
  */
 export function isRenewal( cartItem ) {
 	return cartItem.extra && cartItem.extra.purchaseType === 'renewal';
-}
-
-/**
- * Determines whether a cart item is a transfer
- *
- * @param {Object} cartItem - `CartItemValue` object
- * @returns {boolean} true if item is a renewal
- */
-export function isTransfer( cartItem ) {
-	return cartItem.product_slug === domainProductSlugs.TRANSFER_IN;
 }
 
 /**
@@ -961,7 +959,6 @@ export default {
 	customDesignItem,
 	domainMapping,
 	domainPrivacyProtection,
-	domainRedemption,
 	domainRegistration,
 	domainTransfer,
 	domainTransferPrivacy,
@@ -973,7 +970,6 @@ export default {
 	getDomainPriceRule,
 	getDomainRegistrations,
 	getDomainRegistrationsWithoutPrivacy,
-	getDomainRegistrationTld,
 	getDomainTransfers,
 	getDomainTransfersWithoutPrivacy,
 	getGoogleApps,
@@ -989,18 +985,18 @@ export default {
 	guidedTransferItem,
 	isDomainBeingUsedForPlan,
 	isNextDomainFree,
-	isTransfer,
 	hasDomainCredit,
 	hasDomainInCart,
 	hasDomainMapping,
 	hasDomainRegistration,
-	hasOnlyDomainRegistrationsWithPrivacySupport,
+	hasOnlyDomainProductsWithPrivacySupport,
 	hasFreeTrial,
 	hasGoogleApps,
 	hasOnlyFreeTrial,
 	hasOnlyProductsOf,
 	hasOnlyRenewalItems,
 	hasPlan,
+	hasOnlyBundledDomainProducts,
 	hasPremiumPlan,
 	hasProduct,
 	hasRenewableSubscription,
@@ -1015,6 +1011,7 @@ export default {
 	siteRedirect,
 	shouldBundleDomainWithPlan,
 	spaceUpgradeItem,
+	supportsPrivacyProtectionPurchase,
 	themeItem,
 	unlimitedSpaceItem,
 	unlimitedThemesItem,

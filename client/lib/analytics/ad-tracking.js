@@ -34,13 +34,15 @@ const isAdwordsEnabled = true;
 const isFacebookEnabled = true;
 const isBingEnabled = true;
 const isYahooEnabled = true;
-const isCriteoEnabled = true;
+const isGeminiEnabled = true;
 const isQuantcastEnabled = true;
 const isTwitterEnabled = true;
 const isAolEnabled = true;
+const isExperianEnabled = true;
 const isLinkedinEnabled = true;
 let isYandexEnabled = true;
 const isOutbrainEnabled = true;
+const isCriteoEnabled = false;
 const isAtlasEnabled = false;
 const isPandoraEnabled = false;
 const isQuoraEnabled = false;
@@ -65,6 +67,7 @@ const FACEBOOK_TRACKING_SCRIPT_URL = 'https://connect.facebook.net/en_US/fbevent
 	CRITEO_TRACKING_SCRIPT_URL = 'https://static.criteo.net/js/ld/ld.js',
 	ADWORDS_CONVERSION_ID = config( 'google_adwords_conversion_id' ),
 	ADWORDS_CONVERSION_ID_JETPACK = config( 'google_adwords_conversion_id_jetpack' ),
+	YAHOO_GEMINI_PIXEL_URL = 'https://sp.analytics.yahoo.com/spp.pl?a=10000&.yp=10014088',
 	ONE_BY_AOL_CONVERSION_PIXEL_URL =
 		'https://secure.ace-tag.advertising.com/action/type=132958/bins=1/rich=0/Mnum=1516/',
 	ONE_BY_AOL_AUDIENCE_BUILDING_PIXEL_URL =
@@ -73,6 +76,8 @@ const FACEBOOK_TRACKING_SCRIPT_URL = 'https://connect.facebook.net/en_US/fbevent
 	PANDORA_CONVERSION_PIXEL_URL =
 		'https://data.adxcel-ec2.com/pixel/' +
 		'?ad_log=referer&action=purchase&pixid=7efc5994-458b-494f-94b3-31862eee9e26',
+	EXPERIAN_CONVERSION_PIXEL_URL =
+		'https://d.turn.com/r/dd/id/L21rdC84MTYvY2lkLzE3NDc0MzIzNDgvdC8yL2NhdC8zMjE4NzUwOQ',
 	YAHOO_TRACKING_SCRIPT_URL = 'https://s.yimg.com/wi/ytc.js',
 	TWITTER_TRACKING_SCRIPT_URL = 'https://static.ads-twitter.com/uwt.js',
 	DCM_FLOODLIGHT_IFRAME_URL = 'https://6355556.fls.doubleclick.net/activityi',
@@ -93,7 +98,7 @@ const FACEBOOK_TRACKING_SCRIPT_URL = 'https://connect.facebook.net/en_US/fbevent
 		yahooPixelId: '10014088',
 		twitterPixelId: 'nvzbs',
 		dcmFloodlightAdvertiserId: '6355556',
-		linkedInPartnerId: '36622',
+		linkedInPartnerId: '195308',
 		quoraPixelId: '420845cb70e444938cf0728887a74ca1',
 		outbrainAdvId: '00f0f5287433c2851cc0cb917c7ff0465e',
 	},
@@ -400,7 +405,7 @@ function isAdTrackingAllowed() {
  *
  * @returns {void}
  */
-function retarget() {
+function only_retarget() {
 	if ( ! isAdTrackingAllowed() ) {
 		return;
 	}
@@ -456,6 +461,11 @@ function retarget() {
 		}
 	}
 
+	// Yahoo Gemini
+	if ( isGeminiEnabled ) {
+		new Image().src = YAHOO_GEMINI_PIXEL_URL;
+	}
+
 	// One by AOL
 	if ( isAolEnabled ) {
 		new Image().src = ONE_BY_AOL_AUDIENCE_BUILDING_PIXEL_URL;
@@ -484,7 +494,7 @@ function retarget() {
  * @param {Object} properties - The custom event attributes.
  * @returns {void}
  */
-function trackCustomFacebookConversionEvent( name, properties ) {
+export function trackCustomFacebookConversionEvent( name, properties ) {
 	window.fbw && window.fbq( 'trackCustom', name, properties );
 }
 
@@ -494,7 +504,7 @@ function trackCustomFacebookConversionEvent( name, properties ) {
  * @param {Object} properties - The custom event attributes.
  * @returns {void}
  */
-function trackCustomAdWordsRemarketingEvent( properties ) {
+export function trackCustomAdWordsRemarketingEvent( properties ) {
 	window.google_trackConversion &&
 		window.google_trackConversion( {
 			google_conversion_id: ADWORDS_CONVERSION_ID,
@@ -506,7 +516,7 @@ function trackCustomAdWordsRemarketingEvent( properties ) {
 /**
  * A generic function that we can export and call to track plans page views with our ad partners
  */
-function retargetViewPlans() {
+export function retargetViewPlans() {
 	if ( ! isAdTrackingAllowed() ) {
 		return;
 	}
@@ -522,7 +532,7 @@ function retargetViewPlans() {
  * @param {Object} cartItem - The item added to the cart
  * @returns {void}
  */
-function recordAddToCart( cartItem ) {
+export function recordAddToCart( cartItem ) {
 	if ( ! isAdTrackingAllowed() ) {
 		return;
 	}
@@ -552,7 +562,7 @@ function recordAddToCart( cartItem ) {
  *
  * @param {Object} cart - cart as `CartValue` object
  */
-function recordViewCheckout( cart ) {
+export function recordViewCheckout( cart ) {
 	if ( isCriteoEnabled ) {
 		recordViewCheckoutInCriteo( cart );
 	}
@@ -565,7 +575,7 @@ function recordViewCheckout( cart ) {
  * @param {Number} orderId - the order id
  * @returns {void}
  */
-function recordOrder( cart, orderId ) {
+export function recordOrder( cart, orderId ) {
 	if ( ! isAdTrackingAllowed() ) {
 		return;
 	}
@@ -576,6 +586,7 @@ function recordOrder( cart, orderId ) {
 	// Purchase tracking happens in one of three ways:
 
 	// 1. Fire one tracking event that includes details about the entire order
+
 	recordOrderInAtlas( cart, orderId );
 	recordOrderInCriteo( cart, orderId );
 	recordOrderInFloodlight( cart, orderId );
@@ -584,6 +595,7 @@ function recordOrder( cart, orderId ) {
 	recordOrderInGoogleAnalytics( cart, orderId );
 
 	// 2. Fire a tracking event for each product purchased
+
 	cart.products.forEach( product => {
 		recordProduct( product, orderId );
 	} );
@@ -592,6 +604,17 @@ function recordOrder( cart, orderId ) {
 	window.ga( 'ecommerce:send' );
 
 	// 3. Fire a single tracking event without any details about what was purchased
+
+	// Experian / One 2 One Media
+	if ( isExperianEnabled ) {
+		new Image().src = EXPERIAN_CONVERSION_PIXEL_URL;
+	}
+
+	// Yahoo Gemini
+	if ( isGeminiEnabled ) {
+		new Image().src = YAHOO_GEMINI_PIXEL_URL;
+	}
+
 	if ( isAolEnabled ) {
 		new Image().src = ONE_BY_AOL_CONVERSION_PIXEL_URL;
 	}
@@ -827,7 +850,7 @@ function recordOrderInFloodlight( cart, orderId ) {
  *
  * @returns {void}
  */
-function recordAliasInFloodlight() {
+export function recordAliasInFloodlight() {
 	if ( ! isAdTrackingAllowed() || ! isFloodlightEnabled ) {
 		return;
 	}
@@ -888,7 +911,7 @@ function recordSignupCompletionInFloodlight() {
  * @param {String} urlPath - The URL path
  * @returns {void}
  */
-function recordPageViewInFloodlight( urlPath ) {
+export function recordPageViewInFloodlight( urlPath ) {
 	if ( ! isAdTrackingAllowed() || ! isFloodlightEnabled ) {
 		return;
 	}
@@ -954,7 +977,7 @@ function floodlightUserParams() {
 
 	const currentUser = user.get();
 	if ( currentUser ) {
-		params.u4 = currentUser.ID;
+		params.u4 = currentUser.ID.toString();
 	}
 
 	const anonymousUserId = tracksAnonymousUserId();
@@ -1225,7 +1248,7 @@ function isSupportedCurrency( currency ) {
  *
  * @returns {void}
  */
-function recordSignupStart() {
+export function recordSignupStart() {
 	recordSignupStartInFloodlight();
 }
 
@@ -1234,29 +1257,14 @@ function recordSignupStart() {
  *
  * @returns {void}
  */
-function recordSignupCompletion() {
+export function recordSignupCompletion() {
 	recordSignupCompletionInFloodlight();
 }
 
-export default {
-	retarget: function( context, next ) {
-		const nextFunction = typeof next === 'function' ? next : noop;
+export function retarget( context, next ) {
+	const nextFunction = typeof next === 'function' ? next : noop;
 
-		retarget();
+	only_retarget();
 
-		nextFunction();
-	},
-
-	retargetViewPlans,
-
-	recordAliasInFloodlight,
-	recordPageViewInFloodlight,
-
-	recordAddToCart,
-	recordViewCheckout,
-	recordOrder,
-	recordSignupStart,
-	recordSignupCompletion,
-	trackCustomFacebookConversionEvent,
-	trackCustomAdWordsRemarketingEvent,
-};
+	nextFunction();
+}

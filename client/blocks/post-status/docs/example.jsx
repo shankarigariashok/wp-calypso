@@ -15,7 +15,7 @@ import QueryPosts from 'components/data/query-posts';
 import Card from 'components/card';
 import PostStatus from '../';
 import { getCurrentUser } from 'state/current-user/selectors';
-import { getSitePostsForQuery } from 'state/posts/selectors';
+import { getPostsForQuery } from 'state/posts/selectors';
 
 function PostStatusExample( { queries, primarySiteId, primarySiteUrl, globalIdByQueryLabel } ) {
 	return (
@@ -33,7 +33,7 @@ function PostStatusExample( { queries, primarySiteId, primarySiteUrl, globalIdBy
 						<h3>{ label }</h3>
 						{ primarySiteId && <QueryPosts siteId={ primarySiteId } query={ query } /> }
 						{ ! globalIdByQueryLabel[ label ] && <em>No matching post found</em> }
-						<PostStatus globalId={ globalIdByQueryLabel[ label ] } />
+						<PostStatus globalId={ globalIdByQueryLabel[ label ] } showAll />
 					</p>
 				);
 			} ) }
@@ -56,7 +56,7 @@ const ConnectedPostStatusExample = connect( state => {
 		primarySiteId,
 		primarySiteUrl: get( user, 'primary_blog_url' ),
 		globalIdByQueryLabel: mapValues( queries, query => {
-			return get( getSitePostsForQuery( state, primarySiteId, query ), [ 0, 'global_ID' ] );
+			return get( getPostsForQuery( state, primarySiteId, query ), [ 0, 'global_ID' ] );
 		} ),
 	};
 } )( PostStatusExample );

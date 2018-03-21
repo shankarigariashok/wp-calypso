@@ -18,7 +18,7 @@ import Delta from 'woocommerce/components/delta';
 import { formatValue, getDelta } from '../utils';
 import { getPeriodFormat } from 'state/stats/lists/utils';
 import { getSiteStatsNormalizedData } from 'state/stats/lists/selectors';
-import Sparkline from 'woocommerce/components/sparkline';
+import Sparkline from 'woocommerce/components/d3/sparkline';
 import Table from 'woocommerce/components/table';
 import TableItem from 'woocommerce/components/table/table-item';
 import TableRow from 'woocommerce/components/table/table-row';
@@ -58,7 +58,7 @@ class StoreStatsWidgetList extends Component {
 			{
 				key: 'delta',
 				label: `${ translate( 'Since' ) } \
-				${ moment( sincePeriod.reference_period, periodFormat ).format( UNITS[ unit ].sinceFormat ) }`,
+				${ moment( sincePeriod.reference_period, periodFormat ).format( UNITS[ unit ].shortFormat ) }`,
 			},
 		];
 

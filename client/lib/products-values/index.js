@@ -3,7 +3,6 @@
 /**
  * External dependencies
  */
-
 import { assign, difference, isEmpty, pick } from 'lodash';
 
 /**
@@ -27,7 +26,7 @@ import {
 	PLAN_CHARGEBACK,
 	PLAN_MONTHLY_PERIOD,
 } from 'lib/plans/constants';
-import { isTransfer } from 'lib/cart-values/cart-items';
+import { domainProductSlugs } from 'lib/domains/constants';
 
 import schema from './schema.json';
 
@@ -39,8 +38,8 @@ const productDependencies = {
 		gapps_unlimited: true,
 		private_whois: true,
 	},
-	domain_redemption: {
-		domain: true,
+	[ domainProductSlugs.TRANSFER_IN ]: {
+		[ domainProductSlugs.TRANSFER_IN_PRIVACY ]: true,
 	},
 };
 
@@ -242,11 +241,36 @@ export function isSiteRedirect( product ) {
 	return product.product_slug === 'offsite_redirect';
 }
 
+export function isDomainTransferProduct( product ) {
+	product = formatProduct( product );
+	assertValidProduct( product );
+
+	return isDomainTransfer( product ) || isDomainTransferPrivacy( product );
+}
+
 export function isDomainTransfer( product ) {
 	product = formatProduct( product );
 	assertValidProduct( product );
 
-	return isTransfer( product );
+	return product.product_slug === domainProductSlugs.TRANSFER_IN;
+}
+
+export function isDomainTransferPrivacy( product ) {
+	product = formatProduct( product );
+	assertValidProduct( product );
+
+	return product.product_slug === domainProductSlugs.TRANSFER_IN_PRIVACY;
+}
+
+export function isDelayedDomainTransfer( product ) {
+	return isDomainTransfer( product ) && product.delayedProvisioning;
+}
+
+export function isBundled( product ) {
+	product = formatProduct( product );
+	assertValidProduct( product );
+
+	return !! product.is_bundled;
 }
 
 export function isCredits( product ) {
@@ -385,11 +409,15 @@ export default {
 	isCredits,
 	isCustomDesign,
 	isDependentProduct,
+	isDelayedDomainTransfer,
 	isDomainMapping,
 	isDomainProduct,
 	isDomainRedemption,
 	isDomainRegistration,
 	isDomainTransfer,
+	isDomainTransferPrivacy,
+	isDomainTransferProduct,
+	isBundled,
 	isDotComPlan,
 	isEnterprise,
 	isFreeJetpackPlan,

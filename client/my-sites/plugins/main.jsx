@@ -1,11 +1,10 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import React from 'react';
 import createReactClass from 'create-react-class';
+import page from 'page';
 import { connect } from 'react-redux';
 import { find, isEmpty, some } from 'lodash';
 import { localize } from 'i18n-calypso';
@@ -25,14 +24,19 @@ import URLSearch from 'lib/mixins/url-search';
 import EmptyContent from 'components/empty-content';
 import PluginsStore from 'lib/plugins/store';
 import { fetchPluginData as wporgFetchPluginData } from 'state/plugins/wporg/actions';
-import WporgPluginsSelectors from 'state/plugins/wporg/selectors';
+import { getPlugin } from 'state/plugins/wporg/selectors';
 import PluginsList from './plugins-list';
 import { recordGoogleEvent } from 'state/analytics/actions';
 import JetpackManageErrorPage from 'my-sites/jetpack-manage-error-page';
 import PluginsBrowser from './plugins-browser';
 import NonSupportedJetpackVersionNotice from './not-supported-jetpack-version';
 import NoPermissionsError from './no-permissions-error';
-import { canCurrentUser, canCurrentUserManagePlugins } from 'state/selectors';
+import {
+	canCurrentUser,
+	canCurrentUserManagePlugins,
+	getSelectedOrAllSitesWithPlugins,
+	hasJetpackSites,
+} from 'state/selectors';
 import {
 	canJetpackSiteManage,
 	canJetpackSiteUpdateFiles,
@@ -40,7 +44,6 @@ import {
 	isRequestingSites,
 } from 'state/sites/selectors';
 import { getSelectedSite, getSelectedSiteId, getSelectedSiteSlug } from 'state/ui/selectors';
-import { getSelectedOrAllSitesWithPlugins } from 'state/selectors';
 import HeaderButton from 'components/header-button';
 import { isEnabled } from 'config';
 
@@ -61,6 +64,22 @@ const PluginsMain = createReactClass( {
 	},
 
 	componentWillReceiveProps( nextProps ) {
+		const { hasJetpackSites: hasJpSites, selectedSiteIsJetpack, selectedSiteSlug } = nextProps;
+
+		if ( this.props.isRequestingSites && ! nextProps.isRequestingSites ) {
+			// Selected site is not a Jetpack site
+			if ( selectedSiteSlug && ! selectedSiteIsJetpack ) {
+				page.redirect( `/plugins/${ selectedSiteSlug }` );
+				return;
+			}
+
+			//  None of the other sites are Jetpack sites
+			if ( ! selectedSiteSlug && ! hasJpSites ) {
+				page.redirect( '/plugins' );
+				return;
+			}
+		}
+
 		this.refreshPlugins( nextProps );
 	},
 
@@ -87,7 +106,7 @@ const PluginsMain = createReactClass( {
 	// plugins for Jetpack sites require additional data from the wporg-data store
 	addWporgDataToPlugins( plugins ) {
 		return plugins.map( plugin => {
-			const pluginData = WporgPluginsSelectors.getPlugin( this.props.wporgPlugins, plugin.slug );
+			const pluginData = getPlugin( this.props.wporgPlugins, plugin.slug );
 			if ( ! pluginData ) {
 				this.props.wporgFetchPluginData( plugin.slug );
 			}
@@ -303,7 +322,9 @@ const PluginsMain = createReactClass( {
 		);
 
 		const morePluginsHeader = showInstalledPluginList &&
-			showSuggestedPluginsList && <h3 className="plugins__more-header">More Plugins</h3>;
+			showSuggestedPluginsList && (
+				<h3 className="plugins__more-header">{ this.props.translate( 'More Plugins' ) }</h3>
+			);
 
 		let searchTitle;
 		if ( search ) {
@@ -489,7 +510,9 @@ export default connect(
 	state => {
 		const selectedSite = getSelectedSite( state );
 		const selectedSiteId = getSelectedSiteId( state );
+
 		return {
+			hasJetpackSites: hasJetpackSites( state ),
 			sites: getSelectedOrAllSitesWithPlugins( state ),
 			selectedSite,
 			selectedSiteId,

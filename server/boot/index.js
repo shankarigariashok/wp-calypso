@@ -13,6 +13,8 @@ const path = require( 'path' ),
 	morgan = require( 'morgan' ),
 	pages = require( 'pages' );
 
+const analytics = require( '../lib/analytics' ).default;
+
 /**
  * Returns the server HTTP request handler "app".
  * @returns {object} The express app
@@ -24,13 +26,10 @@ function setup() {
 	// for nginx
 	app.enable( 'trust proxy' );
 
-	// template engine
-	app.set( 'view engine', 'pug' );
-
 	app.use( cookieParser() );
 	app.use( userAgent.express() );
 
-	if ( 'development' === config( 'env' ) ) {
+	if ( 'development' === process.env.NODE_ENV ) {
 		// use legacy CSS rebuild system if css-hot-reload is disabled
 		if ( ! config.isEnabled( 'css-hot-reload' ) ) {
 			// only do `build` upon every request in "development"
@@ -80,14 +79,19 @@ function setup() {
 
 	// loaded when we detect stats blockers - see lib/analytics/index.js
 	app.get( '/nostats.js', function( request, response ) {
-		const analytics = require( '../lib/analytics' );
-		analytics.tracks.recordEvent( 'calypso_stats_blocked', {}, request );
+		analytics.tracks.recordEvent(
+			'calypso_stats_blocked',
+			{
+				do_not_track: request.headers.dnt,
+			},
+			request
+		);
 		response.setHeader( 'content-type', 'application/javascript' );
 		response.end( "console.log('Stats are disabled');" );
 	} );
 
 	// serve files when not in production so that the source maps work correctly
-	if ( 'development' === config( 'env' ) ) {
+	if ( 'development' === process.env.NODE_ENV ) {
 		app.use( '/assets', express.static( path.resolve( __dirname, '..', '..', 'assets' ) ) );
 		app.use( '/client', express.static( path.resolve( __dirname, '..', '..', 'client' ) ) );
 	}

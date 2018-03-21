@@ -15,18 +15,19 @@ import { partial } from 'lodash';
  * Internal dependencies
  */
 import MasterbarItem from './item';
-import Notifications from 'notifications';
+import AsyncLoad from 'components/async-load';
 import store from 'store';
 import { recordTracksEvent } from 'state/analytics/actions';
 import { toggleNotificationsPanel } from 'state/ui/actions';
 import { isNotificationsOpen } from 'state/selectors';
+import TranslatableString from 'components/translatable/proptype';
 
 class MasterbarItemNotifications extends Component {
 	static propTypes = {
 		user: PropTypes.object.isRequired,
 		isActive: PropTypes.bool,
 		className: PropTypes.string,
-		tooltip: PropTypes.string,
+		tooltip: TranslatableString,
 		//connected
 		isNotificationsOpen: PropTypes.bool,
 	};
@@ -139,10 +140,12 @@ class MasterbarItemNotifications extends Component {
 						}
 					/>
 				</MasterbarItem>
-				<Notifications
+				<AsyncLoad
+					require="notifications"
 					isShowing={ this.props.isNotificationsOpen }
 					checkToggle={ this.checkToggleNotes }
 					setIndicator={ this.setNotesIndicator }
+					placeholder={ null }
 				/>
 			</div>
 		);

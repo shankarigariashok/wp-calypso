@@ -5,7 +5,7 @@
  */
 
 import { translate } from 'i18n-calypso';
-import querystring from 'querystring';
+import { stringify } from 'qs';
 import { includes, reduce, filter, map } from 'lodash';
 
 /**
@@ -41,7 +41,7 @@ export const getPaperSizes = country =>
 		{}
 	);
 
-export const getPrintURL = ( siteId, paperSize, labels ) => {
+const _getPDFURL = ( paperSize, labels, baseUrl ) => {
 	if ( ! PAPER_SIZES[ paperSize ] ) {
 		throw new Error( `Invalid paper size: ${ paperSize }` );
 	}
@@ -54,5 +54,14 @@ export const getPrintURL = ( siteId, paperSize, labels ) => {
 		).join( ',' ),
 		json: true,
 	};
-	return api.url.labelsPrint() + '?' + querystring.stringify( params );
+
+	return baseUrl + '?' + stringify( params );
+};
+
+export const getPrintURL = ( paperSize, labels ) => {
+	return _getPDFURL( paperSize, labels, api.url.labelsPrint() );
+};
+
+export const getPreviewURL = ( paperSize, labels ) => {
+	return _getPDFURL( paperSize, labels, api.url.labelTestPrint() );
 };

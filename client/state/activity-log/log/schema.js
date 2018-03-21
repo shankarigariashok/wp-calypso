@@ -1,7 +1,6 @@
 /** @format */
 const activityItemSchema = {
 	type: 'object',
-	additionalProperties: false,
 	required: [
 		'activityDate',
 		'activityGroup',
@@ -9,7 +8,6 @@ const activityItemSchema = {
 		'activityId',
 		'activityIsRewindable',
 		'activityName',
-		'activityTitle',
 		'activityTs',
 		'actorAvatarUrl',
 		'actorName',
@@ -21,6 +19,7 @@ const activityItemSchema = {
 		activityGroup: { type: 'string' },
 		activityIcon: { type: 'string' },
 		activityId: { type: 'string' },
+		activityIsDiscarded: { type: 'boolean' },
 		activityIsRewindable: { type: 'boolean' },
 		activityName: { type: 'string' },
 		activityStatus: {
@@ -87,6 +86,9 @@ export const logItemsSchema = {
 					type: 'string',
 				},
 			},
+		},
+		oldestItemTs: {
+			type: [ 'null', 'integer' ],
 		},
 	},
 };

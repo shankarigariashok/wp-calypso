@@ -1,13 +1,13 @@
 &.payments__dialog {
-	display: flex;
-	flex-direction: column;
-	flex-grow: 1;
-	max-height: 80%;
-	max-width: 600px;
+	min-width: 90%;
+	@include breakpoint( ">660px" ) {
+		min-width: 660px;
+	}
 
 	.dialog__content {
-		height: 100%;
-		overflow-y: scroll;
+		.form-fieldset:last-child {
+			margin-bottom: 0;
+		}
 	}
 
 	.dialog__action-buttons {
@@ -23,13 +23,26 @@
 			}
 		}
 	}
+
+	.is-international-option {
+		display: none;
+	}
+
+	&.show-international-options {
+		.is-international-option {
+			display: block;
+		}
+	}
+}
+
+.payments__edit-international-options-checkbox {
+	margin-right: 8px;
 }
 
 .payments__address-currency-container {
 	display: flex;
 	flex-direction: row;
 	flex-wrap: wrap;
-	justify-content: space-between;
 
 	@include breakpoint( "<660px" ) {
 		flex-direction: column;
@@ -39,11 +52,8 @@
 		margin: 0;
 		padding: 0;
 		box-shadow: none;
+		padding-right: 24px;
 	}
-}
-
-&.store-location__edit-dialog {
-	max-width: 600px;
 }
 
 .payments__currency-container {
@@ -53,7 +63,6 @@
 	padding-top: 24px;
 
 	@include breakpoint( ">960px" ) {
-		padding-left: 24px;
 		padding-top: 0;
 	}
 }
@@ -228,7 +237,7 @@
 .payments__method-loading-feelink,
 .payments__method-loading-enabled,
 .payments__method-loading-settings {
-	background-color: lighten( $gray, 30% );
+	background-color: $gray-lighten-30;
 	animation: loading-fade 1.6s ease-in-out infinite;
 }
 

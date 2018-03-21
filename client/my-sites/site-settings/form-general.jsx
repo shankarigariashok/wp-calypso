@@ -8,7 +8,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import classNames from 'classnames';
 import Gridicon from 'gridicons';
-import { flowRight } from 'lodash';
+import { flowRight, get, has } from 'lodash';
 
 /**
  * Internal dependencies
@@ -17,6 +17,8 @@ import wrapSettingsForm from './wrap-settings-form';
 import Card from 'components/card';
 import CompactCard from 'components/card/compact';
 import Button from 'components/button';
+import Notice from 'components/notice';
+import NoticeAction from 'components/notice/notice-action';
 import LanguagePicker from 'components/language-picker';
 import SectionHeader from 'components/section-header';
 import config from 'config';
@@ -170,6 +172,43 @@ class SiteSettingsFormGeneral extends Component {
 		} );
 	};
 
+	renderLanguagePickerNotice = () => {
+		const { fields, translate } = this.props;
+		const langId = get( fields, 'lang_id', '' );
+		const errors = {
+			error_cap: {
+				text: translate( 'The Site Language setting is disabled due to insufficient permissions.' ),
+				link: 'https://codex.wordpress.org/Roles_and_Capabilities',
+				linkText: translate( 'More info' ),
+			},
+			error_const: {
+				text: translate(
+					'The Site Language setting is disabled because your site has the WPLANG constant set.'
+				),
+				link:
+					'https://codex.wordpress.org/Installing_WordPress_in_Your_Language#Setting_the_language_for_your_site',
+				linkText: translate( 'More info' ),
+			},
+		};
+		const noticeContent = errors[ langId ];
+
+		return (
+			has( noticeContent, 'text' ) && (
+				<Notice
+					text={ noticeContent.text }
+					className="site-settings__language-picker-notice"
+					isCompact
+				>
+					{ has( noticeContent, 'link' ) && (
+						<NoticeAction href={ noticeContent.link } external>
+							{ noticeContent.linkText }
+						</NoticeAction>
+					) }
+				</Notice>
+			)
+		);
+	};
+
 	languageOptions() {
 		const {
 			eventTracker,
@@ -177,19 +216,25 @@ class SiteSettingsFormGeneral extends Component {
 			isRequestingSettings,
 			onChangeField,
 			siteIsJetpack,
+			supportsLanguageSelection,
 			translate,
 		} = this.props;
-		if ( siteIsJetpack ) {
+		const errorNotice = this.renderLanguagePickerNotice();
+
+		if ( ! supportsLanguageSelection ) {
 			return null;
 		}
+
 		return (
-			<FormFieldset>
+			<FormFieldset className={ siteIsJetpack && 'site-settings__has-divider is-top-only' }>
 				<FormLabel htmlFor="lang_id">{ translate( 'Language' ) }</FormLabel>
+				{ errorNotice }
 				<LanguagePicker
 					languages={ config( 'languages' ) }
-					value={ fields.lang_id }
+					valueKey={ siteIsJetpack ? 'wpLocale' : 'value' }
+					value={ errorNotice ? 'en_US' : fields.lang_id }
 					onChange={ onChangeField( 'lang_id' ) }
-					disabled={ isRequestingSettings }
+					disabled={ isRequestingSettings || ( siteIsJetpack && errorNotice ) }
 					onClick={ eventTracker( 'Clicked Language Field' ) }
 				/>
 				<FormSettingExplanation>
@@ -310,14 +355,89 @@ class SiteSettingsFormGeneral extends Component {
 		);
 	}
 
-	Timezone() {
-		const { fields, isRequestingSettings, siteIsJetpack, translate } = this.props;
-		if ( siteIsJetpack ) {
-			return;
+	netNeutralityOption() {
+		const {
+			fields,
+			isRequestingSettings,
+			translate,
+			handleToggle,
+			moment,
+			handleSubmitForm,
+			isSavingSettings,
+		} = this.props;
+
+		const today = moment();
+		// Days and years are 1-indexed, and other things are 0-indexed; i.e. December is month 11.
+		const lastDay = moment( { year: 2017, month: 11, day: 31 } );
+
+		if ( today.isAfter( lastDay, 'day' ) ) {
+			return null;
 		}
 
 		return (
-			<FormFieldset>
+			<div>
+				<SectionHeader label={ translate( 'Net Neutrality' ) }>
+					<Button
+						compact={ true }
+						onClick={ handleSubmitForm }
+						primary={ true }
+						type="submit"
+						disabled={ isRequestingSettings || isSavingSettings }
+					>
+						{ isSavingSettings ? translate( 'Saving…' ) : translate( 'Save Settings' ) }
+					</Button>
+				</SectionHeader>
+				<Card>
+					<FormFieldset>
+						<CompactFormToggle
+							checked={ !! fields.net_neutrality }
+							disabled={ isRequestingSettings }
+							onChange={ handleToggle( 'net_neutrality' ) }
+						>
+							{ translate(
+								'The FCC wants to repeal Net Neutrality. Without Net Neutrality, ' +
+									'big cable and telecom companies can divide the internet into fast ' +
+									'and slow lanes. What would the Internet look like without net neutrality? ' +
+									'Find out by enabling this banner on your site: it shows your support ' +
+									'for real net neutrality rules by displaying a message on the bottom ' +
+									'of your site and "slowing down" some of your posts. ' +
+									'{{netNeutralityLink}}Learn more about Net Neutrality{{/netNeutralityLink}}',
+								{
+									components: {
+										netNeutralityLink: (
+											<a
+												target="_blank"
+												rel="noopener noreferrer"
+												href={
+													'https://en.blog.wordpress.com/2017/07/11/join-us-in-the-fight-for-net-neutrality/'
+												}
+											/>
+										),
+									},
+								}
+							) }
+						</CompactFormToggle>
+					</FormFieldset>
+				</Card>
+			</div>
+		);
+	}
+
+	Timezone() {
+		const {
+			fields,
+			isRequestingSettings,
+			translate,
+			supportsLanguageSelection,
+			moment,
+		} = this.props;
+		const guessedTimezone = moment.tz.guess();
+		const setGuessedTimezone = this.onTimezoneSelect.bind( this, guessedTimezone );
+
+		return (
+			<FormFieldset
+				className={ ! supportsLanguageSelection && 'site-settings__has-divider is-top-only' }
+			>
 				<FormLabel htmlFor="blogtimezone">{ translate( 'Site Timezone' ) }</FormLabel>
 
 				<Timezone
@@ -327,7 +447,25 @@ class SiteSettingsFormGeneral extends Component {
 				/>
 
 				<FormSettingExplanation>
-					{ translate( 'Choose a city in your timezone.' ) }
+					{ translate( 'Choose a city in your timezone.' ) }{' '}
+					{ translate(
+						'You might want to follow our guess: {{button}}Select %(timezoneName)s{{/button}}',
+						{
+							args: {
+								timezoneName: guessedTimezone,
+							},
+							components: {
+								button: (
+									<Button
+										onClick={ setGuessedTimezone }
+										borderless
+										compact
+										className="site-settings__general-settings-set-guessed-timezone"
+									/>
+								),
+							},
+						}
+					) }
 				</FormSettingExplanation>
 			</FormFieldset>
 		);
@@ -354,6 +492,8 @@ class SiteSettingsFormGeneral extends Component {
 		return (
 			<div className={ classNames( classes ) }>
 				{ site && <QuerySiteSettings siteId={ site.ID } /> }
+
+				{ ! siteIsJetpack && this.netNeutralityOption() }
 
 				<SectionHeader label={ translate( 'Site Profile' ) }>
 					<Button
@@ -459,7 +599,9 @@ const connectComponent = connect(
 		return {
 			siteIsJetpack,
 			siteSlug: getSelectedSiteSlug( state ),
-			supportsHolidaySnowOption: siteIsJetpack && isJetpackMinimumVersion( state, siteId, '4.0' ),
+			supportsLanguageSelection:
+				! siteIsJetpack || isJetpackMinimumVersion( state, siteId, '5.9-alpha' ),
+			supportsHolidaySnowOption: ! siteIsJetpack || isJetpackMinimumVersion( state, siteId, '4.0' ),
 		};
 	},
 	null,
@@ -476,6 +618,7 @@ const getFormSettings = settings => {
 		blog_public: '',
 		admin_url: '',
 		holidaysnow: false,
+		net_neutrality: false,
 	};
 
 	if ( ! settings ) {
@@ -491,6 +634,8 @@ const getFormSettings = settings => {
 		timezone_string: settings.timezone_string,
 
 		holidaysnow: !! settings.holidaysnow,
+
+		net_neutrality: settings.net_neutrality,
 	};
 
 	// handling `gmt_offset` and `timezone_string` values

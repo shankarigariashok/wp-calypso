@@ -1,22 +1,5 @@
 /** @format */
 export default {
-	multiDomainRegistrationV1: {
-		datestamp: '20200721',
-		variations: {
-			singlePurchaseFlow: 10,
-			popupCart: 45,
-			keepSearchingInGapps: 45,
-		},
-		defaultVariation: 'singlePurchaseFlow',
-	},
-	signupSurveyStep: {
-		datestamp: '20170329',
-		variations: {
-			showSurveyStep: 20,
-			hideSurveyStep: 80,
-		},
-		defaultVariation: 'hideSurveyStep',
-	},
 	signupAtomicStoreVsPressable: {
 		datestamp: '20171101',
 		variations: {
@@ -34,24 +17,6 @@ export default {
 			pluginsAndThemes: 50,
 		},
 		defaultVariation: 'original',
-	},
-	presaleChatButton: {
-		datestamp: '20170328',
-		variations: {
-			showChatButton: 20,
-			original: 80,
-		},
-		defaultVariation: 'original',
-		localeTargets: 'any',
-	},
-	chatOfferOnCancel: {
-		datestamp: '20170421',
-		variations: {
-			show: 50,
-			hide: 50,
-		},
-		defaultVariation: 'show',
-		allowExistingUsers: true,
 	},
 	ATPromptOnCancel: {
 		datestamp: '20170515',
@@ -81,17 +46,8 @@ export default {
 		allowExistingUsers: true,
 		localeTargets: 'any',
 	},
-	unlimitedThemeNudge: {
-		datestamp: '20171016',
-		variations: {
-			hide: 50,
-			show: 50,
-		},
-		defaultVariation: 'hide',
-		allowExistingUsers: true,
-	},
-	gsuiteUpsell: {
-		datestamp: '20171025',
+	checklistThankYouForFreeUser: {
+		datestamp: '20171204',
 		variations: {
 			show: 50,
 			hide: 50,
@@ -99,41 +55,77 @@ export default {
 		defaultVariation: 'hide',
 		allowExistingUsers: true,
 	},
-	domainsCheckoutLocalizedAddresses: {
-		datestamp: '20171025',
+	checklistThankYouForPaidUser: {
+		datestamp: '20171204',
 		variations: {
-			showLocalizedAddressFormats: 50,
-			showDefaultAddressFormat: 50,
-		},
-		defaultVariation: 'showDefaultAddressFormat',
-		allowExistingUsers: true,
-		localeTargets: 'any',
-	},
-	buttonsColorOnPostSignup: {
-		datestamp: '20171108',
-		variations: {
-			keep: 50,
-			change: 50,
-		},
-		defaultVariation: 'keep',
-		allowExistingUsers: true,
-	},
-	condensedPostList: {
-		datestamp: '20171113',
-		variations: {
-			condensedPosts: 5,
-			largePosts: 95,
-		},
-		defaultVariation: 'largePosts',
-	},
-	showNewPaymentMethods: {
-		datestamp: '20171115',
-		variations: {
-			hide: 50,
 			show: 50,
+			hide: 50,
 		},
 		defaultVariation: 'hide',
 		allowExistingUsers: true,
-		localeTargets: 'any',
+	},
+	domainSuggestionTestV6: {
+		datestamp: '20180315',
+		variations: {
+			group_0: 1, // Default group
+			group_1: 1000,
+			group_2: 1000,
+			group_3: 1000,
+			group_4: 1000,
+		},
+		defaultVariation: 'group_0',
+		allowExistingUsers: true,
+	},
+	minimizedFreePlanForUnsignedUser: {
+		datestamp: '20180308',
+		variations: {
+			original: 50,
+			minimized: 50,
+		},
+		defaultVariation: 'original',
+		allowExistingUsers: true,
+	},
+	upgradePricingDisplayV2: {
+		datestamp: '20180305',
+		variations: {
+			original: 50,
+			modified: 50,
+		},
+		defaultVariation: 'original',
+	},
+	domainSearchPrefill: {
+		datestamp: '20180315',
+		variations: {
+			noPrefill: 50,
+			withSiteTitle: 50,
+		},
+		defaultVariation: 'noPrefill',
+		allowExistingUsers: true,
+	},
+	redesignedSidebarBanner: {
+		datestamp: '20180222',
+		variations: {
+			newBanner: 50,
+			oldBanner: 50,
+		},
+		defaultVariation: 'oldBanner',
+	},
+	siteGoalsShuffle: {
+		datestamp: '20180214',
+		variations: {
+			control: 50,
+			variant: 50,
+		},
+		defaultVariation: 'control',
+		allowExistingUsers: true,
+	},
+	inlineHelpWithContactForm: {
+		datestamp: '20180306',
+		variations: {
+			original: 90,
+			inlinecontact: 10,
+		},
+		defaultVariation: 'original',
+		allowExistingUsers: true,
 	},
 };

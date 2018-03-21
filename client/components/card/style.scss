@@ -5,8 +5,8 @@
 	padding: 16px;
 	box-sizing: border-box;
 	background: $white;
-	box-shadow: 0 0 0 1px transparentize( lighten( $gray, 20% ), .5 ),
-		0 1px 2px lighten( $gray, 30% );
+	box-shadow: 0 0 0 1px transparentize( $gray-lighten-20, .5 ),
+		0 1px 2px $gray-lighten-30;
 
 	@include clear-fix;
 
@@ -33,36 +33,48 @@
 		cursor: pointer;
 	}
 
+	&.is-highlight {
+		padding-left: 21px;
+	}
+
 	&.is-error {
-		box-shadow: inset 3px 0 0 $alert-red;
+		border-left: 3px solid $alert-red;
 	}
 
 	&.is-info {
-		box-shadow: inset 3px 0 0 $blue-wordpress;
+		border-left: 3px solid $blue-wordpress;
 	}
 
 	&.is-success {
-		box-shadow: inset 3px 0 0 $alert-green;
+		border-left: 3px solid $alert-green;
 	}
 
 	&.is-warning {
-		box-shadow: inset 3px 0 0 $alert-yellow;
+		border-left: 3px solid $alert-yellow;
 	}
 }
 
+
 // Clickable Card
 .card__link-indicator {
-	color: lighten( $gray, 20% );
+	color: $gray-text-min;
 	display: block;
 	height: 100%;
 	position: absolute;
-		top: 0;
-		right: 16px;
+	top: 0;
+	right: 16px;
+
+	html[dir="rtl"] & {
+		&.gridicons-chevron-right {
+			transform: scaleX( -1 );
+		}
+	}
+
 }
 
 a.card:hover {
 	.card__link-indicator {
-		color: lighten( $gray, 10% );
+		color: $gray-text;
 	}
 }
 

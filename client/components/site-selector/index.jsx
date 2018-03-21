@@ -19,20 +19,14 @@ import debugFactory from 'debug';
 import { getPreference } from 'state/preferences/selectors';
 import { getCurrentUser } from 'state/current-user/selectors';
 import { getSelectedSite } from 'state/ui/selectors';
-import { getSite } from 'state/sites/selectors';
-import {
-	areAllSitesSingleUser,
-	getSites,
-	getVisibleSites,
-	isRequestingMissingSites,
-} from 'state/selectors';
+import { getSite, hasAllSitesList } from 'state/sites/selectors';
+import { areAllSitesSingleUser, getSites, getVisibleSites, hasLoadedSites } from 'state/selectors';
 import AllSites from 'my-sites/all-sites';
 import Site from 'blocks/site';
 import SitePlaceholder from 'blocks/site/placeholder';
 import Search from 'components/search';
 import SiteSelectorAddSite from './add-site';
 import searchSites from 'components/search-sites';
-import { isPluginActive } from 'state/selectors';
 
 const ALL_SITES = 'ALL_SITES';
 
@@ -40,6 +34,7 @@ const debug = debugFactory( 'calypso:site-selector' );
 
 class SiteSelector extends Component {
 	static propTypes = {
+		isPlaceholder: PropTypes.bool,
 		sites: PropTypes.array,
 		siteBasePath: PropTypes.oneOfType( [ PropTypes.string, PropTypes.bool ] ),
 		showAddNewSite: PropTypes.bool,
@@ -99,17 +94,28 @@ class SiteSelector extends Component {
 	}
 
 	scrollToHighlightedSite() {
-		const selectorElement = ReactDom.findDOMNode( this.refs.selector );
-		if ( selectorElement ) {
-			const highlightedSiteElement = ReactDom.findDOMNode( this.refs.highlightedSite );
-			if ( highlightedSiteElement ) {
-				scrollIntoView( highlightedSiteElement, selectorElement, {
-					onlyScrollIfNeeded: true,
-				} );
-			} else {
-				selectorElement.scrollTop = 0;
-			}
+		if ( ! this.siteSelectorRef ) {
+			return;
 		}
+
+		const selectorElement = ReactDom.findDOMNode( this.siteSelectorRef );
+
+		if ( ! selectorElement ) {
+			return;
+		}
+
+		// Note: Update CSS selectors if the class names change.
+		const highlightedSiteElem = selectorElement.querySelector(
+			'.site.is-highlighted, .site-selector .all-sites.is-highlighted'
+		);
+
+		if ( ! highlightedSiteElem ) {
+			return;
+		}
+
+		scrollIntoView( highlightedSiteElem, selectorElement, {
+			onlyScrollIfNeeded: true,
+		} );
 	}
 
 	computeHighlightedSite() {
@@ -182,7 +188,11 @@ class SiteSelector extends Component {
 		const handledByHost = this.props.onSiteSelect( siteId );
 		this.props.onClose( event, siteId );
 
-		const node = ReactDom.findDOMNode( this.refs.selector );
+		if ( ! this.siteSelectorRef ) {
+			return;
+		}
+
+		const node = ReactDom.findDOMNode( this.siteSelectorRef );
 		if ( node ) {
 			node.scrollTop = 0;
 		}
@@ -253,11 +263,12 @@ class SiteSelector extends Component {
 		return this.props.groups;
 	}
 
+	setSiteSelectorRef = component => ( this.siteSelectorRef = component );
+
 	renderSites() {
 		let sites;
 
-		// Assume that `sites` is falsy when loading
-		if ( this.props.isRequestingMissingSites ) {
+		if ( ! this.props.hasAllSitesList ) {
 			return <SitePlaceholder key="site-placeholder" />;
 		}
 
@@ -299,6 +310,7 @@ class SiteSelector extends Component {
 			this.visibleSites.push( ALL_SITES );
 
 			const isHighlighted = this.isHighlighted( ALL_SITES );
+
 			return (
 				<AllSites
 					key="selector-all-sites"
@@ -307,7 +319,6 @@ class SiteSelector extends Component {
 					onMouseEnter={ this.onAllSitesHover }
 					isHighlighted={ isHighlighted }
 					isSelected={ this.isSelected( ALL_SITES ) }
-					ref={ isHighlighted ? 'highlightedSite' : null }
 				/>
 			);
 		}
@@ -321,6 +332,7 @@ class SiteSelector extends Component {
 		this.visibleSites.push( site.ID );
 
 		const isHighlighted = this.isHighlighted( site.ID );
+
 		return (
 			<Site
 				site={ site }
@@ -330,7 +342,6 @@ class SiteSelector extends Component {
 				onMouseEnter={ this.onSiteHover }
 				isHighlighted={ isHighlighted }
 				isSelected={ this.isSelected( site ) }
-				ref={ isHighlighted ? 'highlightedSite' : null }
 			/>
 		);
 	}
@@ -358,7 +369,14 @@ class SiteSelector extends Component {
 	}
 
 	render() {
+		// Render an empty div.site-selector element as a placeholder. It's useful for lazy
+		// rendering of the selector in sidebar while keeping the on-appear animation work.
+		if ( this.props.isPlaceholder ) {
+			return <div className="site-selector" />;
+		}
+
 		const hiddenSitesCount = this.props.siteCount - this.props.visibleSiteCount;
+
 		const selectorClass = classNames( 'site-selector', 'sites-list', this.props.className, {
 			'is-large': this.props.siteCount > 6 || hiddenSitesCount > 0 || this.state.showSearch,
 			'is-single': this.props.visibleSiteCount === 1,
@@ -378,12 +396,11 @@ class SiteSelector extends Component {
 					onSearch={ this.onSearch }
 					delaySearch={ true }
 					autoFocus={ this.props.autoFocus }
-					// Assume that `sites` is falsy when loading
-					disabled={ ! this.props.sites }
+					disabled={ ! this.props.hasLoadedSites }
 					onSearchClose={ this.props.onClose }
 					onKeyDown={ this.onKeyDown }
 				/>
-				<div className="site-selector__sites" ref="selector">
+				<div className="site-selector__sites" ref={ this.setSiteSelectorRef }>
 					{ this.renderAllSites() }
 					{ this.renderRecentSites() }
 					{ this.renderSites() }
@@ -463,7 +480,7 @@ const navigateToSite = ( siteId, { allSitesPath, allSitesSingleUser, siteBasePat
 		}
 
 		if ( path.match( /^\/store\/stats\// ) ) {
-			const isStore = site.jetpack && isPluginActive( state, site.ID, 'woocommerce' );
+			const isStore = site.jetpack && site.options && site.options.woocommerce_is_active;
 			if ( ! isStore ) {
 				path = '/stats/day';
 			}
@@ -478,6 +495,7 @@ const mapState = state => {
 	const visibleSiteCount = get( user, 'visible_site_count', 0 );
 
 	return {
+		hasLoadedSites: hasLoadedSites( state ),
 		sites: getSites( state ),
 		showRecentSites: get( user, 'visible_site_count', 0 ) > 11,
 		recentSites: getPreference( state, 'recentSites' ),
@@ -486,7 +504,7 @@ const mapState = state => {
 		selectedSite: getSelectedSite( state ),
 		visibleSites: getVisibleSites( state ),
 		allSitesSingleUser: areAllSitesSingleUser( state ),
-		isRequestingMissingSites: isRequestingMissingSites( state ),
+		hasAllSitesList: hasAllSitesList( state ),
 	};
 };
 

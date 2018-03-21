@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import PropTypes from 'prop-types';
 import React from 'react';
 import { connect } from 'react-redux';
@@ -14,13 +12,14 @@ import page from 'page';
  * Internal dependencies
  */
 import { login } from 'lib/paths';
-import addQueryArgs from 'lib/route/add-query-args';
+import { addQueryArgs } from 'lib/route';
 import EmptyContent from 'components/empty-content';
 import RedirectWhenLoggedIn from 'components/redirect-when-logged-in';
 import { hideMagicLoginRequestForm } from 'state/login/magic-login/actions';
-import { recordPageView } from 'state/analytics/actions';
+import { recordPageViewWithClientId as recordPageView } from 'state/analytics/actions';
 
-const nativeLoginUrl = login( { isNative: true } );
+const nativeLoginUrl = login( { isNative: true, twoFactorAuthType: 'link' } );
+
 const lostPasswordURL = addQueryArgs(
 	{
 		action: 'lostpassword',
@@ -30,19 +29,25 @@ const lostPasswordURL = addQueryArgs(
 
 class EmailedLoginLinkExpired extends React.Component {
 	static propTypes = {
+		hideMagicLoginRequestForm: PropTypes.func.isRequired,
 		recordPageView: PropTypes.func.isRequired,
 		translate: PropTypes.func.isRequired,
 	};
 
+	componentDidMount() {
+		this.props.recordPageView( '/log-in/link/use', 'Login > Link > Expired' );
+	}
+
 	onClickTryAgainLink = event => {
 		event.preventDefault();
+
 		this.props.hideMagicLoginRequestForm();
+
 		page( nativeLoginUrl );
 	};
 
 	render() {
 		const { translate } = this.props;
-		this.props.recordPageView( '/log-in/link/use', 'Login > Link > Expired' );
 
 		return (
 			<div>
@@ -51,6 +56,7 @@ class EmailedLoginLinkExpired extends React.Component {
 					redirectTo="/"
 					replaceCurrentLocation={ true }
 				/>
+
 				<EmptyContent
 					action={ translate( 'Try again' ) }
 					actionCallback={ this.onClickTryAgainLink }

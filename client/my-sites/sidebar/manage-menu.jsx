@@ -7,7 +7,7 @@
 import PropTypes from 'prop-types';
 import React, { PureComponent } from 'react';
 import { connect } from 'react-redux';
-import { compact, includes, omit, reduce, get, mapValues } from 'lodash';
+import { compact, includes, omit, reduce, get } from 'lodash';
 import { localize } from 'i18n-calypso';
 
 /**
@@ -16,11 +16,12 @@ import { localize } from 'i18n-calypso';
 import SidebarItem from 'layout/sidebar/item';
 import SidebarButton from 'layout/sidebar/button';
 import config from 'config';
-import { getEditorPath } from 'state/ui/editor/selectors';
+import { getEditorNewPostPath } from 'state/ui/editor/selectors';
 import { getPostTypes } from 'state/post-types/selectors';
 import QueryPostTypes from 'components/data/query-post-types';
 import analytics from 'lib/analytics';
 import { decodeEntities } from 'lib/formatting';
+import compareProps from 'lib/compare-props';
 import MediaLibraryUploadButton from 'my-sites/media-library/upload-button';
 import {
 	getSite,
@@ -30,19 +31,21 @@ import {
 	isSingleUserSite,
 } from 'state/sites/selectors';
 import { areAllSitesSingleUser, canCurrentUser } from 'state/selectors';
+import { itemLinkMatches } from './utils';
+import { recordTracksEvent } from 'state/analytics/actions';
 
 class ManageMenu extends PureComponent {
 	static propTypes = {
-		itemLinkClass: PropTypes.func,
+		path: PropTypes.string,
 		onNavigate: PropTypes.func,
 		siteId: PropTypes.number,
 		// connected props
 		allSingleSites: PropTypes.bool,
-		canUser: PropTypes.func,
+		canCurrentUserFn: PropTypes.func,
 		isJetpack: PropTypes.bool,
 		isSingleUser: PropTypes.bool,
 		postTypes: PropTypes.object,
-		postTypeLinks: PropTypes.object,
+		getNewPostPathFn: PropTypes.func,
 		siteAdminUrl: PropTypes.string,
 		site: PropTypes.oneOfType( [ PropTypes.object, PropTypes.bool ] ),
 		siteSlug: PropTypes.string,
@@ -107,9 +110,9 @@ class ManageMenu extends PureComponent {
 			{
 				name: 'comments',
 				label: this.props.translate( 'Comments' ),
-				capability: 'moderate_comments',
+				capability: 'edit_posts',
 				queryable: true,
-				config: 'comments/management',
+				config: 'manage/comments',
 				link: '/comments',
 				paths: [ '/comment', '/comments' ],
 				wpAdminLink: 'edit-comments.php',
@@ -124,14 +127,17 @@ class ManageMenu extends PureComponent {
 		if ( ! includes( [ 'post', 'page' ], postType ) ) {
 			analytics.mc.bumpStat( 'calypso_publish_menu_click', postType );
 		}
-
+		// Tracks doesn't like dashes (as in 'jetpack-portfolio', for example)
+		this.props.recordTracksEvent(
+			'calypso_mysites_sidebar_' + postType.replace( /-/g, '_' ) + '_clicked'
+		);
 		this.props.onNavigate();
 	};
 
 	renderMenuItem( menuItem ) {
-		const { canUser, site, siteId, siteAdminUrl } = this.props;
+		const { canCurrentUserFn, site, siteId, siteAdminUrl } = this.props;
 
-		if ( siteId && ! canUser( menuItem.capability ) ) {
+		if ( siteId && ! canCurrentUserFn( menuItem.capability ) ) {
 			return null;
 		}
 
@@ -157,6 +163,8 @@ class ManageMenu extends PureComponent {
 		let preload;
 		if ( includes( [ 'post', 'page' ], menuItem.name ) ) {
 			preload = 'posts-pages';
+		} else if ( 'comments' === menuItem.name ) {
+			preload = 'comments';
 		} else {
 			preload = 'posts-custom';
 		}
@@ -185,36 +193,48 @@ class ManageMenu extends PureComponent {
 				icon = 'custom-post-type';
 		}
 
-		const className = this.props.itemLinkClass( menuItem.paths ? menuItem.paths : menuItem.link );
-
 		return (
 			<SidebarItem
 				key={ menuItem.name }
 				label={ menuItem.label }
-				className={ className }
+				selected={ itemLinkMatches( menuItem.paths || menuItem.link, this.props.path ) }
 				link={ link }
 				onNavigate={ this.onNavigate( menuItem.name ) }
 				icon={ icon }
 				preloadSectionName={ preload }
 				postType={ menuItem.name }
+				tipTarget={ `side-menu-${ menuItem.name }` }
 			>
 				{ menuItem.name === 'media' && (
 					<MediaLibraryUploadButton
 						className="sidebar__button"
 						site={ site }
 						href={ menuItem.buttonLink }
+						onClick={ this.trackSidebarButtonClick( 'media' ) }
 					>
 						{ this.props.translate( 'Add' ) }
 					</MediaLibraryUploadButton>
 				) }
 				{ menuItem.name !== 'media' && (
-					<SidebarButton href={ menuItem.buttonLink } preloadSectionName="post-editor">
+					<SidebarButton
+						onClick={ this.trackSidebarButtonClick( menuItem.name ) }
+						href={ menuItem.buttonLink }
+						preloadSectionName="post-editor"
+					>
 						{ this.props.translate( 'Add' ) }
 					</SidebarButton>
 				) }
 			</SidebarItem>
 		);
 	}
+
+	trackSidebarButtonClick = name => {
+		return () => {
+			this.props.recordTracksEvent(
+				'calypso_mysites_sidebar_' + name.replace( /-/g, '_' ) + '_sidebar_button_clicked'
+			);
+		};
+	};
 
 	getCustomMenuItems() {
 		const customPostTypes = omit( this.props.postTypes, [ 'post', 'page' ] );
@@ -229,7 +249,7 @@ class ManageMenu extends PureComponent {
 
 				let buttonLink;
 				if ( config.isEnabled( 'manage/custom-post-types' ) && postType.api_queryable ) {
-					buttonLink = this.props.postTypeLinks[ postTypeSlug ];
+					buttonLink = this.props.getNewPostPathFn( postTypeSlug );
 				}
 
 				return memo.concat( {
@@ -266,23 +286,37 @@ class ManageMenu extends PureComponent {
 	}
 }
 
-export default connect( ( state, { siteId } ) => {
-	const postTypes = getPostTypes( state, siteId );
+/*
+ * A functional selector that returns a function that takes `capability` as a parameter
+ * and returns a boolean. Returns a new function on each invocation, so must be excluded
+ * from the shallow prop comparison.
+ */
+const canCurrentUserFn = ( state, siteId ) => capability =>
+	canCurrentUser( state, siteId, capability );
 
-	return {
+/*
+ * A functional selector similar to `canCurrentUserFn`, this time for generating editor URL
+ * from a post type.
+ */
+const getNewPostPathFn = ( state, siteId ) => postTypeSlug =>
+	getEditorNewPostPath( state, siteId, postTypeSlug );
+
+export default connect(
+	( state, { siteId } ) => ( {
 		allSingleSites: areAllSitesSingleUser( state ),
-		// TODO: Instead of passing a canUser function prop, we should compute and filter
-		// the list of menuItems inside `connect` and pass it to `PostList` as a prop.
-		canUser: cap => canCurrentUser( state, siteId, cap ),
+		canCurrentUserFn: canCurrentUserFn( state, siteId ),
 		isJetpack: isJetpackSite( state, siteId ),
 		isSingleUser: isSingleUserSite( state, siteId ),
-		postTypes,
-		postTypeLinks: mapValues( postTypes, ( postType, postTypeSlug ) => {
-			return getEditorPath( state, siteId, null, postTypeSlug );
-		} ),
+		postTypes: getPostTypes( state, siteId ),
+		getNewPostPathFn: getNewPostPathFn( state, siteId ),
 		siteAdminUrl: getSiteAdminUrl( state, siteId ),
 		site: getSite( state, siteId ),
 		siteId,
 		siteSlug: getSiteSlug( state, siteId ),
-	};
-} )( localize( ManageMenu ) );
+	} ),
+	{
+		recordTracksEvent,
+	},
+	null,
+	{ areStatePropsEqual: compareProps( { ignore: [ 'canCurrentUserFn', 'getNewPostPathFn' ] } ) }
+)( localize( ManageMenu ) );

@@ -13,15 +13,15 @@ import { localize } from 'i18n-calypso';
 /**
  * Internal dependencies
  */
-import analytics from 'lib/analytics';
 import Button from 'components/button';
 import config from 'config';
 import ExternalLink from 'components/external-link';
 import FormTextInput from 'components/forms/form-text-input';
-import { getSitePostsForQueryIgnoringPage } from 'state/posts/selectors';
+import { getPostsForQueryIgnoringPage } from 'state/posts/selectors';
 import humanDate from 'lib/human-date';
 import MultiCheckbox from 'components/forms/multi-checkbox';
 import QueryPosts from 'components/data/query-posts';
+import { recordTrack } from 'woocommerce/lib/analytics';
 
 class ReadingWidget extends Component {
 	state = {
@@ -144,8 +144,8 @@ class ReadingWidget extends Component {
 	};
 
 	onSubmit = () => {
-		// TODO
-		analytics.tracks.recordEvent( 'calypso_woocommerce_dashboard_action_click', {
+		// TODO Logic for this. Not currently in use.
+		recordTrack( 'calypso_woocommerce_dashboard_action_click', {
 			action: 'subscribe',
 		} );
 	};
@@ -202,6 +202,6 @@ export default connect( ( state, ownProps ) => {
 	const siteId = ownProps.siteId ? ownProps.siteId : ReadingWidget.defaultProps.siteId;
 	const query = ownProps.query ? ownProps.query : ReadingWidget.defaultProps.query;
 	return {
-		posts: getSitePostsForQueryIgnoringPage( state, siteId, query ),
+		posts: getPostsForQueryIgnoringPage( state, siteId, query ),
 	};
 } )( localize( ReadingWidget ) );

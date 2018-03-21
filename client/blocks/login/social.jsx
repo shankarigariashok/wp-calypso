@@ -14,14 +14,14 @@ import { localize } from 'i18n-calypso';
  * Internal dependencies
  */
 import config from 'config';
-import { getCurrentQueryArguments } from 'state/ui/selectors';
 import { loginSocialUser, createSocialUser, createSocialUserFailed } from 'state/login/actions';
 import {
 	getCreatedSocialAccountUsername,
 	getCreatedSocialAccountBearerToken,
+	getRedirectToOriginal,
 	isSocialAccountCreating,
 } from 'state/login/selectors';
-import { recordTracksEvent } from 'state/analytics/actions';
+import { recordTracksEventWithClientId as recordTracksEvent } from 'state/analytics/actions';
 import WpcomLoginForm from 'signup/wpcom-login-form';
 import { InfoNotice } from 'blocks/global-notice';
 import { login } from 'lib/paths';
@@ -150,7 +150,7 @@ class SocialLoginForm extends Component {
 
 export default connect(
 	state => ( {
-		redirectTo: getCurrentQueryArguments( state ).redirect_to,
+		redirectTo: getRedirectToOriginal( state ),
 		isSocialAccountCreating: isSocialAccountCreating( state ),
 		bearerToken: getCreatedSocialAccountBearerToken( state ),
 		username: getCreatedSocialAccountUsername( state ),

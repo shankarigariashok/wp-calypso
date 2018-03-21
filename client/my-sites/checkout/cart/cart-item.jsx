@@ -1,11 +1,10 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import React from 'react';
 import { connect } from 'react-redux';
+import Gridicon from 'gridicons';
 
 /**
  * Internal dependencies
@@ -14,15 +13,15 @@ import analytics from 'lib/analytics';
 import { canRemoveFromCart, cartItems } from 'lib/cart-values';
 import {
 	isCredits,
-	isDomainProduct,
 	isGoogleApps,
 	isTheme,
 	isMonthly,
 	isPlan,
+	isBundled,
 } from 'lib/products-values';
 import { currentUserHasFlag } from 'state/current-user/selectors';
 import { DOMAINS_WITH_PLANS_ONLY } from 'state/current-user/constants';
-import * as upgradesActions from 'lib/upgrades/actions';
+import { removeItem } from 'lib/upgrades/actions';
 import { localize } from 'i18n-calypso';
 
 const getIncludedDomain = cartItems.getIncludedDomain;
@@ -36,11 +35,11 @@ export class CartItem extends React.Component {
 			'Product ID',
 			this.props.cartItem.product_id
 		);
-		upgradesActions.removeItem( this.props.cartItem, this.props.domainsWithPlansOnly );
+		removeItem( this.props.cartItem, this.props.domainsWithPlansOnly );
 	};
 
 	price() {
-		const { cart, cartItem, translate } = this.props;
+		const { cartItem, translate } = this.props;
 
 		if ( typeof cartItem.cost === 'undefined' ) {
 			return translate( 'Loading price' );
@@ -50,7 +49,7 @@ export class CartItem extends React.Component {
 			return this.getFreeTrialPrice();
 		}
 
-		if ( cartItems.hasDomainCredit( cart ) && isDomainProduct( cartItem ) && cartItem.cost === 0 ) {
+		if ( isBundled( cartItem ) && cartItem.cost === 0 ) {
 			return this.getDomainPlanPrice( cartItem );
 		}
 
@@ -65,13 +64,14 @@ export class CartItem extends React.Component {
 	}
 
 	monthlyPrice() {
-		const { cost, currency } = this.props.cartItem;
+		const { cartItem, translate } = this.props;
+		const { cost, currency } = cartItem;
 
 		if ( typeof cost === 'undefined' ) {
 			return null;
 		}
 
-		if ( ! isPlan( this.props.cartItem ) ) {
+		if ( ! isPlan( cartItem ) ) {
 			return null;
 		}
 
@@ -79,11 +79,11 @@ export class CartItem extends React.Component {
 			return null;
 		}
 
-		if ( isMonthly( this.props.cartItem ) ) {
+		if ( isMonthly( cartItem ) ) {
 			return null;
 		}
 
-		return this.props.translate( '(%(monthlyPrice)f %(currency)s x 12 months)', {
+		return translate( '(%(monthlyPrice)f %(currency)s x 12 months)', {
 			args: {
 				monthlyPrice: +( cost / 12 ).toFixed( currency === 'JPY' ? 0 : 2 ),
 				currency,
@@ -92,18 +92,20 @@ export class CartItem extends React.Component {
 	}
 
 	getDomainPlanPrice( cartItem ) {
+		const { translate } = this.props;
+
 		if ( cartItem && cartItem.product_cost ) {
 			return (
 				<span>
 					<span className="cart__free-with-plan">
 						{ cartItem.product_cost } { cartItem.currency }
 					</span>
-					<span className="cart__free-text">{ this.props.translate( 'Free with your plan' ) }</span>
+					<span className="cart__free-text">{ translate( 'Free with your plan' ) }</span>
 				</span>
 			);
 		}
 
-		return <em>{ this.props.translate( 'Free with your plan' ) }</em>;
+		return <em>{ translate( 'Free with your plan' ) }</em>;
 	}
 
 	getFreeTrialPrice() {
@@ -115,18 +117,21 @@ export class CartItem extends React.Component {
 	}
 
 	getProductInfo() {
-		const domain =
-			this.props.cartItem.meta || ( this.props.selectedSite && this.props.selectedSite.domain );
+		const { cartItem, selectedSite } = this.props;
+
+		const domain = cartItem.meta || ( selectedSite && selectedSite.domain );
 		let info = null;
 
-		if ( isGoogleApps( this.props.cartItem ) && this.props.cartItem.extra.google_apps_users ) {
-			info = this.props.cartItem.extra.google_apps_users.map( user => <div>{ user.email }</div> );
-		} else if ( isCredits( this.props.cartItem ) ) {
+		if ( isGoogleApps( cartItem ) && cartItem.extra.google_apps_users ) {
+			info = cartItem.extra.google_apps_users.map( user => (
+				<div key={ `user-${ user.email }` }>{ user.email }</div>
+			) );
+		} else if ( isCredits( cartItem ) ) {
 			info = null;
-		} else if ( getIncludedDomain( this.props.cartItem ) ) {
-			info = getIncludedDomain( this.props.cartItem );
-		} else if ( isTheme( this.props.cartItem ) ) {
-			info = this.props.selectedSite && this.props.selectedSite.domain;
+		} else if ( getIncludedDomain( cartItem ) ) {
+			info = getIncludedDomain( cartItem );
+		} else if ( isTheme( cartItem ) ) {
+			info = selectedSite && selectedSite.domain;
 		} else {
 			info = domain;
 		}
@@ -134,22 +139,26 @@ export class CartItem extends React.Component {
 	}
 
 	render() {
+		const { cartItem, translate } = this.props;
+
 		let name = this.getProductName();
-		if ( this.props.cartItem.bill_period && this.props.cartItem.bill_period !== -1 ) {
-			if ( isMonthly( this.props.cartItem ) ) {
-				name += ' - ' + this.props.translate( 'monthly subscription' );
-			} else if ( isTheme( this.props.cartItem ) ) {
-				name += ' - ' + this.props.translate( 'never expires' );
+		if ( cartItem.bill_period && parseInt( cartItem.bill_period ) !== -1 ) {
+			if ( isMonthly( cartItem ) ) {
+				name += ' - ' + translate( 'monthly subscription' );
 			} else {
-				name += ' - ' + this.props.translate( 'annual subscription' );
+				name += ' - ' + translate( 'annual subscription' );
 			}
+		}
+
+		if ( isTheme( cartItem ) ) {
+			name += ' - ' + translate( 'never expires' );
 		}
 
 		/*eslint-disable wpcalypso/jsx-classname-namespace*/
 		return (
 			<li className="cart-item">
 				<div className="primary-details">
-					<span className="product-name">{ name || this.props.translate( 'Loading…' ) }</span>
+					<span className="product-name">{ name || translate( 'Loading…' ) }</span>
 					<span className="product-domain">{ this.getProductInfo() }</span>
 				</div>
 
@@ -164,7 +173,7 @@ export class CartItem extends React.Component {
 	}
 
 	getProductName() {
-		const cartItem = this.props.cartItem;
+		const { cartItem, translate } = this.props;
 		const options = {
 			count: cartItem.volume,
 			args: {
@@ -178,7 +187,7 @@ export class CartItem extends React.Component {
 		} else if ( cartItem.volume === 1 ) {
 			switch ( cartItem.product_slug ) {
 				case 'gapps':
-					return this.props.translate( '%(productName)s (1 User)', {
+					return translate( '%(productName)s (1 User)', {
 						args: {
 							productName: cartItem.product_name,
 						},
@@ -190,14 +199,14 @@ export class CartItem extends React.Component {
 		} else {
 			switch ( cartItem.product_slug ) {
 				case 'gapps':
-					return this.props.translate(
+					return translate(
 						'%(productName)s (%(volume)s User)',
 						'%(productName)s (%(volume)s Users)',
 						options
 					);
 
 				default:
-					return this.props.translate(
+					return translate(
 						'%(productName)s (%(volume)s Item)',
 						'%(productName)s (%(volume)s Items)',
 						options
@@ -207,12 +216,14 @@ export class CartItem extends React.Component {
 	}
 
 	removeButton() {
-		if ( canRemoveFromCart( this.props.cart, this.props.cartItem ) ) {
-			/* eslint-disable wpcalypso/jsx-classname-namespace */
+		const { cart, cartItem } = this.props;
+
+		if ( canRemoveFromCart( cart, cartItem ) ) {
 			return (
-				<button className="remove-item noticon noticon-close" onClick={ this.removeFromCart } />
+				<button className="cart__remove-item" onClick={ this.removeFromCart }>
+					<Gridicon icon="cross-small" />
+				</button>
 			);
-			/* eslint-enable wpcalypso/jsx-classname-namespace */
 		}
 	}
 }

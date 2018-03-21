@@ -1,9 +1,10 @@
-FROM       node:8.9.1
+FROM       node:8.9.4
 LABEL maintainer="Automattic"
 
 WORKDIR    /calypso
 
 
+ENV        CONTAINER 'docker'
 ENV        NODE_PATH=/calypso/server:/calypso/client
 
 # Build a "base" layer
@@ -31,15 +32,31 @@ RUN        true \
            && rm -rf /root/.npm \
            && true
 
+# Build a "source" layer
+#
+# This layer is populated with up-to-date files from
+# Calypso development.
+#
+# If package.json and npm-shrinkwrap are unchanged,
+# `install-if-deps-outdated` should require no action.
+# However, time is being spent in the build step on
+# `install-if-deps-outdated`. This is because in the
+# following COPY, the npm-shrinkwrap mtime is being
+# updated, which is confusing `install-if-deps-outdated`.
+# Touch after copy to ensure that this layer will
+# not trigger additional install as part of the build
+# in the following step.
+COPY       . /calypso/
+RUN        touch node_modules
+
 # Build the final layer
 #
 # This contains built environments of Calypso. It will
 # change any time any of the Calypso source-code changes.
-COPY       . /calypso/
-RUN        true \
-           && CALYPSO_ENV=production npm run build \
-           && chown -R nobody /calypso \
-           && true
+ARG        commit_sha="(unknown)"
+ENV        COMMIT_SHA $commit_sha
+
+RUN        CALYPSO_ENV=production npm run build
 
 USER       nobody
 CMD        NODE_ENV=production node build/bundle.js

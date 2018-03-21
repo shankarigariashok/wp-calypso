@@ -2,17 +2,17 @@
  * /*
  * TinyMCE Writing Improvement Tool Plugin
  * Author: Raphael Mudge (raffi@automattic.com), Andrew Duthie (andrew.duthie@automattic.com)
- * 
+ *
  * http:
- * 
+ *
  * Distributed under the LGPL
- * 
+ *
  * Derived from:
  * 	$Id: editor_plugin_src.js 425 2007-11-21 15:17:39Z spocke $
- * 
+ *
  * 	@author Moxiecode
  * 	@copyright Copyright (C) 2004-2008, Moxiecode Systems AB, All rights reserved.
- * 
+ *
  * 	Moxiecode Spell Checker plugin released under the LGPL with TinyMCE
  *
  * @format
@@ -22,7 +22,7 @@
  * External dependencies
  */
 import tinymce from 'tinymce/tinymce';
-import qs from 'querystring';
+import { stringify } from 'qs';
 import { find, throttle } from 'lodash';
 import { getLocaleSlug, translate } from 'i18n-calypso';
 
@@ -252,7 +252,7 @@ function plugin( editor ) {
 		} );
 
 		const key = editor.getParam( 'atd_rpc_id' );
-		xhr.send( qs.stringify( { data, key } ) );
+		xhr.send( stringify( { data, key } ) );
 	}
 
 	function setAlwaysIgnore( text ) {

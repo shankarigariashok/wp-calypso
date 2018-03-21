@@ -1,9 +1,7 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
 import { debounce } from 'lodash';
@@ -15,7 +13,7 @@ import debugFactory from 'debug';
  */
 import { getSelectedSite, getSelectedSiteId } from 'state/ui/selectors';
 import { isSitePreviewable } from 'state/sites/selectors';
-import addQueryArgs from 'lib/route/add-query-args';
+import { addQueryArgs } from 'lib/route';
 import { setLayoutFocus } from 'state/ui/layout-focus/actions';
 import { isWithinBreakpoint } from 'lib/viewport';
 import Button from 'components/button';
@@ -23,7 +21,7 @@ import DocumentHead from 'components/data/document-head';
 import EmptyContent from 'components/empty-content';
 import Gridicon from 'gridicons';
 import Main from 'components/main';
-import WebPreviewContent from 'components/web-preview/content';
+import WebPreview from 'components/web-preview';
 
 const debug = debugFactory( 'calypso:my-sites:preview' );
 
@@ -50,11 +48,15 @@ class PreviewMain extends React.Component {
 	debouncedUpdateLayout = debounce( this.updateLayout, 50 );
 
 	componentDidMount() {
-		global.window && global.window.addEventListener( 'resize', this.debouncedUpdateLayout );
+		if ( typeof window !== 'undefined' ) {
+			window.addEventListener( 'resize', this.debouncedUpdateLayout );
+		}
 	}
 
 	componentWillUnmount() {
-		global.window && global.window.removeEventListener( 'resize', this.debouncedUpdateLayout );
+		if ( typeof window !== 'undefined' ) {
+			window.removeEventListener( 'resize', this.debouncedUpdateLayout );
+		}
 	}
 
 	updateUrl() {
@@ -138,7 +140,9 @@ class PreviewMain extends React.Component {
 		return (
 			<Main className="preview">
 				<DocumentHead title={ translate( 'Your Site' ) } />
-				<WebPreviewContent
+				<WebPreview
+					showPreview
+					isContentOnly
 					onLocationUpdate={ this.updateSiteLocation }
 					showUrl={ !! this.state.externalUrl }
 					showClose={ this.state.showingClose }

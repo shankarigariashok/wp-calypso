@@ -18,7 +18,11 @@ if ( 'undefined' === typeof window || ! window.configData ) {
 
 const configData = window.configData;
 
-if ( process.env.NODE_ENV === 'development' || configData.env_id === 'stage' ) {
+if (
+	process.env.NODE_ENV === 'development' ||
+	configData.env_id === 'stage' ||
+	( window && window.location.href.indexOf( 'https://calypso.live' ) === 0 )
+) {
 	const match =
 		document.location.search && document.location.search.match( /[?&]flags=([^&]+)(&|$)/ );
 	if ( match ) {
@@ -38,4 +42,7 @@ if ( process.env.NODE_ENV === 'development' || configData.env_id === 'stage' ) {
 	}
 }
 
-export default createConfig( configData );
+const configApi = createConfig( configData );
+
+export default configApi;
+export const isEnabled = configApi.isEnabled;

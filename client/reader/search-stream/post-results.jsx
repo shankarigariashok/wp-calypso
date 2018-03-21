@@ -13,8 +13,8 @@ import { localize } from 'i18n-calypso';
 import Stream from 'reader/stream';
 import EmptyContent from './empty';
 import HeaderBack from 'reader/header-back';
-import { RelatedPostCard } from 'blocks/reader-related-card-v2';
-import { SEARCH_RESULTS } from 'reader/follow-button/follow-sources';
+import { RelatedPostCard } from 'blocks/reader-related-card';
+import { SEARCH_RESULTS } from 'reader/follow-sources';
 import PostPlaceholder from 'reader/stream/post-placeholder';
 
 class PostResults extends Component {

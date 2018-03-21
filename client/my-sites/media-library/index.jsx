@@ -17,7 +17,7 @@ import Content from './content';
 import MediaActions from 'lib/media/actions';
 import MediaLibraryDropZone from './drop-zone';
 import MediaLibrarySelectedStore from 'lib/media/library-selected-store';
-import MediaUtils from 'lib/media/utils';
+import { filterItemsByMimePrefix } from 'lib/media/utils';
 import filterToMimePrefix from './filter-to-mime-prefix';
 import FilterBar from './filter-bar';
 import MediaValidationData from 'components/data/media-validation-data';
@@ -29,10 +29,19 @@ import {
 } from 'state/sharing/keyring/selectors';
 import { requestKeyringConnections } from 'state/sharing/keyring/actions';
 
+// External media sources that do not need a user to connect them
+// should be listed here.
+const noConnectionNeeded = [ 'pexels' ];
+
 const isConnected = props =>
-	props.source === '' || some( props.connectedServices, item => item.service === props.source );
+	noConnectionNeeded.indexOf( props.source ) !== -1 ||
+	props.source === '' ||
+	some( props.connectedServices, item => item.service === props.source );
 const needsKeyring = props =>
-	! props.isRequesting && props.source !== '' && props.connectedServices.length === 0;
+	noConnectionNeeded.indexOf( props.source ) === -1 &&
+	! props.isRequesting &&
+	props.source !== '' &&
+	props.connectedServices.length === 0;
 
 class MediaLibrary extends Component {
 	static propTypes = {
@@ -53,6 +62,7 @@ class MediaLibrary extends Component {
 		single: PropTypes.bool,
 		scrollable: PropTypes.bool,
 		postId: PropTypes.number,
+		disableLargeImageSources: PropTypes.bool,
 	};
 
 	static defaultProps = {
@@ -61,6 +71,7 @@ class MediaLibrary extends Component {
 		onScaleChange: () => {},
 		scrollable: false,
 		source: '',
+		disableLargeImageSources: false,
 	};
 
 	componentWillMount() {
@@ -92,7 +103,7 @@ class MediaLibrary extends Component {
 		if ( this.props.filter ) {
 			// Ensure that items selected as a consequence of this upload match
 			// the current filter
-			filteredItems = MediaUtils.filterItemsByMimePrefix(
+			filteredItems = filterItemsByMimePrefix(
 				filteredItems,
 				filterToMimePrefix( this.props.filter )
 			);
@@ -197,6 +208,7 @@ class MediaLibrary extends Component {
 					onSearch={ this.doSearch }
 					isConnected={ isConnected( this.props ) }
 					post={ !! this.props.postId }
+					disableLargeImageSources={ this.props.disableLargeImageSources }
 				/>
 				{ content }
 			</div>

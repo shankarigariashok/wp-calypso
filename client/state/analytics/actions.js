@@ -4,7 +4,7 @@
  * External dependencies
  */
 
-import { curry, flatMap, get, isFunction, merge, property } from 'lodash';
+import { curry, flatMap, get, set, isFunction, merge, property } from 'lodash';
 
 /**
  * Internal dependencies
@@ -16,7 +16,10 @@ import {
 	ANALYTICS_STAT_BUMP,
 	ANALYTICS_TRACKING_ON,
 	ANALYTICS_TRACKS_ANONID_SET,
+	ANALYTICS_TRACKS_OPT_OUT,
 } from 'state/action-types';
+
+import { getCurrentOAuth2ClientId } from 'state/ui/oauth2-clients/selectors';
 
 const mergedMetaData = ( a, b ) => [
 	...get( a, 'meta.analytics', [] ),
@@ -88,6 +91,18 @@ export const loadTrackingTool = trackingTool => ( {
 	},
 } );
 
+export const setTracksOptOut = isOptingOut => ( {
+	type: ANALYTICS_TRACKS_OPT_OUT,
+	meta: {
+		analytics: [
+			{
+				type: ANALYTICS_TRACKS_OPT_OUT,
+				payload: isOptingOut,
+			},
+		],
+	},
+} );
+
 export const recordGoogleEvent = ( category, action, label, value ) =>
 	recordEvent( 'ga', { category, action, label, value } );
 
@@ -117,3 +132,30 @@ export const recordPageView = ( url, title, service ) => ( {
 } );
 
 export const recordGooglePageView = ( url, title ) => recordPageView( url, title, 'ga' );
+
+const withClientId = actionCreator => ( ...args ) => ( dispatch, getState ) => {
+	const action = actionCreator( ...args );
+
+	if ( typeof action !== 'object' ) {
+		throw new Error(
+			'withClientId only works with action creators that return plain action object'
+		);
+	}
+
+	const clientId = getCurrentOAuth2ClientId( getState() );
+
+	if ( clientId ) {
+		set(
+			action,
+			action.type === ANALYTICS_EVENT_RECORD
+				? 'meta.analytics[0].payload.properties.client_id'
+				: 'meta.analytics[0].payload.client_id',
+			clientId
+		);
+	}
+
+	return dispatch( action );
+};
+
+export const recordTracksEventWithClientId = withClientId( recordTracksEvent );
+export const recordPageViewWithClientId = withClientId( recordPageView );

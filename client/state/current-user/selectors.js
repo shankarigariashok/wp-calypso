@@ -56,6 +56,13 @@ export const createCurrentUserSelector = ( path, otherwise = null ) => state => 
 export const getCurrentUserLocale = createCurrentUserSelector( 'localeSlug' );
 
 /**
+ * Returns the locale variant slug for the current user.
+ * @param  {Object}  state  Global state tree
+ * @return {?String}        Current user locale variant
+ */
+export const getCurrentUserLocaleVariant = createCurrentUserSelector( 'localeVariant' );
+
+/**
  * Returns the country code for the current user.
  *
  * @param  {Object}  state  Global state tree
@@ -76,6 +83,21 @@ export function getCurrentUserSiteCount( state ) {
 	}
 
 	return user.site_count || 0;
+}
+
+/**
+ * Returns the number of visible sites for the current user.
+ *
+ * @param  {Object}  state  Global state tree
+ * @return {?Number}        Current user visible site count
+ */
+export function getCurrentUserVisibleSiteCount( state ) {
+	const user = getCurrentUser( state );
+	if ( ! user ) {
+		return null;
+	}
+
+	return user.visible_site_count || 0;
 }
 
 /**

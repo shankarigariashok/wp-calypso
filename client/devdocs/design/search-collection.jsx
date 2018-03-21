@@ -7,10 +7,13 @@
 import React from 'react';
 
 /**
-* Internal dependencies
-*/
+ * Internal dependencies
+ */
+import DelayRender from 'devdocs/delay-render';
 import DocsExampleWrapper from 'devdocs/docs-example/wrapper';
 import { camelCaseToSlug, getComponentName } from 'devdocs/docs-example/util';
+import ReadmeViewer from 'devdocs/docs-example/readme-viewer';
+import Placeholder from 'devdocs/devdocs-async-load/placeholder';
 
 const shouldShowInstance = ( example, filter, component ) => {
 	const name = getComponentName( example );
@@ -30,7 +33,13 @@ const shouldShowInstance = ( example, filter, component ) => {
 	return ! filter || searchPattern.toLowerCase().indexOf( filter ) > -1;
 };
 
-const Collection = ( { children, filter, section = 'design', component } ) => {
+const Collection = ( {
+	children,
+	component,
+	examplesToMount = 20,
+	filter,
+	section = 'design',
+} ) => {
 	let showCounter = 0;
 	const summary = [];
 
@@ -40,7 +49,7 @@ const Collection = ( { children, filter, section = 'design', component } ) => {
 		}
 
 		const exampleName = getComponentName( example );
-		const exampleLink = `./${ section }/${ camelCaseToSlug( exampleName ) }`;
+		const exampleLink = `/devdocs/${ section }/${ camelCaseToSlug( exampleName ) }`;
 
 		showCounter++;
 
@@ -48,15 +57,19 @@ const Collection = ( { children, filter, section = 'design', component } ) => {
 			summary.push(
 				<span key={ `instance-link-${ showCounter }` } className="design__instance-link">
 					<a href={ exampleLink }>{ exampleName }</a>
-					,&nbsp;
 				</span>
 			);
 		}
 
 		return (
-			<DocsExampleWrapper name={ exampleName } unique={ !! component } url={ exampleLink }>
-				{ example }
-			</DocsExampleWrapper>
+			<div>
+				<DocsExampleWrapper name={ exampleName } unique={ !! component } url={ exampleLink }>
+					{ example }
+				</DocsExampleWrapper>
+				{ component && (
+					<ReadmeViewer section={ section } readmeFilePath={ example.props.readmeFilePath } />
+				) }
+			</div>
 		);
 	} );
 
@@ -65,11 +78,34 @@ const Collection = ( { children, filter, section = 'design', component } ) => {
 			{ showCounter > 1 &&
 				filter && (
 					<div className="design__instance-links">
-						<span>Showing </span>
-						{ summary }...
+						<span className="design__instance-links-label">Results:</span>
+						{ summary }
 					</div>
 				) }
-			{ examples }
+			{ /*
+				The entire list of examples for `/devdocs/blocks` and
+				`/devdocs/design` takes a long time to mount, so we use
+				`DelayRender` to render just the first few components.
+				This means the page change feels a lot faster, especially
+				on lower-end machines and on Firefox.
+			*/ }
+			{ examples.length <= examplesToMount ? (
+				examples
+			) : (
+				<React.Fragment>
+					{ examples.slice( 0, examplesToMount ) }
+
+					<DelayRender>
+						{ shouldRender =>
+							shouldRender ? (
+								examples.slice( examplesToMount )
+							) : (
+								<Placeholder count={ examplesToMount } />
+							)
+						}
+					</DelayRender>
+				</React.Fragment>
+			) }
 		</div>
 	);
 };

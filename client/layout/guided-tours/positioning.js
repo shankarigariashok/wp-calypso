@@ -9,7 +9,7 @@ import { startsWith } from 'lodash';
 /**
  * Internal dependencies
  */
-import viewport from 'lib/viewport';
+import { isMobile } from 'lib/viewport';
 import scrollTo from 'lib/scroll-to';
 
 const DIALOG_WIDTH = 410;
@@ -75,8 +75,7 @@ const dialogPositioners = {
 	} ),
 };
 
-export const query = selector =>
-	[].slice.call( global.window.document.querySelectorAll( selector ) );
+export const query = selector => [].slice.call( window.document.querySelectorAll( selector ) );
 
 export const posToCss = ( { x, y } ) => ( {
 	top: y ? y + 'px' : undefined,
@@ -105,7 +104,7 @@ export function getValidatedArrowPosition( { targetSlug, arrow, stepPos } ) {
 	const rect =
 		target && target.getBoundingClientRect
 			? target.getBoundingClientRect()
-			: global.window.document.body.getBoundingClientRect();
+			: window.document.body.getBoundingClientRect();
 
 	if (
 		stepPos.y >= rect.top &&
@@ -141,7 +140,7 @@ export function getStepPosition( {
 	const rect =
 		target && target.getBoundingClientRect
 			? target.getBoundingClientRect()
-			: global.window.document.body.getBoundingClientRect();
+			: window.document.body.getBoundingClientRect();
 	const position = dialogPositioners[ validatePlacement( placement, target ) ]( rect );
 
 	return {
@@ -151,7 +150,7 @@ export function getStepPosition( {
 }
 
 export function getScrollableSidebar() {
-	if ( viewport.isMobile() ) {
+	if ( isMobile() ) {
 		return query( '#secondary .sidebar' )[ 0 ];
 	}
 	return query( '#secondary .sidebar .sidebar__region' )[ 0 ];
@@ -160,20 +159,18 @@ export function getScrollableSidebar() {
 function validatePlacement( placement, target ) {
 	const targetSlug = target && target.dataset && target.dataset.tipTarget;
 
-	if ( targetSlug === 'sidebar' && viewport.isMobile() ) {
+	if ( targetSlug === 'sidebar' && isMobile() ) {
 		return 'middle';
 	}
 
-	return target && placement !== 'center' && viewport.isMobile() ? 'below' : placement;
+	return target && placement !== 'center' && isMobile() ? 'below' : placement;
 }
 
 function scrollIntoView( target, scrollContainer ) {
 	// TODO(lsinger): consider replacing with http://yiminghe.me/dom-scroll-into-view/
 	const container = scrollContainer || getScrollableSidebar();
 	const { top, bottom } = target.getBoundingClientRect();
-	const clientHeight = viewport.isMobile()
-		? document.documentElement.clientHeight
-		: container.clientHeight;
+	const clientHeight = isMobile() ? document.documentElement.clientHeight : container.clientHeight;
 
 	if ( bottom + DIALOG_PADDING + DIALOG_HEIGHT <= clientHeight ) {
 		return 0;

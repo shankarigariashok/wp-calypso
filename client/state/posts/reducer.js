@@ -3,7 +3,6 @@
 /**
  * External dependencies
  */
-
 import {
 	get,
 	set,
@@ -21,7 +20,7 @@ import {
  * Internal dependencies
  */
 import PostQueryManager from 'lib/query-manager/post';
-import { combineReducers, createReducer, isValidStateWithSchema } from 'state/utils';
+import { combineReducers, createReducer } from 'state/utils';
 import {
 	EDITOR_START,
 	EDITOR_STOP,
@@ -52,7 +51,7 @@ import {
 	mergeIgnoringArrays,
 	normalizePostForState,
 } from './utils';
-import { itemsSchema, queriesSchema } from './schema';
+import { itemsSchema, queriesSchema, allSitesQueriesSchema } from './schema';
 
 /**
  * Tracks all known post objects, indexed by post global ID.
@@ -149,8 +148,8 @@ export function queryRequests( state = {}, action ) {
 
 /**
  * Returns the updated post query state after an action has been dispatched.
- * The state reflects a mapping of serialized query key to an array of post
- * global IDs for the query, if a query response was successfully received.
+ * The state reflects a mapping by site ID of serialized query key to an array
+ * of post IDs for the query, if a query response was successfully received.
  *
  * @param  {Object} state  Current state
  * @param  {Object} action Action payload
@@ -158,6 +157,10 @@ export function queryRequests( state = {}, action ) {
  */
 export const queries = ( () => {
 	function applyToManager( state, siteId, method, createDefault, ...args ) {
+		if ( ! siteId ) {
+			return state;
+		}
+
 		if ( ! state[ siteId ] ) {
 			if ( ! createDefault ) {
 				return state;
@@ -183,6 +186,36 @@ export const queries = ( () => {
 	return createReducer(
 		{},
 		{
+			[ POSTS_REQUEST_SUCCESS ]: ( state, { siteId, query, posts, found } ) => {
+				if ( ! siteId ) {
+					// Handle site-specific queries only
+					return state;
+				}
+				const normalizedPosts = posts.map( normalizePostForState );
+				return applyToManager( state, siteId, 'receive', true, normalizedPosts, { query, found } );
+			},
+			[ POSTS_RECEIVE ]: ( state, { posts } ) => {
+				const postsBySiteId = reduce(
+					posts,
+					( memo, post ) => {
+						return Object.assign( memo, {
+							[ post.site_ID ]: [
+								...( memo[ post.site_ID ] || [] ),
+								normalizePostForState( post ),
+							],
+						} );
+					},
+					{}
+				);
+
+				return reduce(
+					postsBySiteId,
+					( memo, sitePosts, siteId ) => {
+						return applyToManager( memo, siteId, 'receive', true, sitePosts );
+					},
+					state
+				);
+			},
 			[ POST_RESTORE ]: ( state, { siteId, postId } ) => {
 				return applyToManager(
 					state,
@@ -207,32 +240,6 @@ export const queries = ( () => {
 						status: 'trash',
 					},
 					{ patch: true }
-				);
-			},
-			[ POSTS_REQUEST_SUCCESS ]: ( state, { siteId, query, posts, found } ) => {
-				const normalizedPosts = posts.map( normalizePostForState );
-				return applyToManager( state, siteId, 'receive', true, normalizedPosts, { query, found } );
-			},
-			[ POSTS_RECEIVE ]: ( state, { posts } ) => {
-				const postsBySiteId = reduce(
-					posts,
-					( memo, post ) => {
-						return Object.assign( memo, {
-							[ post.site_ID ]: [
-								...( memo[ post.site_ID ] || [] ),
-								normalizePostForState( post ),
-							],
-						} );
-					},
-					{}
-				);
-
-				return reduce(
-					postsBySiteId,
-					( memo, sitePosts, siteId ) => {
-						return applyToManager( memo, siteId, 'receive', true, sitePosts );
-					},
-					state
 				);
 			},
 			[ POST_SAVE ]: ( state, { siteId, postId, post } ) => {
@@ -281,15 +288,106 @@ export const queries = ( () => {
 				return mapValues( state, ( { data, options } ) => ( { data, options } ) );
 			},
 			[ DESERIALIZE ]: state => {
-				if ( ! isValidStateWithSchema( state, queriesSchema ) ) {
-					return {};
-				}
-
-				return mapValues( state, ( { data, options } ) => {
-					return new PostQueryManager( data, options );
-				} );
+				return mapValues( state, ( { data, options } ) => new PostQueryManager( data, options ) );
 			},
-		}
+		},
+		queriesSchema
+	);
+} )();
+
+/**
+ * Returns the updated post query state for queries of all sites at once after
+ * an action has been dispatched.  The state reflects a mapping of serialized
+ * query key to an array of post global IDs for the query, if a query response
+ * was successfully received.
+ *
+ * @param  {Object} state  Current state
+ * @param  {Object} action Action payload
+ * @return {Object}        Updated state
+ */
+export const allSitesQueries = ( () => {
+	function findItemKey( state, siteId, postId ) {
+		return (
+			findKey( state.data.items, post => {
+				return post.site_ID === siteId && post.ID === postId;
+			} ) || null
+		);
+	}
+
+	return createReducer(
+		new PostQueryManager( {}, { itemKey: 'global_ID' } ),
+		{
+			[ POSTS_REQUEST_SUCCESS ]: ( state, { siteId, query, posts, found } ) => {
+				if ( siteId ) {
+					// Handle all-sites queries only.
+					return state;
+				}
+				return state.receive( posts.map( normalizePostForState ), { query, found } );
+			},
+			[ POSTS_RECEIVE ]: ( state, { posts } ) => {
+				return state.receive( posts );
+			},
+			[ POST_RESTORE ]: ( state, { siteId, postId } ) => {
+				const globalId = findItemKey( state, siteId, postId );
+				return state.receive(
+					{
+						global_ID: globalId,
+						status: '__RESTORE_PENDING',
+					},
+					{ patch: true }
+				);
+			},
+			[ POST_RESTORE_FAILURE ]: ( state, { siteId, postId } ) => {
+				const globalId = findItemKey( state, siteId, postId );
+				return state.receive(
+					{
+						global_ID: globalId,
+						status: 'trash',
+					},
+					{ patch: true }
+				);
+			},
+			[ POST_SAVE ]: ( state, { siteId, postId, post } ) => {
+				const globalId = findItemKey( state, siteId, postId );
+				return state.receive(
+					{
+						global_ID: globalId,
+						...post,
+					},
+					{ patch: true }
+				);
+			},
+			[ POST_DELETE ]: ( state, { siteId, postId } ) => {
+				const globalId = findItemKey( state, siteId, postId );
+				return state.receive(
+					{
+						global_ID: globalId,
+						status: '__DELETE_PENDING',
+					},
+					{ patch: true }
+				);
+			},
+			[ POST_DELETE_FAILURE ]: ( state, { siteId, postId } ) => {
+				const globalId = findItemKey( state, siteId, postId );
+				return state.receive(
+					{
+						global_ID: globalId,
+						status: 'trash',
+					},
+					{ patch: true }
+				);
+			},
+			[ POST_DELETE_SUCCESS ]: ( state, { siteId, postId } ) => {
+				const globalId = findItemKey( state, siteId, postId );
+				return state.removeItem( globalId );
+			},
+			[ SERIALIZE ]: state => ( {
+				data: state.data,
+				options: state.options,
+			} ),
+			[ DESERIALIZE ]: state => new PostQueryManager( state.data, state.options ),
+		},
+		allSitesQueriesSchema
 	);
 } )();
 
@@ -378,6 +476,7 @@ export default combineReducers( {
 	siteRequests,
 	queryRequests,
 	queries,
+	allSitesQueries,
 	edits,
 	likes,
 	revisions,

@@ -12,11 +12,12 @@ import { get, isEqual } from 'lodash';
 /**
  * Internal dependencies
  */
-import { isEnabled } from 'config';
+import CommentLink from 'my-sites/comments/comment/comment-link';
+import CommentPostLink from 'my-sites/comments/comment/comment-post-link';
 import Emojify from 'components/emojify';
 import ExternalLink from 'components/external-link';
 import Gravatar from 'components/gravatar';
-import CommentPostLink from 'my-sites/comments/comment/comment-post-link';
+import Tooltip from 'components/tooltip';
 import { decodeEntities } from 'lib/formatting';
 import { urlToDomainAndPath } from 'lib/url';
 import { getSiteComment } from 'state/selectors';
@@ -29,18 +30,18 @@ export class CommentAuthor extends Component {
 		isPostView: PropTypes.bool,
 	};
 
-	shouldComponentUpdate = nextProps => ! isEqual( this.props, nextProps );
-
-	commentHasLink = () => {
-		if ( typeof DOMParser !== 'undefined' && DOMParser.prototype.parseFromString ) {
-			const parser = new DOMParser();
-			const commentDom = parser.parseFromString( this.props.commentContent, 'text/html' );
-
-			return !! commentDom.getElementsByTagName( 'a' ).length;
-		}
-
-		return false;
+	state = {
+		isLinkTooltipVisible: false,
 	};
+
+	shouldComponentUpdate = ( nextProps, nextState ) =>
+		! isEqual( this.props, nextProps ) || ! isEqual( this.state, nextState );
+
+	storeLinkIndicatorRef = icon => ( this.hasLinkIndicator = icon );
+
+	hideLinkTooltip = () => this.setState( { isLinkTooltipVisible: false } );
+
+	showLinkTooltip = () => this.setState( { isLinkTooltipVisible: true } );
 
 	render() {
 		const {
@@ -52,11 +53,13 @@ export class CommentAuthor extends Component {
 			commentType,
 			commentUrl,
 			gravatarUser,
+			hasLink,
 			isBulkMode,
 			isPostView,
 			moment,
 			translate,
 		} = this.props;
+		const { isLinkTooltipVisible } = this.state;
 
 		const formattedDate = moment( commentDate ).format( 'll LT' );
 
@@ -78,8 +81,21 @@ export class CommentAuthor extends Component {
 
 				<div className="comment__author-info">
 					<div className="comment__author-info-element">
-						{ this.commentHasLink() && (
-							<Gridicon icon="link" size={ 18 } className="comment__author-has-link" />
+						{ hasLink && (
+							<span
+								onMouseEnter={ this.showLinkTooltip }
+								onMouseLeave={ this.hideLinkTooltip }
+								ref={ this.storeLinkIndicatorRef }
+							>
+								<Gridicon icon="link" className="comment__author-has-link" size={ 18 } />
+								<Tooltip
+									context={ this.hasLinkIndicator }
+									isVisible={ isLinkTooltipVisible }
+									showOnMobile
+								>
+									{ translate( 'This comment contains links.' ) }
+								</Tooltip>
+							</span>
 						) }
 						<strong className="comment__author-name">
 							<Emojify>{ authorDisplayName || translate( 'Anonymous' ) }</Emojify>
@@ -89,19 +105,14 @@ export class CommentAuthor extends Component {
 
 					<div className="comment__author-info-element">
 						<span className="comment__date">
-							{ isEnabled( 'comments/management/comment-view' ) ? (
-								<a href={ commentUrl } tabIndex={ isBulkMode ? -1 : 0 } title={ formattedDate }>
-									{ relativeDate }
-								</a>
-							) : (
-								<ExternalLink
-									href={ commentUrl }
-									tabIndex={ isBulkMode ? -1 : 0 }
-									title={ formattedDate }
-								>
-									{ relativeDate }
-								</ExternalLink>
-							) }
+							<CommentLink
+								commentId={ commentId }
+								href={ commentUrl }
+								tabIndex={ isBulkMode ? -1 : 0 }
+								title={ formattedDate }
+							>
+								{ relativeDate }
+							</CommentLink>
 						</span>
 						{ authorUrl && (
 							<span className="comment__author-url">
@@ -133,10 +144,9 @@ const mapStateToProps = ( state, { commentId } ) => {
 		commentContent: get( comment, 'content' ),
 		commentDate: get( comment, 'date' ),
 		commentType: get( comment, 'type', 'comment' ),
-		commentUrl: isEnabled( 'comments/management/comment-view' )
-			? `/comment/${ siteSlug }/${ commentId }`
-			: get( comment, 'URL' ),
+		commentUrl: `/comment/${ siteSlug }/${ commentId }`,
 		gravatarUser,
+		hasLink: get( comment, 'has_link', false ),
 	};
 };
 

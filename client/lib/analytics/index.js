@@ -6,7 +6,7 @@
 
 import cookie from 'cookie';
 import debug from 'debug';
-import qs from 'qs';
+import { parse } from 'qs';
 import url from 'url';
 import { assign, isObjectLike, isUndefined, omit, pickBy, startsWith, times } from 'lodash';
 
@@ -105,12 +105,7 @@ loadScript( '//stats.wp.com/w.js?56', function( error ) {
 } ); // W_JS_VER
 
 // Google Analytics
-
-// Load GA only if enabled in the config.
 // Note that doNotTrack() and isPiiUrl() can change at any time so they shouldn't be stored in a variable.
-if ( config( 'google_analytics_enabled' ) ) {
-	loadScript( '//www.google-analytics.com/analytics.js' );
-}
 
 /**
  * Returns whether Google Analytics is allowed.
@@ -323,7 +318,7 @@ const analytics = {
 			// so we can analyze their performance with our analytics tools
 			if ( window.location ) {
 				const parsedUrl = url.parse( window.location.href );
-				const urlParams = qs.parse( parsedUrl.query );
+				const urlParams = parse( parsedUrl.query );
 				const utmParams = pickBy( urlParams, function( value, key ) {
 					return startsWith( key, 'utm_' );
 				} );
@@ -355,6 +350,10 @@ const analytics = {
 
 		setAnonymousUserId: function( anonId ) {
 			window._tkq.push( [ 'identifyAnonUser', anonId ] );
+		},
+
+		setOptOut: function( isOptingOut ) {
+			window._tkq.push( [ 'setOptOut', isOptingOut ] );
 		},
 	},
 
@@ -412,13 +411,10 @@ const analytics = {
 			}
 		},
 
-		recordPageView: function( urlPath, pageTitle ) {
-			if ( ! isGoogleAnalyticsAllowed() ) {
-				return;
-			}
-
-			analytics.ga.initialize();
-
+		recordPageView: makeGoogleAnalyticsTrackingFunction( function recordPageView(
+			urlPath,
+			pageTitle
+		) {
 			gaDebug( 'Recording Page View ~ [URL: ' + urlPath + '] [Title: ' + pageTitle + ']' );
 
 			// Set the current page so all GA events are attached to it.
@@ -429,15 +425,14 @@ const analytics = {
 				page: urlPath,
 				title: pageTitle,
 			} );
-		},
+		} ),
 
-		recordEvent: function( category, action, label, value ) {
-			if ( ! isGoogleAnalyticsAllowed() ) {
-				return;
-			}
-
-			analytics.ga.initialize();
-
+		recordEvent: makeGoogleAnalyticsTrackingFunction( function recordEvent(
+			category,
+			action,
+			label,
+			value
+		) {
 			let debugText = 'Recording Event ~ [Category: ' + category + '] [Action: ' + action + ']';
 
 			if ( 'undefined' !== typeof label ) {
@@ -451,19 +446,18 @@ const analytics = {
 			gaDebug( debugText );
 
 			window.ga( 'send', 'event', category, action, label, value );
-		},
+		} ),
 
-		recordTiming: function( urlPath, eventType, duration, triggerName ) {
-			if ( ! isGoogleAnalyticsAllowed() ) {
-				return;
-			}
-
-			analytics.ga.initialize();
-
+		recordTiming: makeGoogleAnalyticsTrackingFunction( function recordTiming(
+			urlPath,
+			eventType,
+			duration,
+			triggerName
+		) {
 			gaDebug( 'Recording Timing ~ [URL: ' + urlPath + '] [Duration: ' + duration + ']' );
 
 			window.ga( 'send', 'timing', urlPath, eventType, duration, triggerName );
-		},
+		} ),
 	},
 
 	// HotJar tracking
@@ -512,5 +506,35 @@ const analytics = {
 		window._tkq.push( [ 'clearIdentity' ] );
 	},
 };
+
+/**
+ * Wrap Google Analytics with debugging, possible analytics supression, and initialization
+ *
+ * This method will display debug output if Google Analytics is suppresed, otherwise it will
+ * initialize and call the Google Analytics function it is passed.
+ *
+ * @see isGoogleAnalyticsAllowed
+ *
+ * @param  {Function} func Google Analytics tracking function
+ * @return {Function}      Wrapped function
+ */
+export function makeGoogleAnalyticsTrackingFunction( func ) {
+	return function( ...args ) {
+		if ( ! isGoogleAnalyticsAllowed() ) {
+			gaDebug( '[Disallowed] analytics %s( %o )', func.name, args );
+			return;
+		}
+
+		analytics.ga.initialize();
+
+		func( ...args );
+	};
+}
+
 emitter( analytics );
+
 export default analytics;
+export const ga = analytics.ga;
+export const mc = analytics.mc;
+export const pageView = analytics.pageView;
+export const tracks = analytics.tracks;

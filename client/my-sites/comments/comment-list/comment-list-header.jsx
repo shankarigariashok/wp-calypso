@@ -12,16 +12,22 @@ import { get } from 'lodash';
  */
 import HeaderCake from 'components/header-cake';
 import QueryPosts from 'components/data/query-posts';
+import StickyPanel from 'components/sticky-panel';
 import { convertDateToUserLocation } from 'components/post-schedule/utils';
 import { decodeEntities, stripHTML } from 'lib/formatting';
 import { gmtOffset, timezone } from 'lib/site/utils';
 import { bumpStat, composeAnalytics, recordTracksEvent } from 'state/analytics/actions';
-import { getSiteComments } from 'state/selectors';
+import { getSiteComments, hasNavigated } from 'state/selectors';
 import { getSitePost } from 'state/posts/selectors';
 import { isJetpackSite } from 'state/sites/selectors';
 import { getSelectedSite, getSelectedSiteId, getSelectedSiteSlug } from 'state/ui/selectors';
 
+function goBack() {
+	window.history.back();
+}
+
 export const CommentListHeader = ( {
+	commentId,
 	postDate,
 	postId,
 	postTitle,
@@ -30,6 +36,7 @@ export const CommentListHeader = ( {
 	site,
 	siteId,
 	siteSlug,
+	navigated,
 	translate,
 } ) => {
 	const formattedDate = postDate
@@ -38,8 +45,11 @@ export const CommentListHeader = ( {
 
 	const title = postTitle.trim() || translate( 'Untitled' );
 
+	const shouldUseHistoryBack = window.history.length > 1 && navigated;
+	const backHref = ! shouldUseHistoryBack ? `/comments/all/${ siteSlug }` : null;
+
 	return (
-		<div className="comment-list__header">
+		<StickyPanel className="comment-list__header">
 			<QueryPosts siteId={ siteId } postId={ postId } />
 
 			<HeaderCake
@@ -47,17 +57,24 @@ export const CommentListHeader = ( {
 				actionIcon="visible"
 				actionOnClick={ recordReaderArticleOpened }
 				actionText={ translate( 'View Post' ) }
-				backHref={ `/comments/all/${ siteSlug }` }
+				onClick={ shouldUseHistoryBack ? goBack : undefined }
+				backHref={ backHref }
+				alwaysShowActionText
 			>
 				<div className="comment-list__header-title">
-					{ translate( 'Comments on {{span}}%(postTitle)s{{/span}}', {
-						args: { postTitle: title },
-						components: { span: <span className="comment-list__header-post-title" /> },
-					} ) }
+					{ translate(
+						'Comment on {{span}}%(postTitle)s{{/span}}',
+						'Comments on {{span}}%(postTitle)s{{/span}}',
+						{
+							count: commentId ? 1 : 2,
+							args: { postTitle: title },
+							components: { span: <span className="comment-list__header-post-title" /> },
+						}
+					) }
 				</div>
 				<div className="comment-list__header-date">{ formattedDate }</div>
 			</HeaderCake>
-		</div>
+		</StickyPanel>
 	);
 };
 
@@ -75,6 +92,7 @@ const mapStateToProps = ( state, { postId } ) => {
 		)
 	);
 	const isJetpack = isJetpackSite( state, siteId );
+	const navigated = hasNavigated( state );
 
 	return {
 		postDate,
@@ -83,6 +101,7 @@ const mapStateToProps = ( state, { postId } ) => {
 		site,
 		siteId,
 		siteSlug,
+		navigated,
 	};
 };
 

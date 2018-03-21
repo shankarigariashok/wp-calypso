@@ -5,10 +5,12 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import page from 'page';
+import classnames from 'classnames';
 import { bindActionCreators } from 'redux';
 import { connect } from 'react-redux';
 import { slugToCamelCase } from 'devdocs/docs-example/util';
 import { trim } from 'lodash';
+import Gridicons from 'gridicons/example';
 
 /**
  * Internal dependencies
@@ -23,7 +25,9 @@ import SearchCard from 'components/search-card';
 /**
  * Docs examples
  */
+import ActionCard from 'components/action-card/docs/example';
 import Accordions from 'components/accordion/docs/example';
+import BackButton from 'components/back-button/docs/example';
 import Banner from 'components/banner/docs/example';
 import BulkSelect from 'components/bulk-select/docs/example';
 import ButtonGroups from 'components/button-group/docs/example';
@@ -45,13 +49,13 @@ import ExternalLink from 'components/external-link/docs/example';
 import FAQ from 'components/faq/docs/example';
 import FeatureGate from 'components/feature-example/docs/example';
 import FilePickers from 'components/file-picker/docs/example';
+import FocusableExample from 'components/focusable/docs/example';
 import FoldableCard from 'components/foldable-card/docs/example';
 import FormattedHeader from 'components/formatted-header/docs/example';
 import FormFields from 'components/forms/docs/example';
 import Gauge from 'components/gauge/docs/example';
 import GlobalNotices from 'components/global-notices/docs/example';
 import Gravatar from 'components/gravatar/docs/example';
-import Gridicons from 'gridicons/build/example';
 import HeaderButton from 'components/header-button/docs/example';
 import Headers from 'components/header-cake/docs/example';
 import ImagePreloader from 'components/image-preloader/docs/example';
@@ -75,11 +79,16 @@ import SectionHeader from 'components/section-header/docs/example';
 import SectionNav from 'components/section-nav/docs/example';
 import SegmentedControl from 'components/segmented-control/docs/example';
 import SelectDropdown from 'components/select-dropdown/docs/example';
+import ShareButton from 'components/share-button/docs/example';
+import SiteTitleControl from 'components/site-title/docs/example';
 import SocialLogos from 'social-logos/example';
 import Spinner from 'components/spinner/docs/example';
 import SpinnerButton from 'components/spinner-button/docs/example';
 import SpinnerLine from 'components/spinner-line/docs/example';
+import SplitButton from 'components/split-button/docs/example';
 import Suggestions from 'components/suggestions/docs/example';
+import TextDiff from 'components/text-diff/docs/example';
+import TileGrid from 'components/tile-grid/docs/example';
 import TimeSince from 'components/time-since/docs/example';
 import Timezone from 'components/timezone/docs/example';
 import TokenFields from 'components/token-field/docs/example';
@@ -111,8 +120,13 @@ class DesignAssets extends React.Component {
 		const { componentsUsageStats = {}, component } = this.props;
 		const { filter } = this.state;
 
+		const className = classnames( 'devdocs', 'devdocs__components', {
+			'is-single': this.props.component,
+			'is-list': ! this.props.component,
+		} );
+
 		return (
-			<Main className="design">
+			<Main className={ className }>
 				<DocumentHead title="UI Components" />
 
 				{ component ? (
@@ -125,72 +139,84 @@ class DesignAssets extends React.Component {
 						initialValue={ filter }
 						placeholder="Search components…"
 						analyticsGroup="Docs"
+						className="design__ui-components-search"
 					/>
 				) }
 
 				<Collection component={ component } filter={ filter }>
-					<Accordions componentUsageStats={ componentsUsageStats.accordion } />
-					<Banner />
-					<BulkSelect />
-					<ButtonGroups />
-					<Buttons componentUsageStats={ componentsUsageStats.button } />
-					<Cards />
+					<ActionCard readmeFilePath="action-card" />
+					<Accordions
+						componentUsageStats={ componentsUsageStats.accordion }
+						readmeFilePath="accordion"
+					/>
+					<BackButton readmeFilePath="back-button" />
+					<Banner readmeFilePath="banner" />
+					<BulkSelect readmeFilePath="bulk-select" />
+					<ButtonGroups readmeFilePath="button-group" />
+					<Buttons componentUsageStats={ componentsUsageStats.button } readmeFilePath="button" />
+					<SplitButton readmeFilePath="split-button" />
+					<Cards readmeFilePath="card" />
 					<Checklist />
-					<ClipboardButtonInput />
-					<ClipboardButtons />
-					<Count />
-					<CountedTextareas />
-					<DatePicker />
-					<DropZones searchKeywords="drag" />
-					<EllipsisMenu />
+					<ClipboardButtonInput readmeFilePath="clipboard-button-input" />
+					<ClipboardButtons readmeFilePath="forms/clipboard-button" />
+					<Count readmeFilePath="count" />
+					<CountedTextareas readmeFilePath="forms/counted-textarea" />
+					<DatePicker readmeFilePath="date-picker" />
+					<DropZones searchKeywords="drag" readmeFilePath="drop-zone" />
+					<EllipsisMenu readmeFilePath="ellipsis-menu" />
 					<EmbedDialog />
-					<EmojifyExample />
-					<EmptyContent />
-					<ExternalLink />
-					<FAQ />
-					<FeatureGate />
-					<FilePickers />
-					<FoldableCard />
-					<FormattedHeader />
-					<FormFields searchKeywords="input textbox textarea radio" />
-					<Gauge />
+					<EmojifyExample readmeFilePath="emojify" />
+					<EmptyContent readmeFilePath="empty-content" />
+					<ExternalLink readmeFilePath="external-link" />
+					<FAQ readmeFilePath="faq" />
+					<FeatureGate readmeFilePath="feature-example" />
+					<FilePickers readmeFilePath="file-picker" />
+					<FocusableExample readmeFilePath="focusable" />
+					<FoldableCard readmeFilePath="foldable-card" />
+					<FormattedHeader readmeFilePath="formatted-header" />
+					<FormFields searchKeywords="input textbox textarea radio" readmeFilePath="forms" />
+					<Gauge readmeFilePath="gauge" />
 					<GlobalNotices />
-					<Gravatar />
+					<Gravatar readmeFilePath="gravatar" />
 					<Gridicons />
 					<HeaderButton />
-					<Headers />
-					<ImagePreloader />
-					<InfoPopover />
-					<InputChrono />
+					<Headers readmeFilePath="header-cake" />
+					<ImagePreloader readmeFilePath="image-preloader" />
+					<InfoPopover readmeFilePath="info-popover" />
+					<Tooltip readmeFilePath="tooltip" />
+					<InputChrono readmeFilePath="input-chrono" />
 					<JetpackColophonExample />
 					<JetpackLogoExample />
-					<LanguagePicker />
+					<LanguagePicker readmeFilePath="language-picker" />
 					<ListEnd />
 					<Notices />
-					<PaginationExample />
-					<PaymentLogo />
-					<Popovers />
-					<ProgressBar />
-					<Ranges />
-					<Rating />
+					<PaginationExample readmeFilePath="pagination" />
+					<PaymentLogo readmeFilePath="payment-logo" />
+					<Popovers readmeFilePath="popover" />
+					<ProgressBar readmeFilePath="progress-bar" />
+					<Ranges readmeFilePath="forms/range" />
+					<Rating readmeFilePath="rating" />
 					<Ribbon />
 					<ScreenReaderTextExample />
-					<SearchDemo />
-					<SectionHeader />
-					<SectionNav />
-					<SegmentedControl />
-					<SelectDropdown searchKeywords="menu" />
+					<SearchDemo readmeFilePath="search" />
+					<SectionHeader readmeFilePath="section-header" />
+					<SectionNav readmeFilePath="section-nav" />
+					<SegmentedControl readmeFilePath="segmented-control" />
+					<SelectDropdown searchKeywords="menu" readmeFilePath="select-dropdown" />
+					<ShareButton />
+					<SiteTitleControl readmeFilePath="site-title" />
 					<SocialLogos />
-					<Spinner searchKeywords="loading" />
-					<SpinnerButton searchKeywords="loading input submit" />
-					<SpinnerLine searchKeywords="loading" />
+					<Spinner searchKeywords="loading" readmeFilePath="spinner" />
+					<SpinnerButton searchKeywords="loading input submit" readmeFilePath="spinner-button" />
+					<SpinnerLine searchKeywords="loading" readmeFilePath="spinner-line" />
 					<Suggestions />
+					<TextDiff />
+					<TileGrid />
 					<TimeSince />
-					<Timezone />
-					<TokenFields />
-					<Tooltip />
-					<Version />
-					<VerticalMenu />
+					<Timezone readmeFilePath="timezone" />
+					<TokenFields readmeFilePath="token-field" />
+					<VerticalMenu readmeFilePath="vertical-menu" />
+					<Version readmeFilePath="version" />
 					<Wizard />
 				</Collection>
 			</Main>

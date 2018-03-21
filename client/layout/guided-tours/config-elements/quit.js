@@ -15,6 +15,8 @@ import Button from 'components/button';
 import contextTypes from '../context-types';
 
 export default class Quit extends Component {
+	static displayName = 'Quit';
+
 	static propTypes = {
 		primary: PropTypes.bool,
 		subtle: PropTypes.bool,
@@ -33,8 +35,8 @@ export default class Quit extends Component {
 	};
 
 	render() {
-		const { children, primary, subtle } = this.props;
-		const classes = subtle ? 'guided-tours__subtle-button' : '';
+		const { children, primary } = this.props;
+		const classes = primary ? 'guided-tours__primary-button' : 'guided-tours__quit-button';
 		return (
 			<Button className={ classes } onClick={ this.onClick } primary={ primary }>
 				{ children || translate( 'Quit' ) }

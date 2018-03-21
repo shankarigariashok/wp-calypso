@@ -20,10 +20,13 @@ import FormLabel from 'components/forms/form-label';
 import FormInputValidation from 'components/forms/form-input-validation';
 import Card from 'components/card';
 import { localize } from 'i18n-calypso';
-import { loginUserWithTwoFactorVerificationCode } from 'state/login/actions';
 import { getTwoFactorAuthRequestError } from 'state/login/selectors';
-import { recordTracksEvent } from 'state/analytics/actions';
-import { sendSmsCode, formUpdate } from 'state/login/actions';
+import { recordTracksEventWithClientId as recordTracksEvent } from 'state/analytics/actions';
+import {
+	formUpdate,
+	loginUserWithTwoFactorVerificationCode,
+	sendSmsCode,
+} from 'state/login/actions';
 import TwoFactorActions from './two-factor-actions';
 
 class VerificationCodeForm extends Component {
@@ -44,8 +47,8 @@ class VerificationCodeForm extends Component {
 	};
 
 	componentDidMount() {
+		// eslint-disable-next-line react/no-did-mount-set-state
 		this.setState( { isDisabled: false }, () => {
-			// eslint-disable-line react/no-did-mount-set-state
 			this.input.focus();
 		} );
 	}
@@ -73,9 +76,7 @@ class VerificationCodeForm extends Component {
 
 		this.props.formUpdate();
 
-		this.setState( {
-			[ name ]: value.trim(),
-		} );
+		this.setState( { [ name ]: value } );
 	};
 
 	onSubmitForm = event => {
@@ -153,7 +154,7 @@ class VerificationCodeForm extends Component {
 								'is-error': requestError && requestError.field === 'twoStepCode',
 							} ) }
 							name="twoStepCode"
-							pattern="[0-9]*"
+							pattern="[0-9 ]*"
 							ref={ this.saveRef }
 							disabled={ this.state.isDisabled }
 							type="tel"

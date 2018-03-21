@@ -14,6 +14,7 @@ import { get, includes, isEqual, isUndefined, noop } from 'lodash';
  * Internal dependencies
  */
 import Button from 'components/button';
+import scrollTo from 'lib/scroll-to';
 import { getMinimumComment } from 'my-sites/comments/comment/utils';
 import {
 	bumpStat,
@@ -42,6 +43,10 @@ export class CommentActions extends Component {
 		siteId: PropTypes.number,
 		postId: PropTypes.number,
 		commentId: PropTypes.number,
+		canModerateComment: PropTypes.bool,
+		commentsListQuery: PropTypes.object,
+		getCommentOffsetTop: PropTypes.func,
+		redirect: PropTypes.func,
 		toggleEditMode: PropTypes.func,
 		toggleReply: PropTypes.func,
 		updateLastUndo: PropTypes.func,
@@ -137,6 +142,11 @@ export class CommentActions extends Component {
 
 	toggleApproved = () => this.setStatus( this.props.commentIsApproved ? 'unapproved' : 'approved' );
 
+	toggleEditMode = () => {
+		this.props.toggleEditMode();
+		scrollTo( { x: 0, y: this.props.getCommentOffsetTop() } );
+	};
+
 	toggleLike = () => {
 		const { commentIsLiked, commentStatus, like, unlike } = this.props;
 
@@ -155,9 +165,9 @@ export class CommentActions extends Component {
 
 	render() {
 		const {
+			canModerateComment,
 			commentIsApproved,
 			commentIsLiked,
-			toggleEditMode,
 			toggleReply,
 			translate,
 		} = this.props;
@@ -172,6 +182,7 @@ export class CommentActions extends Component {
 						} ) }
 						onClick={ this.toggleApproved }
 						tabIndex="0"
+						disabled={ ! canModerateComment }
 					>
 						<Gridicon icon={ commentIsApproved ? 'checkmark-circle' : 'checkmark' } />
 						<span>{ commentIsApproved ? translate( 'Approved' ) : translate( 'Approve' ) }</span>
@@ -184,6 +195,7 @@ export class CommentActions extends Component {
 						className="comment__action comment__action-spam"
 						onClick={ this.setSpam }
 						tabIndex="0"
+						disabled={ ! canModerateComment }
 					>
 						<Gridicon icon="spam" />
 						<span>{ translate( 'Spam' ) }</span>
@@ -196,6 +208,7 @@ export class CommentActions extends Component {
 						className="comment__action comment__action-trash"
 						onClick={ this.setTrash }
 						tabIndex="0"
+						disabled={ ! canModerateComment }
 					>
 						<Gridicon icon="trash" />
 						<span>{ translate( 'Trash' ) }</span>
@@ -208,6 +221,7 @@ export class CommentActions extends Component {
 						className="comment__action comment__action-delete"
 						onClick={ this.delete }
 						tabIndex="0"
+						disabled={ ! canModerateComment }
 					>
 						<Gridicon icon="trash" />
 						<span>{ translate( 'Delete Permanently' ) }</span>
@@ -222,6 +236,7 @@ export class CommentActions extends Component {
 						} ) }
 						onClick={ this.toggleLike }
 						tabIndex="0"
+						disabled={ ! canModerateComment && ! commentIsApproved }
 					>
 						<Gridicon icon={ commentIsLiked ? 'star' : 'star-outline' } />
 						<span>{ commentIsLiked ? translate( 'Liked' ) : translate( 'Like' ) }</span>
@@ -232,8 +247,9 @@ export class CommentActions extends Component {
 					<Button
 						borderless
 						className="comment__action comment__action-pencil"
-						onClick={ toggleEditMode }
+						onClick={ this.toggleEditMode }
 						tabIndex="0"
+						disabled={ ! canModerateComment }
 					>
 						<Gridicon icon="pencil" />
 						<span>{ translate( 'Edit' ) }</span>
@@ -246,6 +262,7 @@ export class CommentActions extends Component {
 						className="comment__action comment__action-reply"
 						onClick={ toggleReply }
 						tabIndex="0"
+						disabled={ ! canModerateComment && ! commentIsApproved }
 					>
 						<Gridicon icon="reply" />
 						<span>{ translate( 'Reply' ) }</span>
@@ -261,6 +278,7 @@ const mapStateToProps = ( state, { siteId, commentId } ) => {
 	const commentStatus = get( comment, 'status' );
 
 	return {
+		canModerateComment: get( comment, 'can_moderate', false ),
 		commentIsApproved: 'approved' === commentStatus,
 		commentIsLiked: get( comment, 'i_like' ),
 		commentStatus,
@@ -268,7 +286,7 @@ const mapStateToProps = ( state, { siteId, commentId } ) => {
 	};
 };
 
-const mapDispatchToProps = ( dispatch, { siteId, postId, commentId } ) => ( {
+const mapDispatchToProps = ( dispatch, { siteId, postId, commentId, commentsListQuery } ) => ( {
 	changeStatus: ( status, analytics = { alsoUnlike: false, isUndo: false } ) =>
 		dispatch(
 			withAnalytics(
@@ -281,7 +299,7 @@ const mapDispatchToProps = ( dispatch, { siteId, postId, commentId } ) => ( {
 					} ),
 					bumpStat( 'calypso_comment_management', 'comment_status_changed_to_' + status )
 				),
-				changeCommentStatus( siteId, postId, commentId, status )
+				changeCommentStatus( siteId, postId, commentId, status, commentsListQuery )
 			)
 		),
 	deletePermanently: () =>
@@ -291,7 +309,7 @@ const mapDispatchToProps = ( dispatch, { siteId, postId, commentId } ) => ( {
 					recordTracksEvent( 'calypso_comment_management_delete' ),
 					bumpStat( 'calypso_comment_management', 'comment_deleted' )
 				),
-				deleteComment( siteId, postId, commentId, { showSuccessNotice: true } )
+				deleteComment( siteId, postId, commentId, { showSuccessNotice: true }, commentsListQuery )
 			)
 		),
 	like: ( analytics = { alsoApprove: false } ) =>

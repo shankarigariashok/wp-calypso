@@ -10,6 +10,7 @@ import { localize } from 'i18n-calypso';
 /**
  * Internal dependencies
  */
+import config from 'config';
 import DomainSuggestion from 'components/domains/domain-suggestion';
 
 class DomainTransferSuggestion extends React.Component {
@@ -23,12 +24,22 @@ class DomainTransferSuggestion extends React.Component {
 			context: 'Domain transfer or mapping suggestion button',
 		} );
 
+		const props = config.isEnabled( 'domains/kracken-ui' )
+			? {
+					buttonProps: { borderless: true },
+					extraClasses: 'is-visible domain-transfer-suggestion is-kracken-ui',
+					showChevron: true,
+				}
+			: {};
+
 		return (
 			<DomainSuggestion
 				extraClasses="is-visible domain-transfer-suggestion"
 				buttonContent={ buttonContent }
 				onButtonClick={ this.props.onButtonClick }
+				tracksButtonClickSource={ this.props.tracksButtonClickSource }
 				hidePrice={ true }
+				{ ...props }
 			>
 				<div className="domain-transfer-suggestion__domain-description">
 					<h3>
@@ -38,7 +49,7 @@ class DomainTransferSuggestion extends React.Component {
 						} ) }
 					</h3>
 					<p>
-						{ translate( "Transfer or map it to use it as your site's address.", {
+						{ translate( "You can use it as your site's address.", {
 							context: 'Upgrades: Register domain description',
 							comment: 'Explains how you could use an existing domain name with your site.',
 						} ) }

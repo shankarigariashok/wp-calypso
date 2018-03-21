@@ -1,12 +1,15 @@
 /** @format */
-
 /**
  * External dependencies
  */
-
 import { identity } from 'lodash';
 
-var fieldMasks = {};
+/**
+ * Internal dependencies
+ */
+import { getCreditCardType } from 'lib/credit-card-details';
+
+const fieldMasks = {};
 
 fieldMasks[ 'expiration-date' ] = {
 	mask: function( previousValue, nextValue ) {
@@ -30,27 +33,38 @@ fieldMasks[ 'expiration-date' ] = {
 
 		if ( nextValue.length <= 2 ) {
 			return nextValue;
-		} else {
-			return nextValue.substring( 0, 2 ) + '/' + nextValue.substring( 2, 4 );
 		}
+
+		return nextValue.substring( 0, 2 ) + '/' + nextValue.substring( 2, 4 );
 	},
 
 	unmask: identity,
 };
 
+export const formatAmexCreditCard = function( cardNumber ) {
+	const digits = cardNumber.replace( /[^0-9]/g, '' ).slice( 0, 15 );
+	const formattedNumber = `${ digits.slice( 0, 4 ) } ${ digits.slice( 4, 10 ) } ${ digits.slice(
+		10,
+		15
+	) }`;
+	return formattedNumber.trim();
+};
+
+export const formatCreditCard = function( cardNumber ) {
+	if ( getCreditCardType( cardNumber ) === 'amex' ) {
+		return formatAmexCreditCard( cardNumber );
+	}
+	const digits = cardNumber.replace( /[^0-9]/g, '' ).slice( 0, 19 );
+	const formattedNumber = `${ digits.slice( 0, 4 ) } ${ digits.slice( 4, 8 ) } ${ digits.slice(
+		8,
+		12
+	) } ${ digits.slice( 12 ) }`;
+	return formattedNumber.trim();
+};
+
 fieldMasks.number = {
 	mask: function( previousValue, nextValue ) {
-		var digits = nextValue.replace( /[^0-9]/g, '' ),
-			string =
-				digits.slice( 0, 4 ) +
-				' ' +
-				digits.slice( 4, 8 ) +
-				' ' +
-				digits.slice( 8, 12 ) +
-				' ' +
-				digits.slice( 12, 16 );
-
-		return string.trim();
+		return formatCreditCard( nextValue );
 	},
 
 	unmask: function( value ) {
@@ -66,8 +80,28 @@ fieldMasks.cvv = {
 	unmask: identity,
 };
 
-function maskField( fieldName, previousValue, nextValue ) {
-	var fieldMask = fieldMasks[ fieldName ];
+// `document` is an EBANX field. Currently used for Brazilian CPF numbers
+// See isValidCPF() / ebanx.js
+fieldMasks.document = {
+	mask: function( previousValue, nextValue ) {
+		const digits = nextValue.replace( /[^0-9]/g, '' ),
+			string =
+				digits.slice( 0, 3 ) +
+				'.' +
+				digits.slice( 3, 6 ) +
+				'.' +
+				digits.slice( 6, 9 ) +
+				'-' +
+				digits.slice( 9, 11 );
+
+		return string.replace( /^[\s\.\-]+|[\s\.\-]+$/g, '' );
+	},
+
+	unmask: identity,
+};
+
+export function maskField( fieldName, previousValue, nextValue ) {
+	const fieldMask = fieldMasks[ fieldName ];
 	if ( ! fieldMask ) {
 		return nextValue;
 	}
@@ -75,16 +109,11 @@ function maskField( fieldName, previousValue, nextValue ) {
 	return fieldMask.mask( previousValue, nextValue );
 }
 
-function unmaskField( fieldName, previousValue, nextValue ) {
-	var fieldMask = fieldMasks[ fieldName ];
+export function unmaskField( fieldName, previousValue, nextValue ) {
+	const fieldMask = fieldMasks[ fieldName ];
 	if ( ! fieldMask ) {
 		return nextValue;
 	}
 
 	return fieldMask.unmask( fieldMask.mask( previousValue, nextValue ) );
 }
-
-export default {
-	maskField: maskField,
-	unmaskField: unmaskField,
-};
