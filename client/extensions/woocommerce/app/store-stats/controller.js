@@ -13,11 +13,10 @@ import { moment, translate } from 'i18n-calypso';
 import AsyncLoad from 'components/async-load';
 import StatsPagePlaceholder from 'my-sites/stats/stats-page-placeholder';
 import { setDocumentHeadTitle as setTitle } from 'state/document-head/actions';
-import { getQueryDate, getUnitPeriod, getQueries } from './utils';
+import { getQueryDate, getQueries } from './utils';
 import analytics from 'lib/analytics';
 import titlecase from 'to-title-case';
 import { recordTrack } from 'woocommerce/lib/analytics';
-import { UNITS } from './constants';
 import config from 'config';
 
 function isValidParameters( context ) {
