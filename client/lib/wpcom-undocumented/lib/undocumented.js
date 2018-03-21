@@ -2508,4 +2508,15 @@ Undocumented.prototype.checkSiteAddressAvailability = function( siteId, siteAddr
 	} );
 };
 
+Undocumented.prototype.checkSiteAddressValidation = function( siteId, siteAddress ) {
+	return this.wpcom.req.post(
+		{
+			path: `/sites/${ siteId }/site-rename/validation`,
+			apiNamespace: 'wpcom/v2',
+		},
+		{},
+		{ blogname: siteAddress }
+	);
+};
+
 export default Undocumented;
